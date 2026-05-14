@@ -1,0 +1,16 @@
+{
+  "name": "custom_ollama_local",
+  "engine": "openai",
+  "display_name": "Local Ollama OpenAI Compatible",
+  "description": "Local Ollama through the OpenAI-compatible chat completions API",
+  "api_key_env": "",
+  "base_url": "http://127.0.0.1:11434/v1/chat/completions",
+  "models": [
+    {
+      "name": "qwen3.5:9b",
+      "context_limit": 32768
+    }
+  ],
+  "supports_streaming": true,
+  "requires_auth": false
+}

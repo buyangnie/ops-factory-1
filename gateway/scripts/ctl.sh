@@ -255,6 +255,12 @@ build_knowledge_cli_mcp() {
         "${SERVICE_DIR}/agents/qa-cli-agent/config/mcp/knowledge-cli/dist/index.js"
 }
 
+build_local_tiny_tools_mcp() {
+    build_node_mcp "Local-Tiny-Tools" \
+        "${SERVICE_DIR}/agents/local-tiny-agent/config/mcp/local-tiny-tools" \
+        "${SERVICE_DIR}/agents/local-tiny-agent/config/mcp/local-tiny-tools/src/index.js"
+}
+
 # --- Agents (goosed) helpers ---
 shutdown_agents() {
     if pgrep -f goosed >/dev/null 2>&1; then
@@ -338,6 +344,7 @@ do_startup() {
     build_gateway
     build_knowledge_service_mcp
     build_knowledge_cli_mcp
+    build_local_tiny_tools_mcp
 
     local jar="${SERVICE_DIR}/gateway-service/target/gateway-service.jar"
     local lib_dir="${SERVICE_DIR}/gateway-service/target/lib"
