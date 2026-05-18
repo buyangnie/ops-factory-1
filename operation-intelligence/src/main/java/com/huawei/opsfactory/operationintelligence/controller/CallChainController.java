@@ -76,7 +76,10 @@ public class CallChainController {
             }
         }
 
-        validateTimeRange(request.getStartTime(), request.getEndTime());
+        ResponseStatusException validationError = validateTimeRange(request.getStartTime(), request.getEndTime());
+        if (validationError != null) {
+            return Mono.error(validationError);
+        }
 
         // 转换为内部格式
         List<Map<String, String>> conditions = request.getCondition().stream()
@@ -104,22 +107,25 @@ public class CallChainController {
 
     /**
      * Validate time range.
+     *
+     * @return ResponseStatusException if validation fails, null otherwise
      */
-    private void validateTimeRange(long startTime, long endTime) {
+    private ResponseStatusException validateTimeRange(long startTime, long endTime) {
         if (startTime <= 0 || endTime <= 0) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+            return new ResponseStatusException(HttpStatus.BAD_REQUEST,
                 "startTime and endTime are required and must be positive");
         }
         if (endTime <= startTime) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+            return new ResponseStatusException(HttpStatus.BAD_REQUEST,
                 "endTime must be greater than startTime");
         }
 
         long maxSpanMs = properties.getCallChain().getMaxTimeRangeMs();
         if (endTime - startTime > maxSpanMs) {
             long maxMinutes = maxSpanMs / 60000;
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+            return new ResponseStatusException(HttpStatus.BAD_REQUEST,
                 "time range must not exceed " + maxMinutes + " minutes");
         }
+        return null;
     }
 }
