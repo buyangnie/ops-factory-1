@@ -94,7 +94,12 @@ function WhitelistFormModal({
                 enabled,
             })
         } catch (err) {
-            setError(err instanceof Error ? err.message : 'Unknown error')
+            const message = err instanceof Error ? err.message : String(err)
+            if (message === 'Command whitelist entry conflict') {
+                setError(t('remoteDiagnosis.whitelist.duplicatePattern'))
+            } else {
+                setError(message)
+            }
         } finally {
             setSaving(false)
         }
@@ -252,6 +257,12 @@ export function WhitelistTab() {
         },
         [editingCommand, updateCommand, createCommand, fetchCommands, showToast, t],
     )
+
+    const handleCloseModal = useCallback(() => {
+        setShowAddModal(false)
+        setEditingCommand(null)
+        fetchCommands()
+    }, [fetchCommands])
 
     const handleToggleEnabled = useCallback(
         async (cmd: WhitelistCommand) => {
@@ -462,10 +473,7 @@ export function WhitelistTab() {
             {(showAddModal || editingCommand) && (
                 <WhitelistFormModal
                     command={editingCommand}
-                    onClose={() => {
-                        setShowAddModal(false)
-                        setEditingCommand(null)
-                    }}
+                    onClose={handleCloseModal}
                     onSave={handleSaveCommand}
                 />
             )}
