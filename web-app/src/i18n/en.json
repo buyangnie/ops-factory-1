@@ -2197,6 +2197,7 @@
     "businessIpInvalid": "Invalid business IP format",
     "usernameInvalidChars": "Username can only contain ASCII characters (no Chinese or other non-ASCII characters)",
     "credentialInvalidChars": "Credential can only contain ASCII characters (no Chinese or other non-ASCII characters)",
+    "invalidChars": "Contains invalid characters (< > \" ' &). These characters are not allowed for security reasons.",
     "duplicateIp": "This IP address is already used in the same environment group: {{ip}} (host: {{host}})",
     "hostCountUnit": "hosts",
     "noSourceRelations": "No outgoing relations",

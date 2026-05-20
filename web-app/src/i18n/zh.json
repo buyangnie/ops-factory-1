@@ -2197,6 +2197,7 @@
     "businessIpInvalid": "业务地址格式无效",
     "usernameInvalidChars": "用户名只能包含ASCII字符（不支持中文或其他非ASCII字符）",
     "credentialInvalidChars": "凭证只能包含ASCII字符（不支持中文或其他非ASCII字符）",
+    "invalidChars": "包含非法字符（< > \" ' &），这些字符因安全原因不允许使用",
     "duplicateIp": "该IP地址已在同一环境组下被使用：{{ip}}（主机：{{host}}）",
     "hostCountUnit": "台主机",
     "noSourceRelations": "暂无出向关系",

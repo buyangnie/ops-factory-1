@@ -2,6 +2,7 @@ import { useState, useCallback, useEffect, useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
 import type { HostGroup, Cluster, Host, CustomAttribute, HostCreateRequest, BusinessService, ClusterType, BusinessType, ClusterRelation } from '../../../../types/host'
 import { isValidIp } from '../../../../utils/ip-validation'
+import { validateAndSanitize } from '../../../../utils/inputValidation'
 import CustomAttributeEditor from './CustomAttributeEditor'
 import TopologyNodeIcon, { type TopologyNodeKind } from './TopologyNodeIcon'
 import SearchableSelect from '../../../platform/ui/forms/SearchableSelect'
@@ -242,13 +243,15 @@ export default function ResourceFormModal({
 
     const handleAddClusterRelation = useCallback(async (sourceType: 'cluster' | 'business-service', sourceId: string) => {
         if (!newRelTargetId) return
+        const descResult = validateAndSanitize(newRelDesc, t('hostResource.relationDesc'))
+        if (!descResult.valid) { setError(t('hostResource.invalidChars')); return }
         setError(null)
         try {
             await onSaveClusterRelation({
                 sourceType,
                 sourceId,
                 targetId: newRelTargetId,
-                description: newRelDesc.trim(),
+                description: descResult.sanitized,
             })
             setNewRelTargetId('')
             setNewRelDesc('')
@@ -256,22 +259,24 @@ export default function ResourceFormModal({
         } catch (err) {
             setError(err instanceof Error ? err.message : 'Failed')
         }
-    }, [newRelTargetId, newRelDesc, onSaveClusterRelation, fetchClusterRelations])
+    }, [newRelTargetId, newRelDesc, onSaveClusterRelation, fetchClusterRelations, t])
 
     const handleSaveRelationEdit = useCallback(async () => {
         if (!editingRelId) return
+        const descResult = validateAndSanitize(editRelDesc, t('hostResource.relationDesc'))
+        if (!descResult.valid) { setError(t('hostResource.invalidChars')); return }
         setError(null)
         try {
             await onUpdateClusterRelation(editingRelId, {
                 targetId: editRelTargetId,
-                description: editRelDesc.trim(),
+                description: descResult.sanitized,
             })
             setEditingRelId(null)
             await fetchClusterRelations()
         } catch (err) {
             setError(err instanceof Error ? err.message : 'Failed')
         }
-    }, [editingRelId, editRelTargetId, editRelDesc, onUpdateClusterRelation, fetchClusterRelations])
+    }, [editingRelId, editRelTargetId, editRelDesc, onUpdateClusterRelation, fetchClusterRelations, t])
 
     const handleDeleteClusterRelation = useCallback(async (relId: string) => {
         setError(null)
@@ -309,32 +314,95 @@ export default function ResourceFormModal({
         setSaving(true)
         try {
             if (selectedType === 'group') {
-                if (!groupName.trim()) { setError(t('hostResource.nameRequired')); setSaving(false); return }
-                await onSaveGroup({ name: groupName.trim(), code: groupCode.trim(), parentId: groupParentId || null, description: groupDescription.trim(), enabled: groupEnabled })
+                const nameResult = validateAndSanitize(groupName, t('hostResource.groupName'))
+                if (!nameResult.valid) { setError(t('hostResource.invalidChars')); setSaving(false); return }
+
+                const codeResult = validateAndSanitize(groupCode, t('hostResource.groupCode'))
+                if (!codeResult.valid) { setError(t('hostResource.invalidChars')); setSaving(false); return }
+
+                const descResult = validateAndSanitize(groupDescription, t('hostResource.description'))
+                if (!descResult.valid) { setError(t('hostResource.invalidChars')); setSaving(false); return }
+
+                if (!nameResult.sanitized) { setError(t('hostResource.nameRequired')); setSaving(false); return }
+
+                await onSaveGroup({
+                    name: nameResult.sanitized,
+                    code: codeResult.sanitized,
+                    parentId: groupParentId || null,
+                    description: descResult.sanitized,
+                    enabled: groupEnabled
+                })
             } else if (selectedType === 'cluster') {
-                if (!clusterName.trim()) { setError(t('hostResource.nameRequired')); setSaving(false); return }
-                if (!clusterType.trim()) { setError(t('hostResource.clusterTypeRequired')); setSaving(false); return }
+                const nameResult = validateAndSanitize(clusterName, t('hostResource.clusterName'))
+                if (!nameResult.valid) { setError(t('hostResource.invalidChars')); setSaving(false); return }
+
+                const typeResult = validateAndSanitize(clusterType, t('hostResource.clusterType'))
+                if (!typeResult.valid) { setError(t('hostResource.invalidChars')); setSaving(false); return }
+
+                const purposeResult = validateAndSanitize(clusterPurpose, t('hostResource.purpose'))
+                if (!purposeResult.valid) { setError(t('hostResource.invalidChars')); setSaving(false); return }
+
+                const descResult = validateAndSanitize(clusterDescription, t('hostResource.description'))
+                if (!descResult.valid) { setError(t('hostResource.invalidChars')); setSaving(false); return }
+
+                if (!nameResult.sanitized) { setError(t('hostResource.nameRequired')); setSaving(false); return }
+                if (!typeResult.sanitized) { setError(t('hostResource.clusterTypeRequired')); setSaving(false); return }
                 if (!clusterGroupId) { setError(t('hostResource.parentGroupRequired')); setSaving(false); return }
+
                 await onSaveCluster({
-                    name: clusterName.trim(), type: clusterType.trim(), purpose: clusterPurpose.trim(),
-                    groupId: clusterGroupId || null, description: clusterDescription.trim(),
+                    name: nameResult.sanitized,
+                    type: typeResult.sanitized,
+                    purpose: purposeResult.sanitized,
+                    groupId: clusterGroupId || null,
+                    description: descResult.sanitized,
                 })
             } else if (selectedType === 'business-service') {
-                if (!bsName.trim()) { setError(t('hostResource.nameRequired')); setSaving(false); return }
+                const nameResult = validateAndSanitize(bsName, t('hostResource.bsName'))
+                if (!nameResult.valid) { setError(t('hostResource.invalidChars')); setSaving(false); return }
+
+                const codeResult = validateAndSanitize(bsCode, t('hostResource.bsCode'))
+                if (!codeResult.valid) { setError(t('hostResource.invalidChars')); setSaving(false); return }
+
+                const descResult = validateAndSanitize(bsDescription, t('hostResource.description'))
+                if (!descResult.valid) { setError(t('hostResource.invalidChars')); setSaving(false); return }
+
+                if (!nameResult.sanitized) { setError(t('hostResource.nameRequired')); setSaving(false); return }
                 if (!bsGroupId) { setError(t('hostResource.parentGroupRequired')); setSaving(false); return }
+
                 await onSaveBusinessService({
-                    name: bsName.trim(),
-                    code: bsCode.trim(),
+                    name: nameResult.sanitized,
+                    code: codeResult.sanitized,
                     groupId: bsGroupId || null,
                     businessTypeId: bsSelectedBusinessTypeId || null,
                     hostIds: editingItem?.type === 'business-service' ? (editingItem.data.hostIds ?? []) : [],
                     tags: bsTags.split(',').map(s => s.trim()).filter(Boolean),
                     priority: bsPriority.trim(),
-                    description: bsDescription.trim(),
+                    description: descResult.sanitized,
                     contactInfo: '',
                 })
             } else if (selectedType === 'host') {
-                if (!hostName.trim() || !hostIp.trim()) { setError(t('hostResource.nameAndIpRequired')); setSaving(false); return }
+                const nameResult = validateAndSanitize(hostName, t('hostResource.hostName'))
+                if (!nameResult.valid) { setError(t('hostResource.invalidChars')); setSaving(false); return }
+
+                const hostnameResult = validateAndSanitize(hostname, t('hostResource.hostname'))
+                if (!hostnameResult.valid) { setError(t('hostResource.invalidChars')); setSaving(false); return }
+
+                const osResult = validateAndSanitize(hostOs, t('hostResource.os'))
+                if (!osResult.valid) { setError(t('hostResource.invalidChars')); setSaving(false); return }
+
+                const locationResult = validateAndSanitize(hostLocation, t('hostResource.location'))
+                if (!locationResult.valid) { setError(t('hostResource.invalidChars')); setSaving(false); return }
+
+                const purposeResult = validateAndSanitize(hostPurpose, t('hostResource.purpose'))
+                if (!purposeResult.valid) { setError(t('hostResource.invalidChars')); setSaving(false); return }
+
+                const businessResult = validateAndSanitize(hostBusiness, t('hostResource.business'))
+                if (!businessResult.valid) { setError(t('hostResource.invalidChars')); setSaving(false); return }
+
+                const descResult = validateAndSanitize(hostDescription, t('hostResource.description'))
+                if (!descResult.valid) { setError(t('hostResource.invalidChars')); setSaving(false); return }
+
+                if (!nameResult.sanitized || !hostIp.trim()) { setError(t('hostResource.nameAndIpRequired')); setSaving(false); return }
                 if (!isValidIp(hostIp)) { setError(t('hostResource.ipInvalid')); setSaving(false); return }
                 if (hostBusinessIp.trim() && !isValidIp(hostBusinessIp)) { setError(t('hostResource.businessIpInvalid')); setSaving(false); return }
                 if (hostUsername && !/^[\x00-\x7F]*$/.test(hostUsername)) {
@@ -344,7 +412,7 @@ export default function ResourceFormModal({
                     setError(t('hostResource.credentialInvalidChars')); setSaving(false); return
                 }
                 const editingHostId = editingItem?.type === 'host' ? editingItem.data.id : null
-                const trimmedHostName = hostName.trim()
+                const trimmedHostName = nameResult.sanitized
                 const duplicate = hosts.some(h => h.name?.toLowerCase() === trimmedHostName.toLowerCase() && h.id !== editingHostId)
                 if (duplicate) { setError(t('hostResource.duplicateName', { name: trimmedHostName })); setSaving(false); return }
 
@@ -370,10 +438,14 @@ export default function ResourceFormModal({
                 }
 
                 const payload: Record<string, unknown> = {
-                    name: hostName.trim(), hostname: hostname.trim() || null, ip: hostIp.trim(), port: hostPort,
-                    os: hostOs.trim() || null, location: hostLocation.trim() || null, username: hostUsername.trim(),
-                    authType: hostAuthType, clusterId: hostClusterId || null, purpose: hostPurpose.trim() || null,
-                    business: hostBusiness.trim() || null, description: hostDescription.trim(),
+                    name: nameResult.sanitized,
+                    hostname: hostnameResult.sanitized || null,
+                    ip: hostIp.trim(), port: hostPort,
+                    os: osResult.sanitized || null, location: locationResult.sanitized || null,
+                    username: hostUsername.trim(),
+                    authType: hostAuthType, clusterId: hostClusterId || null,
+                    purpose: purposeResult.sanitized || null,
+                    business: businessResult.sanitized || null, description: descResult.sanitized,
                     customAttributes: hostCustomAttributes.filter(attr => attr.key.trim().length > 0),
                     businessIp: hostBusinessIp.trim() || null,
                     role: hostRole || null,
