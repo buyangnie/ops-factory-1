@@ -1,0 +1,17 @@
+{
+    "gatewayUrl": "",
+    "gatewaySecretKey": "test",
+    "controlCenterUrl": "",
+    "controlCenterSecretKey": "change-me",
+    "knowledgeServiceUrl": "",
+    "businessIntelligenceServiceUrl": "",
+	"skillMarketServiceUrl": "",
+    "logging": {
+        "level": "info",
+        "consoleEnabled": true,
+        "bufferSize": 200,
+        "sink": "console",
+        "logDirectory": null
+    },
+    "port": 5173
+}
