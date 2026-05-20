@@ -1168,7 +1168,7 @@
     }
   },
   "history": {
-    "title": "Chat History",
+    "title": "History Records",
     "subtitle": "View and manage your previous chat sessions",
     "searchPlaceholder": "Search sessions...",
     "clearSearch": "Clear search",

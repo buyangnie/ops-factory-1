@@ -1168,7 +1168,7 @@
     }
   },
   "history": {
-    "title": "对话历史",
+    "title": "历史记录",
     "subtitle": "查看和管理之前的对话记录",
     "searchPlaceholder": "搜索会话...",
     "clearSearch": "清除搜索",
