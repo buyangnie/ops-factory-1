@@ -24,12 +24,12 @@ export function getUrlParam(name: string): string | null {
 export function isEmbedMode(): boolean {
     const urlValue = getUrlParam('embed')
     if (urlValue === 'true') {
-        sessionStorage.setItem(EMBED_SESSION_KEY, 'true')
+        try { sessionStorage.setItem(EMBED_SESSION_KEY, 'true') } catch { /* storage unavailable */ }
         return true
     }
     if (urlValue === 'false') {
-        sessionStorage.removeItem(EMBED_SESSION_KEY)
+        try { sessionStorage.removeItem(EMBED_SESSION_KEY) } catch { /* storage unavailable */ }
         return false
     }
-    return sessionStorage.getItem(EMBED_SESSION_KEY) === 'true'
+    try { return sessionStorage.getItem(EMBED_SESSION_KEY) === 'true' } catch { return false }
 }
