@@ -770,7 +770,7 @@ class XlsxBuilder:
         row = self._add_chart(ws, self.charts.chart_pers_top10_stacked_bar, personnel_priority, row=row)
         row = self._write_chart_desc(ws, "Performance Matrix (Volume vs MTTR)" if self.language == "en" else "绩效矩阵 (工单量 vs 平均解决时间)", row)
         row = self._add_chart(ws, self.charts.chart_pers_performance_matrix, personnel, row=row)
-        # Heatmap (uses "Resolver" column)
+        # Heatmap (uses "assigned_to" column)
         row = self._add_heatmap(ws, self.charts.chart_pers_skill_heatmap, ws, self.incidents_df, row, row=row)
 
         row = self._write_insight(ws, "personnel", row)

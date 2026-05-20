@@ -30,6 +30,7 @@ public class ExcelBiDataProvider implements BiDataProvider {
     private static final String CHANGES_FILE = "Changes-exported.xlsx";
     private static final String REQUESTS_FILE = "Requests-exported.xlsx";
     private static final String PROBLEMS_FILE = "Problems-exported.xlsx";
+    private static final String SLA_FILE = "SLAs-exported.xlsx";
 
     private final BusinessIntelligenceRuntimeProperties runtimeProperties;
     private final DataFormatter formatter = new DataFormatter();
@@ -42,21 +43,23 @@ public class ExcelBiDataProvider implements BiDataProvider {
     public BiRawData load() {
         Path baseDir = Paths.get(runtimeProperties.getBaseDir()).toAbsolutePath().normalize();
         List<Map<String, String>> incidents = readRows(baseDir.resolve(INCIDENTS_FILE), "Data");
-        List<Map<String, String>> incidentSlaCriteria = readRows(baseDir.resolve(INCIDENTS_FILE), "SLA_Criteria");
+        List<Map<String, String>> incidentSlaCriteria = readRows(baseDir.resolve(SLA_FILE), "Incidents_SLA");
+        List<Map<String, String>> requestSlaCriteria = readRows(baseDir.resolve(SLA_FILE), "Requests_SLA");
         List<Map<String, String>> changes = readRows(baseDir.resolve(CHANGES_FILE), "Data");
         List<Map<String, String>> requests = readRows(baseDir.resolve(REQUESTS_FILE), "Data");
         List<Map<String, String>> problems = readRows(baseDir.resolve(PROBLEMS_FILE), "Data");
         log.info(
-            "Loaded business intelligence source data baseDir={} incidents={} incidentSlaCriteria={} changes={} requests={} problems={}",
+            "Loaded business intelligence source data baseDir={} incidents={} incidentSlaCriteria={} requestSlaCriteria={} changes={} requests={} problems={}",
             baseDir,
             incidents.size(),
             incidentSlaCriteria.size(),
+            requestSlaCriteria.size(),
             changes.size(),
             requests.size(),
             problems.size()
         );
         List<Map<String, String>> enrichedIncidents = enrichIncidentsWithSla(incidents, incidentSlaCriteria);
-        return new BiRawData(enrichedIncidents, incidentSlaCriteria, changes, requests, problems);
+        return new BiRawData(enrichedIncidents, incidentSlaCriteria, changes, requests, problems, requestSlaCriteria);
     }
 
     private List<Map<String, String>> readRows(Path file, String sheetName) {
@@ -123,9 +126,9 @@ public class ExcelBiDataProvider implements BiDataProvider {
             return incidents;
         }
         Map<String, Double> responseTargets = buildCriteriaMap(criteria,
-            List.of("Response （minutes）", "Response (minutes)", "Response"));
+            List.of("response_sla_min"));
         Map<String, Double> resolutionTargets = buildCriteriaMap(criteria,
-            List.of("Resolution （hours）", "Resolution (hours)", "Resolution"));
+            List.of("resolution_sla_min"));
 
         for (Map<String, String> row : incidents) {
             String priority = row.getOrDefault(BiColumns.PRIORITY, "").trim();
@@ -141,7 +144,7 @@ public class ExcelBiDataProvider implements BiDataProvider {
                 } else {
                     double respMinutes = parseDouble(respRaw);
                     double resolMinutes = parseDouble(resolRaw);
-                    boolean met = respMinutes <= respTarget && resolMinutes / 60.0 <= resolTarget;
+                    boolean met = respMinutes <= respTarget && resolMinutes <= resolTarget;
                     row.put(BiColumns.SLA_COMPLIANT, met ? "Yes" : "No");
                 }
             }

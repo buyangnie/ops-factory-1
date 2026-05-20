@@ -19,80 +19,141 @@ The system automatically identifies risk signals such as: Incident SLA Rate < 70
 
 | Field | Type | Description |
 |-------|------|-------------|
-| Order Number | Text | Unique incident identifier |
-| Order Name | Text | Incident title/description |
-| Begin Date | DateTime | When incident was opened |
-| End Date | DateTime | When incident was closed |
-| Current Phase | Text | Current phase |
-| Priority | Text | P1/P2/P3/P4 |
-| Order Status | Text | Completed, Suspended, In Progress |
-| Category | Text | Incident type (Card, Compliance, Digital View Monitoring, etc.) |
-| Resolver | Text | Assigned person |
-| Response Time(m) | Number | Response time in minutes |
-| Resolution Time(m) | Number | Resolution time in minutes |
-| Resolution Date | DateTime | When resolved |
-| Total Time(m) | Number | Total duration in minutes |
-| Suspend Time(m) | Number | Paused duration |
-| SLA Compliant | Text | Computed: Yes/No. Derived by comparing Response Time(m) and Resolution Time(m) against per-priority SLA thresholds from the SLA_Criteria sheet. Can be used in query_tickets filters. |
+| ticket_id | Text | Unique incident identifier |
+| title | Text | Incident title |
+| description | Long text | Incident description |
+| status | Text | Closed, Suspended, In Progress |
+| status_reason | Text | Reason for current status |
+| priority | Text | P1/P2/P3/P4 |
+| category | Text | Incident type (Card, Compliance, Digital View Monitoring, etc.) |
+| subcategory | Text | Sub-category |
+| channel | Enum | Source channel |
+| requester | Text | Who reported the incident |
+| affected_user | Text | Impacted user |
+| affected_item | Text | Configuration item affected |
+| assigned_group | Text | Team assigned |
+| assigned_to | Text | Person assigned to resolve |
+| opened_at | DateTime | When incident was opened |
+| updated_at | DateTime | Last update time |
+| resolved_at | DateTime | When resolved |
+| closed_at | DateTime | When closed |
+| response_time_minutes | Number | Response time in minutes |
+| resolution_time_minutes | Number | Resolution time in minutes |
+| suspended_minutes | Number | Paused duration |
+| close_code | Text | Solved, Workaround, Duplicate, Not_reproducible, Cancelled |
+| close_notes | Long text | Closure notes |
+| major_incident | Boolean | Whether flagged as major incident |
+| problem_ids | Text | Linked problem IDs |
+| SLA Compliant | Text | Computed: Yes/No. Derived by comparing response_time_minutes and resolution_time_minutes against per-priority SLA thresholds from SLAs-exported.xlsx Incidents_SLA sheet. Can be used in query_tickets filters. |
 
 ### Changes (Changes-exported.xlsx)
 
 | Field | Type | Description |
 |-------|------|-------------|
-| Change Number | Text | Unique identifier (CHG*) |
-| Change Title | Text | Brief description |
-| Change Type | Text | Standard/Normal/Emergency |
-| Risk Level | Text | Low/Medium/High/Critical |
-| Status | Text | Current status |
-| Requested Date | DateTime | When change was requested |
-| Planned Start | DateTime | Scheduled start |
-| Planned End | DateTime | Scheduled end |
-| Actual Start | DateTime | Real start time |
-| Actual End | DateTime | Real end time |
-| Implementer | Text | Person/team implementing |
-| Category | Text | Application/Infrastructure/Database/Network/Security |
-| Success | Text | Yes/No |
-| Incident Caused | Text | Yes/No |
-| Related Incidents | Text | Comma-separated INC numbers |
-| Backout Performed | Text | Yes/No |
-| CI Affected | Text | Configuration item |
+| ticket_id | Text | Unique identifier (CHG*) |
+| title | Text | Brief description |
+| description | Long text | Change description |
+| status | Text | Current status (Closed, Cancelled, In Progress, Pending) |
+| status_reason | Text | Reason for current status |
+| priority | Text | P1/P2/P3/P4 |
+| category | Text | Application/Infrastructure/Database/Network/Security |
+| subcategory | Text | Sub-category |
+| channel | Enum | Source channel |
+| requester | Text | Who requested the change |
+| affected_user | Text | Impacted user |
+| affected_item | Text | Configuration item affected |
+| assigned_group | Text | Team assigned |
+| assigned_to | Text | Person implementing the change |
+| opened_at | DateTime | When change was requested |
+| updated_at | DateTime | Last update time |
+| resolved_at | DateTime | When resolved |
+| closed_at | DateTime | When closed |
+| close_code | Text | Successful, Failed, Cancelled |
+| close_notes | Long text | Closure notes |
+| approval_status | Text | Approved, Pending, Rejected |
+| approver | Text | Who approved the change |
+| change_type | Text | Standard/Normal/Emergency |
+| risk | Text | Low/Medium/High/Critical |
+| planned_start_at | DateTime | Scheduled start |
+| planned_end_at | DateTime | Scheduled end |
+| actual_start_at | DateTime | Real start time |
+| actual_end_at | DateTime | Real end time |
+| implementation_plan | Long text | Implementation details |
+| test_plan | Long text | Testing approach |
+| backout_plan | Long text | Rollback approach |
+| incident_ids | Text | Comma-separated INC numbers caused by this change (non-empty = incident caused) |
 
 ### Requests (Requests-exported.xlsx)
 
 | Field | Type | Description |
 |-------|------|-------------|
-| Request Number | Text | Unique identifier (REQ*) |
-| Request Title | Text | Brief description |
-| Request Type | Text | Access/Provisioning/Information/Standard Change |
-| Status | Text | Current status |
-| Requested Date | DateTime | When submitted |
-| Requester Dept | Text | Department |
-| Assignee | Text | Fulfillment person |
-| Category | Text | Request category |
-| Fulfillment Time(h) | Number | Hours to fulfill |
-| SLA Met | Text | Yes/No |
-| Satisfaction Score | Number | 1-5 scale |
-| Feedback | Text | User comments |
+| ticket_id | Text | Unique identifier (REQ*) |
+| title | Text | Brief description |
+| description | Long text | Request description |
+| status | Text | Current status (Closed, In Progress, Pending, Fulfilled, Cancelled) |
+| status_reason | Text | Reason for current status |
+| priority | Text | P1/P2/P3/P4 |
+| category | Text | Request category (User Access, Provisioning, Query, Billing, Account) |
+| subcategory | Text | Sub-category |
+| channel | Enum | Source channel |
+| requester | Text | Who submitted the request |
+| affected_user | Text | Impacted user |
+| affected_item | Text | Configuration item |
+| assigned_group | Text | Team assigned |
+| assigned_to | Text | Fulfillment person |
+| opened_at | DateTime | When submitted |
+| updated_at | DateTime | Last update time |
+| resolved_at | DateTime | When resolved |
+| closed_at | DateTime | When closed |
+| response_time_minutes | Number | Response time in minutes |
+| resolution_time_minutes | Number | Fulfillment time in minutes (divide by 60 for hours) |
+| suspended_minutes | Number | Paused duration |
+| close_code | Text | Fulfilled, Cancelled |
+| close_notes | Long text | Closure notes |
+| catalog_item | Text | Service catalog item (Access, Provisioning, Information, Standard Change) |
+| approval_status | Text | Approval status |
+| approver | Text | Who approved |
+| fulfilled_at | DateTime | When fulfilled |
+| request_variables | Text | Request details |
+| satisfaction_score | Number | 1-5 scale |
+| requester_dept | Text | Department |
+| feedback | Text | User comments |
+| change_ids | Text | Linked change IDs |
+| incident_ids | Text | Linked incident IDs |
+
+Note: Request SLA compliance is computed by comparing resolution_time_minutes against per-priority thresholds from SLAs-exported.xlsx Requests_SLA sheet, not from a raw SLA Met column.
 
 ### Problems (Problems-exported.xlsx)
 
 | Field | Type | Description |
 |-------|------|-------------|
-| Problem Number | Text | Unique identifier (PRB*) |
-| Problem Title | Text | Brief description |
-| Priority | Text | P1/P2/P3/P4 |
-| Status | Text | Current status |
-| Logged Date | DateTime | When created |
-| Resolution Date | DateTime | When resolved |
-| Root Cause | Text | Identified root cause |
-| Root Cause Category | Text | Human Error/Process Gap/Technical Defect/Vendor Issue/Unknown |
-| Known Error | Text | Yes/No |
-| Workaround Available | Text | Yes/No |
-| Permanent Fix Implemented | Text | Yes/No |
-| Related Incidents | Number | Count of linked incidents |
-| Category | Text | Problem category |
-| CI Affected | Text | Configuration item |
-| Resolver | Text | Person who resolved |
+| ticket_id | Text | Unique identifier (PRB*) |
+| title | Text | Brief description |
+| description | Long text | Problem description |
+| status | Text | Current status (Open, In Progress, Known Error, Resolved, Closed) |
+| status_reason | Text | Reason for current status |
+| priority | Text | P1/P2/P3/P4 |
+| category | Text | Problem category (Application, Infrastructure, Database, Network, Security) |
+| subcategory | Text | Sub-category |
+| channel | Enum | Source channel |
+| requester | Text | Who reported the problem |
+| affected_user | Text | Impacted user |
+| affected_item | Text | Configuration item |
+| assigned_group | Text | Team assigned |
+| assigned_to | Text | Person assigned |
+| opened_at | DateTime | When created |
+| updated_at | DateTime | Last update time |
+| resolved_at | DateTime | When resolved |
+| closed_at | DateTime | When closed |
+| close_code | Text | Fix_applied, Risk_accepted, Workaround_applied, Duplicate |
+| close_notes | Long text | Closure notes |
+| known_error | Boolean | TRUE/FALSE |
+| root_cause | Long text | Identified root cause description |
+| cause_code | Text | Human Error/Process Gap/Technical Defect/Vendor Issue/Configuration Error/Unknown |
+| workaround | Long text | Workaround description (non-empty = workaround available) |
+| permanent_fix | Long text | Permanent fix description (non-empty = fix implemented) |
+| related_incident_count | Number | Count of linked incidents |
+| permanent_fix_change_id | Text | Change ID that applied the permanent fix |
 
 ## Output Format
 

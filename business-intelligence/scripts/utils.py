@@ -9,10 +9,10 @@ from pathlib import Path
 from typing import Optional, List, Tuple, Dict
 
 
-def load_excel_data(file_path: Path) -> Tuple[pd.DataFrame, pd.DataFrame]:
-    """Load incident data and SLA criteria from Excel file."""
-    sla_df = pd.read_excel(file_path, sheet_name="SLA_Criteria")
-    data_df = pd.read_excel(file_path, sheet_name="Data")
+def load_excel_data(incident_file: Path, sla_file: Path) -> Tuple[pd.DataFrame, pd.DataFrame]:
+    """Load incident data and SLA criteria from separate Excel files."""
+    sla_df = pd.read_excel(sla_file, sheet_name="Incidents_SLA")
+    data_df = pd.read_excel(incident_file, sheet_name="Data")
     return data_df, sla_df
 
 
@@ -21,28 +21,28 @@ def clean_data(df: pd.DataFrame, excluded_resolvers: List[str]) -> pd.DataFrame:
     df = df.copy()
     
     # Remove excluded resolvers
-    df = df[~df["Resolver"].isin(excluded_resolvers)]
-    df = df[df["Resolver"].notna()]
-    df = df[df["Resolver"].str.strip() != ""]
-    
+    df = df[~df["assigned_to"].isin(excluded_resolvers)]
+    df = df[df["assigned_to"].notna()]
+    df = df[df["assigned_to"].str.strip() != ""]
+
     # Remove invalid resolution times
-    if "Resolution Time(m)" in df.columns:
-        df = df[df["Resolution Time(m)"] >= 0]
-    
+    if "resolution_time_minutes" in df.columns:
+        df = df[df["resolution_time_minutes"] >= 0]
+
     # Convert date columns
-    date_columns = ["Begin Date", "Resolution Date", "End Date"]
+    date_columns = ["opened_at", "resolved_at", "closed_at"]
     for col in date_columns:
         if col in df.columns:
             df[col] = pd.to_datetime(df[col], errors="coerce")
-    
+
     # Add computed columns
-    if "Resolution Time(m)" in df.columns:
-        df["Resolution_Hours"] = df["Resolution Time(m)"] / 60
+    if "resolution_time_minutes" in df.columns:
+        df["Resolution_Hours"] = df["resolution_time_minutes"] / 60
     
     return df
 
 
-def get_date_range(df: pd.DataFrame, date_column: str = "Begin Date") -> Tuple[datetime, datetime]:
+def get_date_range(df: pd.DataFrame, date_column: str = "opened_at") -> Tuple[datetime, datetime]:
     """Get the date range from a DataFrame."""
     if date_column not in df.columns:
         return datetime.now(), datetime.now()
@@ -54,7 +54,7 @@ def get_date_range(df: pd.DataFrame, date_column: str = "Begin Date") -> Tuple[d
     return dates.min().to_pydatetime(), dates.max().to_pydatetime()
 
 
-def get_data_span_days(df: pd.DataFrame, date_column: str = "Begin Date") -> int:
+def get_data_span_days(df: pd.DataFrame, date_column: str = "opened_at") -> int:
     """Get the number of days in the data span."""
     start, end = get_date_range(df, date_column)
     return (end - start).days
@@ -64,7 +64,7 @@ def filter_by_period(
     df: pd.DataFrame,
     start_date: datetime,
     end_date: datetime,
-    date_column: str = "Begin Date"
+    date_column: str = "opened_at"
 ) -> pd.DataFrame:
     """Filter DataFrame by date range."""
     if date_column not in df.columns:

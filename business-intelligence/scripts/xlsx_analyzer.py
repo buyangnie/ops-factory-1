@@ -248,11 +248,6 @@ class ActionPlanRow:
 # Helper utilities
 # =============================================================================
 
-def _bool_col(series: pd.Series) -> pd.Series:
-    """Convert a boolean-ish column to actual bool."""
-    return series.astype(str).str.strip().str.lower().isin(["yes", "true", "1"])
-
-
 def _safe_col(df: pd.DataFrame, col: str) -> pd.Series:
     """Return column if exists, else Series of NaN."""
     if df is None or col not in df.columns:
@@ -294,17 +289,17 @@ class XlsxDetailAnalyzer:
     # -----------------------------------------------------------------
 
     def priority_breakdown(self) -> List[PriorityRow]:
-        if not _nonempty(self.inc) or "Priority" not in self.inc.columns:
+        if not _nonempty(self.inc) or "priority" not in self.inc.columns:
             return []
         df = self.inc
         total = len(df)
         rows: List[PriorityRow] = []
         cum = 0.0
-        for priority, grp in df.groupby("Priority", sort=False):
+        for priority, grp in df.groupby("priority", sort=False):
             cnt = len(grp)
             pct = safe_divide(cnt, total)
             cum += pct
-            rt = _safe_col(grp, "Resolution Time(m)")
+            rt = _safe_col(grp, "resolution_time_minutes")
             rt_valid = rt.dropna()
 
             # SLA rates — compute from Resolution Time(m) vs sla_map threshold
@@ -319,15 +314,15 @@ class XlsxDetailAnalyzer:
                 else:
                     sla_minutes = float(sla_val) * 60
 
-                if "Resolution Time(m)" in grp.columns:
-                    rt_vals = grp["Resolution Time(m)"].dropna()
+                if "resolution_time_minutes" in grp.columns:
+                    rt_vals = grp["resolution_time_minutes"].dropna()
                     compliant_count = (rt_vals <= sla_minutes).sum()
                     res_sla = safe_divide(compliant_count, len(rt_vals))
                     violation = int((rt_vals > sla_minutes).sum())
 
                 # Response SLA (if Response Time(m) exists and has non-zero values)
-                if "Response Time(m)" in grp.columns:
-                    resp_vals = grp["Response Time(m)"].dropna()
+                if "response_time_minutes" in grp.columns:
+                    resp_vals = grp["response_time_minutes"].dropna()
                     resp_vals = resp_vals[resp_vals > 0]  # skip zeros (no response tracking)
                     if len(resp_vals) > 0:
                         if isinstance(sla_val, dict):
@@ -353,21 +348,21 @@ class XlsxDetailAnalyzer:
         return rows
 
     def category_breakdown(self, top_n: int = 20) -> List[CategoryRow]:
-        if not _nonempty(self.inc) or "Category" not in self.inc.columns:
+        if not _nonempty(self.inc) or "category" not in self.inc.columns:
             return []
         df = self.inc
         total = len(df)
-        counts = df["Category"].value_counts().head(top_n)
+        counts = df["category"].value_counts().head(top_n)
         rows: List[CategoryRow] = []
         cum = 0.0
         for cat, cnt in counts.items():
-            grp = df[df["Category"] == cat]
+            grp = df[df["category"] == cat]
             pct = safe_divide(cnt, total)
             cum += pct
-            rt = _safe_col(grp, "Resolution Time(m)").dropna()
+            rt = _safe_col(grp, "resolution_time_minutes").dropna()
             pdist: Dict[str, int] = {}
-            if "Priority" in grp.columns:
-                pdist = grp["Priority"].value_counts().to_dict()
+            if "priority" in grp.columns:
+                pdist = grp["priority"].value_counts().to_dict()
                 pdist = {str(k): int(v) for k, v in pdist.items()}
             rows.append(CategoryRow(
                 category=str(cat),
@@ -392,12 +387,12 @@ class XlsxDetailAnalyzer:
             return []
         df = self.inc
         violations: List[SLAViolation] = []
-        if "Resolution Time(m)" not in df.columns:
+        if "resolution_time_minutes" not in df.columns:
             return []
         # Find violations: Resolution Time(m) > SLA threshold
         for _, row in df.iterrows():
-            priority = str(row.get("Priority", "P3"))
-            rt = row.get("Resolution Time(m)", None)
+            priority = str(row.get("priority", "P3"))
+            rt = row.get("resolution_time_minutes", None)
             if rt is None or pd.isna(rt):
                 continue
             sla_val = self.sla_map.get(priority)
@@ -412,7 +407,7 @@ class XlsxDetailAnalyzer:
 
             # Extract month from incident date for heatmap
             month_str = ""
-            for date_col in ["Begin Date", "begin_date", "Created Date"]:
+            for date_col in ["opened_at"]:
                 if date_col in row.index:
                     try:
                         dt = pd.to_datetime(row[date_col])
@@ -423,13 +418,13 @@ class XlsxDetailAnalyzer:
                     break
 
             violations.append(SLAViolation(
-                order_number=str(row.get("Order Number", "N/A")),
+                order_number=str(row.get("ticket_id", "N/A")),
                 priority=priority,
-                category=str(row.get("Category", "N/A")),
+                category=str(row.get("category", "N/A")),
                 violation_type="Resolution",
                 overtime=overtime_str,
-                resolver=str(row.get("Resolver", "N/A")),
-                status=str(row.get("Order Status", "N/A")),
+                resolver=str(row.get("assigned_to", "N/A")),
+                status=str(row.get("status", "N/A")),
                 reason=reason,
                 month=month_str,
             ))
@@ -474,23 +469,24 @@ class XlsxDetailAnalyzer:
     # -----------------------------------------------------------------
 
     def change_type_breakdown(self) -> List[ChangeDetailRow]:
-        if not _nonempty(self.chg) or "Change Type" not in self.chg.columns:
+        if not _nonempty(self.chg) or "change_type" not in self.chg.columns:
             return []
         df = self.chg
         total = len(df)
         rows: List[ChangeDetailRow] = []
-        for ctype, grp in df.groupby("Change Type", sort=False):
+        for ctype, grp in df.groupby("change_type", sort=False):
             cnt = len(grp)
             success = 0.0
-            if "Success" in grp.columns:
-                success = safe_divide(_bool_col(grp["Success"]).sum(), cnt)
+            if "close_code" in grp.columns:
+                success = safe_divide((grp["close_code"].astype(str).str.strip() == "Successful").sum(), cnt)
             incident_rate = 0.0
-            if "Incident Caused" in grp.columns:
-                incident_rate = safe_divide(_bool_col(grp["Incident Caused"]).sum(), cnt)
+            if "incident_ids" in grp.columns:
+                incident_ids_valid = grp["incident_ids"].notna() & (grp["incident_ids"].astype(str).str.strip() != "")
+                incident_rate = safe_divide(incident_ids_valid.sum(), cnt)
             duration = 0.0
-            if "Actual Start" in grp.columns and "Actual End" in grp.columns:
-                starts = pd.to_datetime(grp["Actual Start"], errors="coerce")
-                ends = pd.to_datetime(grp["Actual End"], errors="coerce")
+            if "actual_start_at" in grp.columns and "actual_end_at" in grp.columns:
+                starts = pd.to_datetime(grp["actual_start_at"], errors="coerce")
+                ends = pd.to_datetime(grp["actual_end_at"], errors="coerce")
                 dur = (ends - starts).dt.total_seconds() / 3600
                 dur_valid = dur.dropna()
                 duration = float(dur_valid.mean()) if len(dur_valid) else 0.0
@@ -505,21 +501,21 @@ class XlsxDetailAnalyzer:
         return rows
 
     def change_category_breakdown(self) -> List[ChangeCategoryRow]:
-        if not _nonempty(self.chg) or "Category" not in self.chg.columns:
+        if not _nonempty(self.chg) or "category" not in self.chg.columns:
             return []
         df = self.chg
         rows: List[ChangeCategoryRow] = []
-        for cat, grp in df.groupby("Category", sort=False):
+        for cat, grp in df.groupby("category", sort=False):
             cnt = len(grp)
             success = 0.0
             fail = 0
-            if "Success" in grp.columns:
-                succ_mask = _bool_col(grp["Success"])
+            if "close_code" in grp.columns:
+                succ_mask = grp["close_code"].astype(str).str.strip() == "Successful"
                 success = safe_divide(succ_mask.sum(), cnt)
                 fail = int((~succ_mask).sum())
             inc_cnt = 0
-            if "Incident Caused" in grp.columns:
-                inc_cnt = int(_bool_col(grp["Incident Caused"]).sum())
+            if "incident_ids" in grp.columns:
+                inc_cnt = int((grp["incident_ids"].notna() & (grp["incident_ids"].astype(str).str.strip() != "")).sum())
             risk = "Low"
             if safe_divide(fail, cnt) > 0.2 or safe_divide(inc_cnt, cnt) > 0.1:
                 risk = "High"
@@ -540,26 +536,26 @@ class XlsxDetailAnalyzer:
     # -----------------------------------------------------------------
 
     def request_type_breakdown(self) -> List[RequestTypeRow]:
-        if not _nonempty(self.req) or "Request Type" not in self.req.columns:
+        if not _nonempty(self.req) or "catalog_item" not in self.req.columns:
             return []
         df = self.req
         total = len(df)
         rows: List[RequestTypeRow] = []
-        for rtype, grp in df.groupby("Request Type", sort=False):
+        for rtype, grp in df.groupby("catalog_item", sort=False):
             cnt = len(grp)
             comp_rate = 0.0
-            if "Status" in grp.columns:
-                completed = grp["Status"].astype(str).str.strip().str.lower().isin(
+            if "status" in grp.columns:
+                completed = grp["status"].astype(str).str.strip().str.lower().isin(
                     ["completed", "fulfilled", "closed", "resolved"]
                 )
                 comp_rate = safe_divide(completed.sum(), cnt)
             avg_fulfill = 0.0
-            if "Fulfillment Time(h)" in grp.columns:
-                ft = grp["Fulfillment Time(h)"].dropna()
-                avg_fulfill = float(ft.mean()) if len(ft) else 0.0
+            if "resolution_time_minutes" in grp.columns:
+                ft = grp["resolution_time_minutes"].dropna()
+                avg_fulfill = float(ft.mean()) / 60 if len(ft) else 0.0
             csat = 0.0
-            if "Satisfaction Score" in grp.columns:
-                scores = pd.to_numeric(grp["Satisfaction Score"], errors="coerce").dropna()
+            if "satisfaction_score" in grp.columns:
+                scores = pd.to_numeric(grp["satisfaction_score"], errors="coerce").dropna()
                 csat = float(scores.mean()) if len(scores) else 0.0
             rows.append(RequestTypeRow(
                 request_type=str(rtype),
@@ -572,9 +568,9 @@ class XlsxDetailAnalyzer:
         return rows
 
     def csat_distribution(self) -> List[CSATBucket]:
-        if not _nonempty(self.req) or "Satisfaction Score" not in self.req.columns:
+        if not _nonempty(self.req) or "satisfaction_score" not in self.req.columns:
             return []
-        scores = pd.to_numeric(self.req["Satisfaction Score"], errors="coerce").dropna()
+        scores = pd.to_numeric(self.req["satisfaction_score"], errors="coerce").dropna()
         if len(scores) == 0:
             return []
         labels = {5: "Very Satisfied", 4: "Satisfied", 3: "Neutral", 2: "Dissatisfied", 1: "Very Dissatisfied"}
@@ -599,7 +595,7 @@ class XlsxDetailAnalyzer:
     # -----------------------------------------------------------------
 
     def problem_status_breakdown(self) -> List[ProblemStatusRow]:
-        if not _nonempty(self.prb) or "Status" not in self.prb.columns:
+        if not _nonempty(self.prb) or "status" not in self.prb.columns:
             return []
         df = self.prb
         total = len(df)
@@ -611,11 +607,11 @@ class XlsxDetailAnalyzer:
             "resolved": "Verify fix effectiveness",
             "closed": "Archive and update knowledge base",
         }
-        for status, grp in df.groupby("Status", sort=False):
+        for status, grp in df.groupby("status", sort=False):
             cnt = len(grp)
             avg_age = 0.0
-            if "Logged Date" in grp.columns:
-                logged = pd.to_datetime(grp["Logged Date"], errors="coerce")
+            if "opened_at" in grp.columns:
+                logged = pd.to_datetime(grp["opened_at"], errors="coerce")
                 ages = (pd.Timestamp.now() - logged).dt.days
                 ages_valid = ages.dropna()
                 avg_age = float(ages_valid.mean()) if len(ages_valid) else 0.0
@@ -631,23 +627,20 @@ class XlsxDetailAnalyzer:
         return rows
 
     def root_cause_category_breakdown(self) -> List[RootCauseCategoryRow]:
-        if not _nonempty(self.prb) or "Root Cause Category" not in self.prb.columns:
+        if not _nonempty(self.prb) or "cause_code" not in self.prb.columns:
             return []
         df = self.prb
         total = len(df)
         rows: List[RootCauseCategoryRow] = []
-        for cat, grp in df.groupby("Root Cause Category", sort=False):
+        for cat, grp in df.groupby("cause_code", sort=False):
             cnt = len(grp)
             related = 0
-            if "Related Incidents" in grp.columns:
-                ri = grp["Related Incidents"].dropna().astype(str)
-                for v in ri:
-                    parts = [p.strip() for p in v.replace(";", ",").split(",") if p.strip()]
-                    related += len(parts)
+            if "related_incident_count" in grp.columns:
+                related = int(pd.to_numeric(grp["related_incident_count"], errors="coerce").fillna(0).sum())
             fix_rate = 0.0
-            if "Permanent Fix Implemented" in grp.columns:
-                fix_rate = safe_divide(_bool_col(grp["Permanent Fix Implemented"]).sum(), cnt)
-            typical = str(grp.iloc[0].get("Problem Title", "N/A")) if len(grp) else "N/A"
+            if "permanent_fix" in grp.columns:
+                fix_rate = safe_divide((grp["permanent_fix"].notna() & (grp["permanent_fix"].astype(str).str.strip() != "")).sum(), cnt)
+            typical = str(grp.iloc[0].get("title", "N/A")) if len(grp) else "N/A"
             rows.append(RootCauseCategoryRow(
                 category=str(cat),
                 count=cnt,
@@ -667,15 +660,15 @@ class XlsxDetailAnalyzer:
             return []
         df = self.chg
         links: List[CrossProcessLink] = []
-        if "Incident Caused" not in df.columns or "Related Incidents" not in df.columns:
+        if "incident_ids" not in df.columns:
             return []
-        caused = df[_bool_col(df["Incident Caused"])]
+        caused = df[df["incident_ids"].notna() & (df["incident_ids"].astype(str).str.strip() != "")]
         for _, row in caused.iterrows():
-            ri = str(row.get("Related Incidents", ""))
+            ri = str(row.get("incident_ids", ""))
             ids = [p.strip() for p in ri.replace(";", ",").split(",") if p.strip()]
             impact = "High" if len(ids) > 2 else ("Medium" if len(ids) > 0 else "Low")
             links.append(CrossProcessLink(
-                source_id=str(row.get("Change Number", "N/A")),
+                source_id=str(row.get("ticket_id", "N/A")),
                 source_type="Change",
                 target_count=len(ids),
                 target_ids=", ".join(ids) if ids else "N/A",
@@ -688,19 +681,22 @@ class XlsxDetailAnalyzer:
             return []
         df = self.prb
         links: List[CrossProcessLink] = []
-        if "Related Incidents" not in df.columns:
+        if "related_incident_count" not in df.columns:
             return []
         for _, row in df.iterrows():
-            ri = str(row.get("Related Incidents", ""))
-            ids = [p.strip() for p in ri.replace(";", ",").split(",") if p.strip()]
-            if not ids:
+            ri_val = row.get("related_incident_count", 0)
+            try:
+                count = int(float(ri_val)) if pd.notna(ri_val) and str(ri_val).strip() else 0
+            except (ValueError, TypeError):
+                count = 0
+            if count <= 0:
                 continue
-            impact = "High" if len(ids) > 3 else ("Medium" if len(ids) > 1 else "Low")
+            impact = "High" if count > 3 else ("Medium" if count > 1 else "Low")
             links.append(CrossProcessLink(
-                source_id=str(row.get("Problem Number", "N/A")),
+                source_id=str(row.get("ticket_id", "N/A")),
                 source_type="Problem",
-                target_count=len(ids),
-                target_ids=", ".join(ids),
+                target_count=count,
+                target_ids=f"{count} incidents",
                 impact=impact,
             ))
         return links
@@ -710,20 +706,20 @@ class XlsxDetailAnalyzer:
     # -----------------------------------------------------------------
 
     def personnel_breakdown(self) -> List[PersonnelRow]:
-        if not _nonempty(self.inc) or "Resolver" not in self.inc.columns:
+        if not _nonempty(self.inc) or "assigned_to" not in self.inc.columns:
             return []
         df = self.inc
         total = len(df)
         rows: List[PersonnelRow] = []
-        for name, grp in df.groupby("Resolver", sort=False):
+        for name, grp in df.groupby("assigned_to", sort=False):
             cnt = len(grp)
-            rt = _safe_col(grp, "Resolution Time(m)").dropna()
+            rt = _safe_col(grp, "resolution_time_minutes").dropna()
             avg_rt = float(rt.mean()) if len(rt) else 0.0
 
             # Completion rate
             comp = 0.0
-            if "Order Status" in grp.columns:
-                done = grp["Order Status"].astype(str).str.strip().str.lower().isin(
+            if "status" in grp.columns:
+                done = grp["status"].astype(str).str.strip().str.lower().isin(
                     ["closed", "resolved", "completed"]
                 )
                 comp = safe_divide(done.sum(), cnt)
@@ -731,12 +727,12 @@ class XlsxDetailAnalyzer:
             # SLA rates
             resp_sla = 0.0
             res_sla = 0.0
-            if "Resolution Time(m)" in grp.columns and "Priority" in grp.columns:
+            if "resolution_time_minutes" in grp.columns and "priority" in grp.columns:
                 res_ok = 0
                 res_total = 0
                 for _, r in grp.iterrows():
-                    p = str(r.get("Priority", ""))
-                    rt_val = r.get("Resolution Time(m)", None)
+                    p = str(r.get("priority", ""))
+                    rt_val = r.get("resolution_time_minutes", None)
                     if pd.notna(rt_val) and p in self.sla_map:
                         sla_val = self.sla_map[p]
                         sla_min = float(sla_val) * 60 if not isinstance(sla_val, dict) else sla_val.get("resolution_hours", 24) * 60
@@ -744,12 +740,12 @@ class XlsxDetailAnalyzer:
                         if rt_val <= sla_min:
                             res_ok += 1
                 res_sla = safe_divide(res_ok, res_total)
-            if "Response Time(m)" in grp.columns and "Priority" in grp.columns:
+            if "response_time_minutes" in grp.columns and "priority" in grp.columns:
                 resp_ok = 0
                 resp_total = 0
                 for _, r in grp.iterrows():
-                    p = str(r.get("Priority", ""))
-                    resp_t = r.get("Response Time(m)", None)
+                    p = str(r.get("priority", ""))
+                    resp_t = r.get("response_time_minutes", None)
                     if pd.notna(resp_t) and p in self.sla_map:
                         sla_val = self.sla_map[p]
                         if isinstance(sla_val, dict):
@@ -775,8 +771,8 @@ class XlsxDetailAnalyzer:
 
             # Specialty
             specialty = "General"
-            if "Category" in grp.columns:
-                top_cat = grp["Category"].value_counts()
+            if "category" in grp.columns:
+                top_cat = grp["category"].value_counts()
                 if len(top_cat) > 0:
                     specialty = str(top_cat.index[0])
 
@@ -795,13 +791,13 @@ class XlsxDetailAnalyzer:
 
     def personnel_priority_breakdown(self) -> List[PersonnelPriorityRow]:
         """Compute personnel breakdown with priority distribution."""
-        if not _nonempty(self.inc) or "Resolver" not in self.inc.columns or "Priority" not in self.inc.columns:
+        if not _nonempty(self.inc) or "assigned_to" not in self.inc.columns or "priority" not in self.inc.columns:
             return []
         df = self.inc
         rows: List[PersonnelPriorityRow] = []
 
-        for name, grp in df.groupby("Resolver", sort=False):
-            priority_counts = grp["Priority"].value_counts().to_dict()
+        for name, grp in df.groupby("assigned_to", sort=False):
+            priority_counts = grp["priority"].value_counts().to_dict()
             p1 = int(priority_counts.get("P1", 0))
             p2 = int(priority_counts.get("P2", 0))
             p3 = int(priority_counts.get("P3", 0))
@@ -863,14 +859,14 @@ class XlsxDetailAnalyzer:
         return rows
 
     def skill_coverage(self) -> List[SkillCoverage]:
-        if not _nonempty(self.inc) or "Category" not in self.inc.columns or "Resolver" not in self.inc.columns:
+        if not _nonempty(self.inc) or "category" not in self.inc.columns or "assigned_to" not in self.inc.columns:
             return []
         df = self.inc
         rows: List[SkillCoverage] = []
-        total_resolvers = df["Resolver"].nunique()
-        for cat, grp in df.groupby("Category", sort=False):
-            handlers = grp["Resolver"].nunique()
-            primary = str(grp["Resolver"].value_counts().index[0]) if len(grp) > 0 else "N/A"
+        total_resolvers = df["assigned_to"].nunique()
+        for cat, grp in df.groupby("category", sort=False):
+            handlers = grp["assigned_to"].nunique()
+            primary = str(grp["assigned_to"].value_counts().index[0]) if len(grp) > 0 else "N/A"
             coverage = safe_divide(handlers, total_resolvers)
             if handlers <= 1:
                 risk = "High"
@@ -906,26 +902,26 @@ class XlsxDetailAnalyzer:
                     periods[key] = MonthlyTrend(period=key)
                 setattr(periods[key], attr, getattr(periods[key], attr) + 1)
 
-        _add_counts(self.inc, "Begin Date", "incident_count")
-        _add_counts(self.chg, "Requested Date", "change_count")
-        _add_counts(self.req, "Requested Date", "request_count")
-        _add_counts(self.prb, "Logged Date", "problem_count")
+        _add_counts(self.inc, "opened_at", "incident_count")
+        _add_counts(self.chg, "opened_at", "change_count")
+        _add_counts(self.req, "opened_at", "request_count")
+        _add_counts(self.prb, "opened_at", "problem_count")
 
         # Compute per-period metrics for incidents
-        if _nonempty(self.inc) and "Begin Date" in self.inc.columns:
+        if _nonempty(self.inc) and "opened_at" in self.inc.columns:
             df = self.inc.copy()
-            df["_month"] = pd.to_datetime(df["Begin Date"], errors="coerce").dt.strftime("%Y-%m")
+            df["_month"] = pd.to_datetime(df["opened_at"], errors="coerce").dt.strftime("%Y-%m")
             for month, grp in df.groupby("_month", sort=False):
                 if month in periods:
-                    if "Resolution Time(m)" in grp.columns:
-                        rt = grp["Resolution Time(m)"].dropna()
+                    if "resolution_time_minutes" in grp.columns:
+                        rt = grp["resolution_time_minutes"].dropna()
                         periods[month].avg_resolution_min = float(rt.mean()) if len(rt) else 0.0
-                    if "Resolution Time(m)" in grp.columns:
+                    if "resolution_time_minutes" in grp.columns:
                         compliant = 0
                         total_with_rt = 0
                         for _, r in grp.iterrows():
-                            p = str(r.get("Priority", "P3"))
-                            rt_val = r.get("Resolution Time(m)")
+                            p = str(r.get("priority", "P3"))
+                            rt_val = r.get("resolution_time_minutes")
                             if pd.notna(rt_val):
                                 total_with_rt += 1
                                 sla_v = self.sla_map.get(p)
@@ -934,17 +930,17 @@ class XlsxDetailAnalyzer:
                                     if rt_val <= sla_min:
                                         compliant += 1
                         periods[month].completion_rate = safe_divide(compliant, total_with_rt)
-                    if "Priority" in grp.columns:
-                        hp = grp["Priority"].astype(str).str.strip().str.upper().isin(["P1", "P2", "1", "2", "HIGH", "CRITICAL"])
+                    if "priority" in grp.columns:
+                        hp = grp["priority"].astype(str).str.strip().str.upper().isin(["P1", "P2", "1", "2", "HIGH", "CRITICAL"])
                         periods[month].high_priority_pct = safe_divide(hp.sum(), len(grp))
 
         # Compute change success rate per month
-        if _nonempty(self.chg) and "Requested Date" in self.chg.columns and "Success" in self.chg.columns:
+        if _nonempty(self.chg) and "opened_at" in self.chg.columns and "close_code" in self.chg.columns:
             df_chg = self.chg.copy()
-            df_chg["_month"] = pd.to_datetime(df_chg["Requested Date"], errors="coerce").dt.strftime("%Y-%m")
+            df_chg["_month"] = pd.to_datetime(df_chg["opened_at"], errors="coerce").dt.strftime("%Y-%m")
             for month, grp in df_chg.groupby("_month", sort=False):
                 if month in periods:
-                    success = _bool_col(grp["Success"]).sum()
+                    success = (grp["close_code"].astype(str).str.strip() == "Successful").sum()
                     periods[month].change_success_rate = safe_divide(success, len(grp))
 
         sorted_keys = sorted(periods.keys())
@@ -967,21 +963,21 @@ class XlsxDetailAnalyzer:
         return rows
 
     def day_of_week_analysis(self) -> List[DayOfWeekRow]:
-        if not _nonempty(self.inc) or "Begin Date" not in self.inc.columns:
+        if not _nonempty(self.inc) or "opened_at" not in self.inc.columns:
             return []
         df = self.inc.copy()
-        df["_dow"] = pd.to_datetime(df["Begin Date"], errors="coerce").dt.dayofweek
+        df["_dow"] = pd.to_datetime(df["opened_at"], errors="coerce").dt.dayofweek
         day_names = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
         total = len(df)
         rows: List[DayOfWeekRow] = []
         for dow in range(7):
             grp = df[df["_dow"] == dow]
             cnt = len(grp)
-            rt = _safe_col(grp, "Resolution Time(m)").dropna()
+            rt = _safe_col(grp, "resolution_time_minutes").dropna()
             avg_rt = float(rt.mean()) if len(rt) else 0.0
             hp = 0
-            if "Priority" in grp.columns:
-                hp = int(grp["Priority"].astype(str).str.strip().str.upper().isin(
+            if "priority" in grp.columns:
+                hp = int(grp["priority"].astype(str).str.strip().str.upper().isin(
                     ["P1", "P2", "1", "2", "HIGH", "CRITICAL"]
                 ).sum())
             avg_daily = safe_divide(cnt, max(1, total / 7))
@@ -1002,10 +998,10 @@ class XlsxDetailAnalyzer:
         return rows
 
     def hour_of_day_analysis(self) -> List[HourBucket]:
-        if not _nonempty(self.inc) or "Begin Date" not in self.inc.columns:
+        if not _nonempty(self.inc) or "opened_at" not in self.inc.columns:
             return []
         df = self.inc.copy()
-        df["_hour"] = pd.to_datetime(df["Begin Date"], errors="coerce").dt.hour
+        df["_hour"] = pd.to_datetime(df["opened_at"], errors="coerce").dt.hour
         total = len(df)
 
         buckets = [
@@ -1024,7 +1020,7 @@ class XlsxDetailAnalyzer:
         for period, hr_range, hours in buckets:
             grp = df[df["_hour"].isin(hours)]
             cnt = len(grp)
-            rt = _safe_col(grp, "Resolution Time(m)").dropna()
+            rt = _safe_col(grp, "resolution_time_minutes").dropna()
             avg_rt = float(rt.mean()) if len(rt) else 0.0
             rows.append(HourBucket(
                 period=period,

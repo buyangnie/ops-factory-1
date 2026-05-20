@@ -12,7 +12,7 @@ from typing import List, Dict, Optional, Tuple, Any
 from pathlib import Path
 
 from config import (
-    INCIDENTS_FILE, CHANGES_FILE, REQUESTS_FILE, PROBLEMS_FILE,
+    INCIDENTS_FILE, CHANGES_FILE, REQUESTS_FILE, PROBLEMS_FILE, SLA_FILE,
     EXCLUDED_RESOLVERS,
     HEALTH_SCORE_WEIGHTS,
     SLA_SCORE_THRESHOLDS, MTTR_SCORE_THRESHOLDS, BACKLOG_SCORE_THRESHOLDS,
@@ -336,30 +336,23 @@ class ComprehensiveAnalyzer:
     def _load_all_data(self) -> None:
         """Load all data files."""
         # Incidents (required)
-        self.incidents_df, self.sla_df = load_excel_data(self.incidents_file)
+        self.sla_file = SLA_FILE
+        self.incidents_df, self.sla_df = load_excel_data(self.incidents_file, self.sla_file)
         self.incidents_df = clean_data(self.incidents_df, EXCLUDED_RESOLVERS)
 
-        # Build SLA map — store as dict with both response and resolution
+        # Build SLA map from new schema format (resolution_sla_min is already in minutes)
         self.sla_map = DEFAULT_SLA.copy()
         for _, row in self.sla_df.iterrows():
-            resolution_col = None
-            response_col = None
-            for col_name in ["Resolution （hours）", "Resolution (hours)"]:
-                if col_name in row.index:
-                    resolution_col = col_name
-                    break
-            for col_name in ["Response （minutes）", "Response (minutes)"]:
-                if col_name in row.index:
-                    response_col = col_name
-                    break
-            priority = row["Priority"]
-            if resolution_col or response_col:
-                res_hours = row[resolution_col] if resolution_col else 24
-                resp_min = row[response_col] if response_col else None
-                self.sla_map[priority] = {
-                    "resolution_hours": float(res_hours),
-                    "response_minutes": float(resp_min) if resp_min is not None else None,
-                }
+            priority = row["priority"]
+            resolution_min = int(row["resolution_sla_min"])
+            response_min = int(row["response_sla_min"]) if pd.notna(row.get("response_sla_min")) else None
+            self.sla_map[priority] = {
+                "resolution_hours": resolution_min / 60,
+                "response_minutes": float(response_min) if response_min is not None else None,
+                "resolution_target": float(row.get("resolution_sla_target", 0.85)),
+                "response_target": float(row.get("response_sla_target", 0.85)),
+                "time_basis": str(row.get("time_basis", "Calendar")),
+            }
 
         # Changes (optional)
         if self.changes_file.exists():
@@ -382,7 +375,7 @@ class ComprehensiveAnalyzer:
             return
 
         # Parse dates
-        for col in ["Requested Date", "Planned Start", "Planned End", "Actual Start", "Actual End"]:
+        for col in ["opened_at", "planned_start_at", "planned_end_at", "actual_start_at", "actual_end_at"]:
             if col in self.changes_df.columns:
                 self.changes_df[col] = pd.to_datetime(self.changes_df[col], errors='coerce')
 
@@ -392,7 +385,7 @@ class ComprehensiveAnalyzer:
             return
 
         # Parse dates
-        for col in ["Requested Date", "Due Date", "Fulfilled Date"]:
+        for col in ["opened_at", "resolution_due_at", "fulfilled_at"]:
             if col in self.requests_df.columns:
                 self.requests_df[col] = pd.to_datetime(self.requests_df[col], errors='coerce')
 
@@ -402,7 +395,7 @@ class ComprehensiveAnalyzer:
             return
 
         # Parse dates
-        for col in ["Logged Date", "Target Resolution", "Resolution Date"]:
+        for col in ["opened_at", "resolution_due_at", "resolved_at"]:
             if col in self.problems_df.columns:
                 self.problems_df[col] = pd.to_datetime(self.problems_df[col], errors='coerce')
 
@@ -449,7 +442,7 @@ class ComprehensiveAnalyzer:
         )
 
         # P1/P2 Count
-        p1_p2_count = len(self.incidents_df[self.incidents_df["Priority"].isin(["P1", "P2"])])
+        p1_p2_count = len(self.incidents_df[self.incidents_df["priority"].isin(["P1", "P2"])])
 
         kpis["p1_p2_count"] = KPIMetric(
             name="P1/P2 Incidents",
@@ -471,8 +464,8 @@ class ComprehensiveAnalyzer:
         )
 
         # Backlog
-        backlog = len(self.incidents_df[self.incidents_df["Order Status"].isin(["Open", "Pending", "In Progress"])])
-        daily_avg = len(self.incidents_df) / max(self.incidents_df["Begin Date"].dt.date.nunique(), 1)
+        backlog = len(self.incidents_df[self.incidents_df["status"].isin(["Open", "Pending", "In Progress"])])
+        daily_avg = len(self.incidents_df) / max(self.incidents_df["opened_at"].dt.date.nunique(), 1)
         backlog_ratio = safe_divide(backlog, daily_avg)
         backlog_score = self._score_threshold_reverse(backlog_ratio, BACKLOG_SCORE_THRESHOLDS)
 
@@ -518,8 +511,8 @@ class ComprehensiveAnalyzer:
         total = 0
 
         for _, row in df.iterrows():
-            priority = row.get("Priority", "P3")
-            resolution_time = row.get("Resolution Time(m)", 0)
+            priority = row.get("priority", "P3")
+            resolution_time = row.get("resolution_time_minutes", 0)
 
             if pd.isna(resolution_time):
                 continue
@@ -538,10 +531,10 @@ class ComprehensiveAnalyzer:
 
     def _calculate_avg_mttr(self, df: pd.DataFrame) -> float:
         """Calculate average MTTR in hours."""
-        if "Resolution Time(m)" not in df.columns:
+        if "resolution_time_minutes" not in df.columns:
             return 0.0
 
-        valid_times = df["Resolution Time(m)"].dropna()
+        valid_times = df["resolution_time_minutes"].dropna()
         if len(valid_times) == 0:
             return 0.0
 
@@ -583,8 +576,8 @@ class ComprehensiveAnalyzer:
             kpis["avg_mttr"].trend = trend
 
         # Update P1/P2
-        prev_p1p2 = len(previous_df[previous_df["Priority"].isin(["P1", "P2"])])
-        curr_p1p2 = len(current_df[current_df["Priority"].isin(["P1", "P2"])])
+        prev_p1p2 = len(previous_df[previous_df["priority"].isin(["P1", "P2"])])
+        curr_p1p2 = len(current_df[current_df["priority"].isin(["P1", "P2"])])
 
         kpis["p1_p2_count"].previous_value = prev_p1p2
         change, trend = calculate_percentage_change(curr_p1p2, prev_p1p2)
@@ -607,7 +600,7 @@ class ComprehensiveAnalyzer:
             ))
 
         # R002: MTTR Spike per category
-        category_mttr = self.incidents_df.groupby("Category")["Resolution Time(m)"].mean() / 60
+        category_mttr = self.incidents_df.groupby("category")["resolution_time_minutes"].mean() / 60
         for category, mttr in category_mttr.items():
             if mttr > 48:
                 risks.append(RiskItem(
@@ -643,8 +636,8 @@ class ComprehensiveAnalyzer:
 
         total_changes = len(self.changes_df)
 
-        # Change Success Rate
-        successful = len(self.changes_df[self.changes_df["Success"] == "Yes"])
+        # Change Success Rate (close_code == "Successful")
+        successful = len(self.changes_df[self.changes_df["close_code"] == "Successful"])
         success_rate = safe_divide(successful, total_changes)
         success_score = self._score_threshold(success_rate, CHANGE_SUCCESS_THRESHOLDS)
 
@@ -658,7 +651,7 @@ class ComprehensiveAnalyzer:
         )
 
         # Emergency Change Ratio
-        emergency_count = len(self.changes_df[self.changes_df["Change Type"] == "Emergency"])
+        emergency_count = len(self.changes_df[self.changes_df["change_type"] == "Emergency"])
         emergency_ratio = safe_divide(emergency_count, total_changes)
         emergency_score = self._score_threshold_reverse(emergency_ratio, EMERGENCY_CHANGE_THRESHOLDS)
 
@@ -671,8 +664,10 @@ class ComprehensiveAnalyzer:
             category="change"
         )
 
-        # Change-Induced Incidents
-        incident_caused = len(self.changes_df[self.changes_df["Incident Caused"] == "Yes"])
+        # Change-Induced Incidents (incident_ids non-empty)
+        incident_caused = len(self.changes_df[
+            self.changes_df["incident_ids"].notna() & (self.changes_df["incident_ids"].astype(str).str.strip() != "")
+        ])
         incident_rate = safe_divide(incident_caused, total_changes)
         incident_score = self._score_threshold_reverse(incident_rate, CHANGE_INCIDENT_THRESHOLDS)
 
@@ -762,7 +757,7 @@ class ComprehensiveAnalyzer:
         total_requests = len(self.requests_df)
 
         # Fulfillment Rate
-        fulfilled = len(self.requests_df[self.requests_df["Status"] == "Fulfilled"])
+        fulfilled = len(self.requests_df[self.requests_df["status"] == "Fulfilled"])
         fulfillment_rate = safe_divide(fulfilled, total_requests)
 
         kpis["fulfillment_rate"] = KPIMetric(
@@ -774,11 +769,22 @@ class ComprehensiveAnalyzer:
             category="request"
         )
 
-        # Request SLA Compliance
-        fulfilled_df = self.requests_df[self.requests_df["Status"] == "Fulfilled"]
-        if len(fulfilled_df) > 0:
-            sla_met = len(fulfilled_df[fulfilled_df["SLA Met"] == "Yes"])
-            request_sla_rate = safe_divide(sla_met, len(fulfilled_df))
+        # Request SLA Compliance (computed from resolution_time_minutes vs SLA threshold)
+        fulfilled_df = self.requests_df[self.requests_df["status"].isin(["Closed", "Fulfilled"])]
+        if len(fulfilled_df) > 0 and "resolution_time_minutes" in fulfilled_df.columns:
+            # Use same SLA calculation as incidents: compare actual time vs threshold
+            sla_compliant = 0
+            for _, req_row in fulfilled_df.iterrows():
+                req_priority = req_row.get("priority", "P3")
+                sla_val = self.sla_map.get(req_priority, self.sla_map.get("P3", 24))
+                if isinstance(sla_val, dict):
+                    threshold_min = sla_val.get("resolution_hours", 24) * 60
+                else:
+                    threshold_min = float(sla_val) * 60
+                actual_min = req_row.get("resolution_time_minutes", float('inf'))
+                if pd.notna(actual_min) and actual_min <= threshold_min:
+                    sla_compliant += 1
+            request_sla_rate = safe_divide(sla_compliant, len(fulfilled_df))
         else:
             request_sla_rate = 0.0
 
@@ -792,8 +798,8 @@ class ComprehensiveAnalyzer:
         )
 
         # Average Fulfillment Time
-        if "Fulfillment Time(h)" in fulfilled_df.columns:
-            avg_fulfillment = fulfilled_df["Fulfillment Time(h)"].dropna().mean()
+        if "resolution_time_minutes" in fulfilled_df.columns:
+            avg_fulfillment = fulfilled_df["resolution_time_minutes"].dropna().mean() / 60
             avg_fulfillment = avg_fulfillment if not pd.isna(avg_fulfillment) else 0
         else:
             avg_fulfillment = 0
@@ -808,8 +814,8 @@ class ComprehensiveAnalyzer:
         )
 
         # CSAT Score
-        if "Satisfaction Score" in fulfilled_df.columns:
-            csat_scores = fulfilled_df["Satisfaction Score"].dropna()
+        if "satisfaction_score" in fulfilled_df.columns:
+            csat_scores = fulfilled_df["satisfaction_score"].dropna()
             avg_csat = csat_scores.mean() if len(csat_scores) > 0 else 0
         else:
             avg_csat = 0
@@ -892,7 +898,7 @@ class ComprehensiveAnalyzer:
         total_problems = len(self.problems_df)
 
         # Resolution Rate
-        resolved = len(self.problems_df[self.problems_df["Status"].isin(["Resolved", "Closed"])])
+        resolved = len(self.problems_df[self.problems_df["status"].isin(["Resolved", "Closed"])])
         resolution_rate = safe_divide(resolved, total_problems)
         resolution_score = self._score_threshold(resolution_rate, PROBLEM_CLOSURE_THRESHOLDS)
 
@@ -906,7 +912,7 @@ class ComprehensiveAnalyzer:
         )
 
         # RCA Completion Rate
-        has_rca = len(self.problems_df[self.problems_df["Root Cause"].notna() & (self.problems_df["Root Cause"] != "")])
+        has_rca = len(self.problems_df[self.problems_df["root_cause"].notna() & (self.problems_df["root_cause"] != "")])
         rca_rate = safe_divide(has_rca, total_problems)
         rca_score = self._score_threshold(rca_rate, RCA_COMPLETION_THRESHOLDS)
 
@@ -920,7 +926,9 @@ class ComprehensiveAnalyzer:
         )
 
         # Known Error Count
-        known_errors = len(self.problems_df[self.problems_df["Known Error"] == "Yes"])
+        known_errors = len(self.problems_df[
+            self.problems_df["known_error"].astype(str).str.strip().str.upper().isin(["TRUE", "YES", "1"])
+        ])
 
         kpis["known_errors"] = KPIMetric(
             name="Known Errors",
@@ -932,7 +940,7 @@ class ComprehensiveAnalyzer:
         )
 
         # Open Problems
-        open_problems = len(self.problems_df[~self.problems_df["Status"].isin(["Resolved", "Closed"])])
+        open_problems = len(self.problems_df[~self.problems_df["status"].isin(["Resolved", "Closed"])])
 
         kpis["open_problems"] = KPIMetric(
             name="Open Problems",
@@ -944,7 +952,7 @@ class ComprehensiveAnalyzer:
         )
 
         # Total Related Incidents
-        total_related_incidents = self.problems_df["Related Incidents"].sum()
+        total_related_incidents = self.problems_df["related_incident_count"].sum()
         avg_related = safe_divide(total_related_incidents, total_problems)
 
         kpis["avg_related_incidents"] = KPIMetric(
@@ -1120,11 +1128,11 @@ class ComprehensiveAnalyzer:
 
         # Set period based on granularity
         if granularity == "monthly":
-            self.incidents_df["Period"] = self.incidents_df["Begin Date"].dt.to_period("M")
+            self.incidents_df["Period"] = self.incidents_df["opened_at"].dt.to_period("M")
         elif granularity == "weekly":
-            self.incidents_df["Period"] = self.incidents_df["Begin Date"].dt.to_period("W")
+            self.incidents_df["Period"] = self.incidents_df["opened_at"].dt.to_period("W")
         else:
-            self.incidents_df["Period"] = self.incidents_df["Begin Date"].dt.to_period("D")
+            self.incidents_df["Period"] = self.incidents_df["opened_at"].dt.to_period("D")
 
         periods = sorted(self.incidents_df["Period"].dropna().unique())[-12:]
 
@@ -1202,23 +1210,23 @@ class ComprehensiveAnalyzer:
 
     def _get_major_incidents(self) -> List[MajorIncident]:
         """Get major P1/P2 incidents."""
-        p1_p2_df = self.incidents_df[self.incidents_df["Priority"].isin(["P1", "P2"])].copy()
+        p1_p2_df = self.incidents_df[self.incidents_df["priority"].isin(["P1", "P2"])].copy()
 
         if len(p1_p2_df) == 0:
             return []
 
-        p1_p2_df["Priority_Order"] = p1_p2_df["Priority"].map({"P1": 0, "P2": 1})
-        p1_p2_df = p1_p2_df.sort_values(["Priority_Order", "Begin Date"], ascending=[True, False])
+        p1_p2_df["Priority_Order"] = p1_p2_df["priority"].map({"P1": 0, "P2": 1})
+        p1_p2_df = p1_p2_df.sort_values(["Priority_Order", "opened_at"], ascending=[True, False])
 
         incidents = []
         for _, row in p1_p2_df.head(5).iterrows():
             incidents.append(MajorIncident(
-                order_number=str(row.get("Order Number", "")),
-                name=str(row.get("Order Name", ""))[:100],
-                priority=str(row.get("Priority", "")),
-                status=str(row.get("Order Status", "")),
-                begin_date=row["Begin Date"],
-                resolution_time=row.get("Resolution Time(m)")
+                order_number=str(row.get("ticket_id", "")),
+                name=str(row.get("title", ""))[:100],
+                priority=str(row.get("priority", "")),
+                status=str(row.get("status", "")),
+                begin_date=row["opened_at"],
+                resolution_time=row.get("resolution_time_minutes")
             ))
 
         return incidents
@@ -1228,17 +1236,18 @@ class ComprehensiveAnalyzer:
         if self.changes_df is None:
             return []
 
-        failed_df = self.changes_df[self.changes_df["Success"] == "No"].head(5)
+        failed_df = self.changes_df[self.changes_df["close_code"].isin(["Failed", "Backed_out"])].head(5)
 
         changes = []
         for _, row in failed_df.iterrows():
+            incident_ids_val = row.get("incident_ids", "")
             changes.append(ChangeRecord(
-                change_number=str(row.get("Change Number", "")),
-                title=str(row.get("Change Title", ""))[:80],
-                change_type=str(row.get("Change Type", "")),
-                status=str(row.get("Status", "")),
+                change_number=str(row.get("ticket_id", "")),
+                title=str(row.get("title", ""))[:80],
+                change_type=str(row.get("change_type", "")),
+                status=str(row.get("status", "")),
                 success=False,
-                incident_caused=row.get("Incident Caused", "No") == "Yes"
+                incident_caused=pd.notna(incident_ids_val) and str(incident_ids_val).strip() != ""
             ))
 
         return changes
@@ -1248,17 +1257,17 @@ class ComprehensiveAnalyzer:
         if self.problems_df is None:
             return []
 
-        open_df = self.problems_df[~self.problems_df["Status"].isin(["Resolved", "Closed"])].head(5)
+        open_df = self.problems_df[~self.problems_df["status"].isin(["Resolved", "Closed"])].head(5)
 
         problems = []
         for _, row in open_df.iterrows():
             problems.append(ProblemRecord(
-                problem_number=str(row.get("Problem Number", "")),
-                title=str(row.get("Problem Title", ""))[:80],
-                status=str(row.get("Status", "")),
-                known_error=row.get("Known Error", "No") == "Yes",
-                related_incidents=int(row.get("Related Incidents", 0)),
-                root_cause=str(row.get("Root Cause", ""))[:50] if pd.notna(row.get("Root Cause")) else ""
+                problem_number=str(row.get("ticket_id", "")),
+                title=str(row.get("title", ""))[:80],
+                status=str(row.get("status", "")),
+                known_error=bool(row.get("known_error", False)),
+                related_incidents=int(row.get("related_incident_count", 0)),
+                root_cause=str(row.get("root_cause", ""))[:50] if pd.notna(row.get("root_cause")) else ""
             ))
 
         return problems
@@ -1268,7 +1277,7 @@ class ComprehensiveAnalyzer:
         breakdown = []
 
         for priority in ["P1", "P2", "P3", "P4"]:
-            priority_df = self.incidents_df[self.incidents_df["Priority"] == priority]
+            priority_df = self.incidents_df[self.incidents_df["priority"] == priority]
             total = len(priority_df)
 
             if total == 0:
@@ -1282,7 +1291,7 @@ class ComprehensiveAnalyzer:
                 sla_minutes = float(sla_val) * 60
 
             for _, row in priority_df.iterrows():
-                resolution_time = row.get("Resolution Time(m)", 0)
+                resolution_time = row.get("resolution_time_minutes", 0)
                 if pd.notna(resolution_time) and resolution_time <= sla_minutes:
                     compliant += 1
 

@@ -8,7 +8,8 @@ public record BiRawData(
     List<Map<String, String>> incidentSlaCriteria,
     List<Map<String, String>> changes,
     List<Map<String, String>> requests,
-    List<Map<String, String>> problems
+    List<Map<String, String>> problems,
+    List<Map<String, String>> requestSlaCriteria
 ) {
 }
 

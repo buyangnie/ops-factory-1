@@ -4,7 +4,7 @@ GOOSE_MODE: auto
 GOOSE_DISABLE_KEYRING: '1'
 GOOSE_TELEMETRY_ENABLED: false
 GOOSE_CONTEXT_LIMIT: '65536'
-GOOSE_MAX_TOKENS: '32768'
+GOOSE_MAX_TOKENS: '8192'
 GOOSE_TEMPERATURE: '0.2'
 GOOSE_CONTEXT_STRATEGY: summarize
 GOOSE_AUTO_COMPACT_THRESHOLD: '0.8'
@@ -114,7 +114,7 @@ extensions:
     enabled: true
     type: platform
     name: skills
-    description: Load and use skills from relevant directories
+    description: Discover and provide skill instructions from filesystem and builtins
     display_name: Skills
     bundled: true
     available_tools: []
