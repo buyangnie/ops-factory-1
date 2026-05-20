@@ -1,0 +1,187 @@
+.multiselect {
+    position: relative;
+    width: 100%;
+}
+
+.multiselect-trigger {
+    display: flex;
+    align-items: center;
+    min-height: 34px;
+    padding: 2px 28px 2px 6px;
+    border: 1px solid var(--border-color, #dcdfe6);
+    border-radius: 4px;
+    background: var(--surface-background, #fff);
+    cursor: pointer;
+    transition: border-color 0.2s;
+    position: relative;
+    gap: 4px;
+    flex-wrap: wrap;
+}
+
+.multiselect-trigger:hover {
+    border-color: var(--color-text-secondary, #c0c4cc);
+}
+
+.multiselect:focus-within .multiselect-trigger {
+    border-color: var(--color-primary, #409eff);
+}
+
+.multiselect-placeholder {
+    color: var(--color-text-muted, #c0c4cc);
+    font-size: var(--font-size-sm, 0.8125rem);
+    user-select: none;
+}
+
+.multiselect-tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    flex: 1;
+    min-width: 0;
+}
+
+.multiselect-tag {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 1px 6px;
+    background: #f0f2f5;
+    border: 1px solid #e4e7ed;
+    border-radius: 3px;
+    font-size: 0.75rem;
+    color: var(--text-primary, #606266);
+    line-height: 1.6;
+    white-space: nowrap;
+    max-width: 140px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.multiselect-tag-remove {
+    font-size: 0.8125rem;
+    color: var(--color-text-muted, #909399);
+    cursor: pointer;
+    line-height: 1;
+    border-radius: 50%;
+    width: 14px;
+    height: 14px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    transition: background 0.15s, color 0.15s;
+}
+
+.multiselect-tag-remove:hover {
+    background: var(--color-primary, #409eff);
+    color: #fff;
+}
+
+.multiselect-arrow {
+    position: absolute;
+    right: 8px;
+    top: 50%;
+    transform: translateY(-50%);
+    font-size: 0.75rem;
+    color: var(--color-text-muted, #c0c4cc);
+    transition: transform 0.25s;
+    pointer-events: none;
+}
+
+.multiselect-arrow.is-open {
+    transform: translateY(-50%) rotate(180deg);
+}
+
+.multiselect-dropdown {
+    position: absolute;
+    top: calc(100% + 4px);
+    left: 0;
+    width: 100%;
+    max-height: 200px;
+    overflow-y: auto;
+    background: var(--surface-background, #fff);
+    border: 1px solid var(--border-color, #e4e7ed);
+    border-radius: 4px;
+    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.12);
+    z-index: 50;
+    padding: 4px 0;
+}
+
+.multiselect-option {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 12px;
+    font-size: var(--font-size-sm, 0.8125rem);
+    color: var(--text-primary, #606266);
+    cursor: pointer;
+    transition: background 0.15s;
+}
+
+.multiselect-option:hover {
+    background: #f5f7fa;
+}
+
+.multiselect-option.is-selected {
+    color: var(--color-primary, #409eff);
+    font-weight: 500;
+}
+
+.multiselect-check {
+    width: 14px;
+    height: 14px;
+    border: 1px solid var(--border-color, #dcdfe6);
+    border-radius: 2px;
+    flex-shrink: 0;
+    position: relative;
+    transition: background 0.15s, border-color 0.15s;
+}
+
+.multiselect-check.is-checked {
+    background: var(--color-primary, #409eff);
+    border-color: var(--color-primary, #409eff);
+}
+
+.multiselect-check.is-checked::after {
+    content: '';
+    position: absolute;
+    left: 3.5px;
+    top: 0.5px;
+    width: 4px;
+    height: 8px;
+    border: solid #fff;
+    border-width: 0 1.5px 1.5px 0;
+    transform: rotate(45deg);
+}
+
+.multiselect-empty {
+    padding: 8px 12px;
+    color: var(--color-text-muted, #909399);
+    font-size: var(--font-size-sm, 0.8125rem);
+    text-align: center;
+}
+
+@media (prefers-color-scheme: dark) {
+    .multiselect-trigger {
+        background: var(--surface-background, #1e293b);
+        border-color: var(--border-color, #475569);
+    }
+
+    .multiselect-tag {
+        background: #334155;
+        border-color: #475569;
+    }
+
+    .multiselect-dropdown {
+        background: var(--surface-background, #1e293b);
+        border-color: var(--border-color, #475569);
+    }
+
+    .multiselect-option:hover {
+        background: #334155;
+    }
+
+    .multiselect-check {
+        border-color: #64748b;
+    }
+}
