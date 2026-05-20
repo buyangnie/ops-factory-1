@@ -5,6 +5,8 @@
     "confirmTitle": "Confirm",
     "delete": "Delete",
     "actions": "Actions",
+    "selectedCount": "{{count}} selected",
+    "selectAll": "Select All",
     "showing": "Showing {{start}}-{{end}} of {{total}}",
     "perPage": "per page",
     "previousPage": "Previous page",
@@ -1574,8 +1576,7 @@
     }
   },
   "onlyoffice": {
-    "loadFailed": "Document preview service unavailable",
-    "loadFailedHint": "Please check if the document preview service is running properly",
+    "loadFailed": "Unsupported document format",
     "downloadInstead": "Download file to view"
   },
   "agentConfigure": {
@@ -2183,6 +2184,7 @@
     "confirmDeleteCluster": "Are you sure you want to delete this cluster?",
     "confirmForceDeleteGroup": "This group contains sub-resources. Force delete will remove all sub-groups, clusters, hosts, and their relations. Continue?",
     "confirmForceDeleteCluster": "This cluster contains hosts. Force delete will remove all hosts and their relations. Continue?",
+    "confirmDeleteClustersWithHosts": "The selected {{count}} clusters contain {{totalHosts}} hosts. Force delete will remove all hosts and their relations. Continue?",
     "confirmDeleteBusinessService": "Are you sure you want to delete this business service?",
     "bsName": "Business Name",
     "bsCode": "Business Code",
@@ -2199,6 +2201,7 @@
     "credentialInvalidChars": "Credential can only contain ASCII characters (no Chinese or other non-ASCII characters)",
     "invalidChars": "Contains invalid characters (< > \" ' &). These characters are not allowed for security reasons.",
     "duplicateIp": "This IP address is already used in the same environment group: {{ip}} (host: {{host}})",
+    "duplicateClusterName": "A cluster named \"{{name}}\" already exists in the same environment group. Please use a different name.",
     "hostCountUnit": "hosts",
     "noSourceRelations": "No outgoing relations",
     "containedHosts": "Contained Hosts",
@@ -2239,7 +2242,9 @@
     "entryResources": "Entry Resources",
     "entryResourcesHint": "Select hosts under this group as business entry points",
     "confirmDeleteClusterType": "Are you sure you want to delete this cluster type?",
+    "confirmDeleteClusterTypes": "Are you sure you want to delete {{count}} selected cluster types?",
     "clusterTypeInUse": "Cluster type \"{{name}}\" is used by the following clusters: {{clusters}}. Please delete them first.",
+    "clusterTypesInUseBatch": "The following cluster types are in use and cannot be deleted: {{names}}",
     "confirmDeleteBusinessType": "Are you sure you want to delete this business type?",
     "sourceType": "Source Type",
     "sourceTypeHost": "Host",

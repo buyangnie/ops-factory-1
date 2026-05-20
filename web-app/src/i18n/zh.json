@@ -5,6 +5,8 @@
     "confirmTitle": "确认操作",
     "delete": "删除",
     "actions": "操作",
+    "selectedCount": "已选中 {{count}} 项",
+    "selectAll": "全选",
     "showing": "显示第 {{start}}-{{end}} 条，共 {{total}} 条",
     "perPage": "条/页",
     "previousPage": "上一页",
@@ -1575,8 +1577,7 @@
     }
   },
   "onlyoffice": {
-    "loadFailed": "文档预览服务不可用",
-    "loadFailedHint": "请检查文档预览服务是否正常运行",
+    "loadFailed": "文档格式不支持展示",
     "downloadInstead": "下载文件查看"
   },
   "agentConfigure": {
@@ -2183,6 +2184,7 @@
     "confirmDeleteCluster": "确定删除此集群？",
     "confirmForceDeleteGroup": "该环境组下存在子资源，强制删除将同时删除所有子分组、集群、主机和关联关系。确定继续？",
     "confirmForceDeleteCluster": "该集群下存在主机，强制删除将同时删除所有主机和关联关系。确定继续？",
+    "confirmDeleteClustersWithHosts": "选中的 {{count}} 个集群中共有 {{totalHosts}} 台主机，强制删除将同时删除所有主机和关联关系。确定继续？",
     "confirmDeleteBusinessService": "确定删除此业务服务？",
     "bsName": "业务名称",
     "bsCode": "业务编码",
@@ -2199,6 +2201,7 @@
     "credentialInvalidChars": "凭证只能包含ASCII字符（不支持中文或其他非ASCII字符）",
     "invalidChars": "包含非法字符（< > \" ' &），这些字符因安全原因不允许使用",
     "duplicateIp": "该IP地址已在同一环境组下被使用：{{ip}}（主机：{{host}}）",
+    "duplicateClusterName": "同一环境组下已存在名为「{{name}}」的集群，请使用其他名称。",
     "hostCountUnit": "台主机",
     "noSourceRelations": "暂无出向关系",
     "containedHosts": "包含主机",
@@ -2239,7 +2242,9 @@
     "entryResources": "入口资源",
     "entryResourcesHint": "选择该分组下的主机资源作为业务入口",
     "confirmDeleteClusterType": "确定删除此集群类型？",
+    "confirmDeleteClusterTypes": "确定删除选中的 {{count}} 个集群类型？",
     "clusterTypeInUse": "集群类型「{{name}}」正在被以下集群使用：{{clusters}}，请先删除使用该集群类型的集群。",
+    "clusterTypesInUseBatch": "以下集群类型正在被使用，无法删除：{{names}}",
     "confirmDeleteBusinessType": "确定删除此业务类型？",
     "sourceType": "源类型",
     "sourceTypeHost": "主机",

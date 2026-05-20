@@ -19,12 +19,14 @@ type Props = {
     tree: TreeNode[]
     selectedId: string | null
     selectedType: TreeNodeType | null
+    selectedIds?: Set<string>
     onSelect: (id: string, type: TreeNodeType) => void
+    onToggleSelect?: (id: string, type: TreeNodeType) => void
     onEdit?: (id: string, type: TreeNodeType) => void
     onDelete?: (id: string, type: TreeNodeType) => void
 }
 
-export default function ResourceTree({ tree, selectedId, selectedType, onSelect, onEdit, onDelete }: Props) {
+export default function ResourceTree({ tree, selectedId, selectedType, selectedIds, onSelect, onToggleSelect, onEdit, onDelete }: Props) {
     const { t } = useTranslation()
 
     if (tree.length === 0) {
@@ -44,7 +46,9 @@ export default function ResourceTree({ tree, selectedId, selectedType, onSelect,
                     depth={0}
                     selectedId={selectedId}
                     selectedType={selectedType}
+                    selectedIds={selectedIds}
                     onSelect={onSelect}
+                    onToggleSelect={onToggleSelect}
                     onEdit={onEdit}
                     onDelete={onDelete}
                     inheritedDisabled={false}
@@ -54,21 +58,25 @@ export default function ResourceTree({ tree, selectedId, selectedType, onSelect,
     )
 }
 
-function TreeNodeItem({ node, depth, selectedId, selectedType, onSelect, onEdit, onDelete, inheritedDisabled }: {
+function TreeNodeItem({ node, depth, selectedId, selectedType, selectedIds, onSelect, onToggleSelect, onEdit, onDelete, inheritedDisabled }: {
     node: TreeNode
     depth: number
     selectedId: string | null
     selectedType: TreeNodeType | null
+    selectedIds?: Set<string>
     onSelect: (id: string, type: TreeNodeType) => void
+    onToggleSelect?: (id: string, type: TreeNodeType) => void
     onEdit?: (id: string, type: TreeNodeType) => void
     onDelete?: (id: string, type: TreeNodeType) => void
     inheritedDisabled: boolean
 }) {
     const isSelected = selectedId === node.id && selectedType === node.type
+    const isChecked = selectedIds ? selectedIds.has(node.id) : false
     const hasChildren = node.children && node.children.length > 0
     const [expanded, setExpanded] = useState(false)
 
     const isDisabled = inheritedDisabled === true
+    const isCluster = node.type === 'cluster' || node.type === 'business-service'
 
     const handleClick = () => {
         onSelect(node.id, node.type)
@@ -79,12 +87,19 @@ function TreeNodeItem({ node, depth, selectedId, selectedType, onSelect, onEdit,
         setExpanded(prev => !prev)
     }
 
+    const handleCheckboxClick = (e: React.ChangeEvent<HTMLInputElement>) => {
+        e.stopPropagation()
+        if (onToggleSelect && isCluster) {
+            onToggleSelect(node.id, node.type)
+        }
+    }
+
     const isFolder = node.type === 'group' || node.type === 'subgroup'
 
     return (
         <div className="hr-tree-node-wrapper">
             <div
-                className={`hr-tree-node ${isSelected ? 'hr-tree-node-selected' : ''} ${isDisabled ? 'hr-tree-node-disabled' : ''}`}
+                className={`hr-tree-node ${isSelected ? 'hr-tree-node-selected' : ''} ${isChecked ? 'hr-tree-node-checked' : ''} ${isDisabled ? 'hr-tree-node-disabled' : ''}`}
                 style={{ paddingLeft: depth * 16 + 8 }}
                 onClick={handleClick}
             >
@@ -95,6 +110,15 @@ function TreeNodeItem({ node, depth, selectedId, selectedType, onSelect, onEdit,
                     >
                         &#9654;
                     </span>
+                )}
+                {isCluster && selectedIds && (
+                    <input
+                        type="checkbox"
+                        checked={isChecked}
+                        onChange={handleCheckboxClick}
+                        style={{ marginRight: 6, cursor: 'pointer' }}
+                        onClick={e => e.stopPropagation()}
+                    />
                 )}
                 {isFolder ? (
                     <span className="hr-tree-icon hr-tree-icon-folder" />

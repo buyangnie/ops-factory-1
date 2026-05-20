@@ -349,6 +349,20 @@ export default function ResourceFormModal({
                 if (!typeResult.sanitized) { setError(t('hostResource.clusterTypeRequired')); setSaving(false); return }
                 if (!clusterGroupId) { setError(t('hostResource.parentGroupRequired')); setSaving(false); return }
 
+                // Check duplicate cluster name in same group
+                const editingClusterId = editingItem?.type === 'cluster' ? editingItem.data.id : null
+                const trimmedClusterName = nameResult.sanitized
+                const duplicateCluster = clusters.find(c =>
+                    c.name?.toLowerCase() === trimmedClusterName.toLowerCase() &&
+                    c.groupId === clusterGroupId &&
+                    c.id !== editingClusterId
+                )
+                if (duplicateCluster) {
+                    setError(t('hostResource.duplicateClusterName', { name: trimmedClusterName }))
+                    setSaving(false)
+                    return
+                }
+
                 await onSaveCluster({
                     name: nameResult.sanitized,
                     type: typeResult.sanitized,
