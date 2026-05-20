@@ -412,7 +412,12 @@ function SopFormModal({
                 payload.tags = sopTags
                 payload.nodes = []
             } else {
-                payload.nodes = nodes
+                // Filter out variables without name and transitions without condition
+                payload.nodes = nodes.map(node => ({
+                    ...node,
+                    variables: (node.variables ?? []).filter(v => v.name.trim().length > 0),
+                    transitions: (node.transitions ?? []).filter(t => t.condition.trim().length > 0),
+                }))
             }
             await onSave(payload)
         } catch (err) {
