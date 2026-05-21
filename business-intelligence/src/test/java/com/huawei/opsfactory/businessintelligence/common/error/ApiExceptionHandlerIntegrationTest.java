@@ -30,7 +30,7 @@ class ApiExceptionHandlerIntegrationTest {
 
     @BeforeEach
     void setUp() {
-        given(dataProvider.load()).willReturn(new BiRawData(List.of(), List.of(), List.of(), List.of(), List.of()));
+        given(dataProvider.load()).willReturn(new BiRawData(List.of(), List.of(), List.of(), List.of(), List.of(), List.of()));
     }
 
     @Test

@@ -750,9 +750,9 @@ class MatplotlibChartEngine:
                 return None
             col_type = col_time = None
             for c in requests_df.columns:
-                if "request" in c.lower() and "type" in c.lower():
+                if "catalog" in c.lower():
                     col_type = c
-                if "fulfillment" in c.lower() and "time" in c.lower():
+                if "resolution_time" in c.lower():
                     col_time = c
             if col_type and col_time:
                 grouped = requests_df.groupby(col_type)[col_time].agg(["min", "mean", "max"])
@@ -795,7 +795,7 @@ class MatplotlibChartEngine:
                 return None
             col_type = col_dept = None
             for c in requests_df.columns:
-                if "request" in c.lower() and "type" in c.lower():
+                if "catalog" in c.lower():
                     col_type = c
                 if "requester" in c.lower() and "dept" in c.lower():
                     col_dept = c
@@ -1107,7 +1107,7 @@ class MatplotlibChartEngine:
                 return None
             col_resolver = col_category = None
             for c in incidents_df.columns:
-                if "resolver" in c.lower():
+                if "assigned" in c.lower():
                     col_resolver = c
                 if "category" in c.lower():
                     col_category = c
@@ -1204,7 +1204,7 @@ class MatplotlibChartEngine:
                 return None
             col_date = None
             for c in incidents_df.columns:
-                if "begin" in c.lower() and "date" in c.lower():
+                if "opened" in c.lower():
                     col_date = c
             if col_date:
                 dt_series = pd.to_datetime(incidents_df[col_date], errors="coerce")

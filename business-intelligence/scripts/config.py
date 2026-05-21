@@ -18,12 +18,12 @@ OUTPUT_DIR = PROJECT_DIR / "output"
 
 OUTPUT_DIR.mkdir(exist_ok=True)
 
-# Data files
-DATA_FILE = DATA_DIR / "Incidents-exported.xlsx"
+# Data files (new schema format)
 INCIDENTS_FILE = DATA_DIR / "Incidents-exported.xlsx"
 CHANGES_FILE = DATA_DIR / "Changes-exported.xlsx"
 REQUESTS_FILE = DATA_DIR / "Requests-exported.xlsx"
 PROBLEMS_FILE = DATA_DIR / "Problems-exported.xlsx"
+SLA_FILE = DATA_DIR / "SLAs-exported.xlsx"
 
 # =============================================================================
 # API Configuration
