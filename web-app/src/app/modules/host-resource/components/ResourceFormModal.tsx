@@ -290,23 +290,22 @@ export default function ResourceFormModal({
 
     const getModalTitle = () => {
         if (editingItem) {
-            const prefix = t('hostResource.edit', { defaultValue: 'Edit' })
             const typeLabels: Record<string, string> = {
-                group: t('hostResource.createGroup'),
-                cluster: t('hostResource.createCluster'),
-                'business-service': t('hostResource.createBusinessService'),
-                host: t('hostResource.createHost'),
+                group: t('hostResource.editGroupTitle', { defaultValue: 'Edit Group' }),
+                cluster: t('hostResource.editClusterTitle', { defaultValue: 'Edit Cluster' }),
+                'business-service': t('hostResource.editBusinessServiceTitle', { defaultValue: 'Edit Business Service' }),
+                host: t('hostResource.editHostTitle', { defaultValue: 'Edit Host' }),
             }
-            return `${prefix}${typeLabels[editingItem.type] ?? ''}`
+            return typeLabels[editingItem.type] ?? t('hostResource.editGroupTitle')
         }
         if (!selectedType) return t('hostResource.createResource')
         const typeLabels: Record<string, string> = {
-            group: t('hostResource.createGroup'),
-            cluster: t('hostResource.createCluster'),
-            'business-service': t('hostResource.createBusinessService'),
-            host: t('hostResource.createHost'),
+            group: t('hostResource.createGroupTitle', { defaultValue: 'Create Group' }),
+            cluster: t('hostResource.createClusterTitle', { defaultValue: 'Create Cluster' }),
+            'business-service': t('hostResource.createBusinessServiceTitle', { defaultValue: 'Create Business Service' }),
+            host: t('hostResource.createHostTitle', { defaultValue: 'Create Host' }),
         }
-        return `${t('hostResource.create', { defaultValue: 'Create' })}${typeLabels[selectedType] ?? ''}`
+        return typeLabels[selectedType] ?? t('hostResource.createGroupTitle')
     }
 
     const handleSave = useCallback(async () => {
