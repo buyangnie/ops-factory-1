@@ -278,7 +278,7 @@ export default function ImportDialog({ open, onClose, importing, progress, onImp
                             <ul className="hr-import-error-list">
                                 {result.errors.map((err, idx) => (
                                     <li key={idx} className="hr-import-error-item">
-                                        <span className="hr-import-error-row">Row {err.row}:</span> {translateError(err)}
+                                        <span className="hr-import-error-row">{t('hostResource.importErrorRow', { row: err.row })}</span> {translateError(err)}
                                     </li>
                                 ))}
                             </ul>

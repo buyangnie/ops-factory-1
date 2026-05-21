@@ -2287,6 +2287,7 @@
     "importErrorDuplicate": "{{type}} \"{{name}}\" already exists",
     "importErrorSetParentFailed": "Failed to set parent group: {{message}}",
     "importErrorImportFailed": "Import failed: {{message}}",
+    "importErrorRow": "Row {{row}}:",
     "importType_ClusterTypes": "Cluster Types",
     "importType_BusinessTypes": "Business Types",
     "importType_HostGroups": "Host Groups",

@@ -26,7 +26,7 @@ describe('operation intelligence frontend structure', () => {
 
         expect(runtimeSource).toContain('operationIntelligenceServiceUrl')
         expect(runtimeSource).toContain('operationIntelligenceSecretKey')
-        expect(runtimeSource).toContain("const OPERATION_INTELLIGENCE_PATH_PREFIX = '/operation-intelligence'")
+        expect(runtimeSource).toContain("pathPrefix: '/operation-intelligence'")
         expect(runtimeSource).toContain('OPERATION_INTELLIGENCE_SERVICE_URL')
         expect(runtimeSource).toContain('OPERATION_INTELLIGENCE_SECRET_KEY')
         expect(config.operationIntelligenceServiceUrl).toBe('http://127.0.0.1:8096')

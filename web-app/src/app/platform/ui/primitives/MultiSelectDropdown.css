@@ -8,9 +8,9 @@
     align-items: center;
     min-height: 34px;
     padding: 2px 28px 2px 6px;
-    border: 1px solid var(--border-color, #dcdfe6);
+    border: 1px solid var(--color-border, #dcdfe6);
     border-radius: 4px;
-    background: var(--surface-background, #fff);
+    background: var(--color-bg-primary, #fff);
     cursor: pointer;
     transition: border-color 0.2s;
     position: relative;
@@ -49,7 +49,7 @@
     border: 1px solid #e4e7ed;
     border-radius: 3px;
     font-size: 0.75rem;
-    color: var(--text-primary, #606266);
+    color: var(--color-text-primary, #606266);
     line-height: 1.6;
     white-space: nowrap;
     max-width: 140px;
@@ -99,8 +99,8 @@
     width: 100%;
     max-height: 200px;
     overflow-y: auto;
-    background: var(--surface-background, #fff);
-    border: 1px solid var(--border-color, #e4e7ed);
+    background: var(--color-bg-primary, #fff);
+    border: 1px solid var(--color-border, #e4e7ed);
     border-radius: 4px;
     box-shadow: 0 2px 12px rgba(0, 0, 0, 0.12);
     z-index: 50;
@@ -113,7 +113,7 @@
     gap: 8px;
     padding: 6px 12px;
     font-size: var(--font-size-sm, 0.8125rem);
-    color: var(--text-primary, #606266);
+    color: var(--color-text-primary, #606266);
     cursor: pointer;
     transition: background 0.15s;
 }
@@ -130,7 +130,7 @@
 .multiselect-check {
     width: 14px;
     height: 14px;
-    border: 1px solid var(--border-color, #dcdfe6);
+    border: 1px solid var(--color-border, #dcdfe6);
     border-radius: 2px;
     flex-shrink: 0;
     position: relative;
@@ -163,8 +163,8 @@
 
 @media (prefers-color-scheme: dark) {
     .multiselect-trigger {
-        background: var(--surface-background, #1e293b);
-        border-color: var(--border-color, #475569);
+        background: var(--color-bg-primary, #1e293b);
+        border-color: var(--color-border, #475569);
     }
 
     .multiselect-tag {
@@ -173,8 +173,8 @@
     }
 
     .multiselect-dropdown {
-        background: var(--surface-background, #1e293b);
-        border-color: var(--border-color, #475569);
+        background: var(--color-bg-primary, #1e293b);
+        border-color: var(--color-border, #475569);
     }
 
     .multiselect-option:hover {

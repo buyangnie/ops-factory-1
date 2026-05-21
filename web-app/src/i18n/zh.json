@@ -2287,6 +2287,7 @@
     "importErrorDuplicate": "{{type}} \"{{name}}\" 已存在",
     "importErrorSetParentFailed": "设置父环境组失败：{{message}}",
     "importErrorImportFailed": "导入失败：{{message}}",
+    "importErrorRow": "第 {{row}} 行：",
     "importType_ClusterTypes": "集群类型",
     "importType_BusinessTypes": "业务类型",
     "importType_HostGroups": "环境组",

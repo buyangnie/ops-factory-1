@@ -57,7 +57,7 @@ interface ImportDeps {
     createCluster: (body: Partial<Cluster>) => Promise<Cluster>
     createHost: (body: HostCreateRequest) => Promise<Host>
     createBusinessService: (body: Partial<BusinessService>) => Promise<BusinessService>
-    createRelation: (body: Partial<import('../../../../types/host').HostRelation>) => Promise<unknown>
+    createRelation: (body: Partial<HostRelation>) => Promise<unknown>
     createClusterType: (body: Partial<ClusterType>) => Promise<unknown>
     createBusinessType: (body: Partial<BusinessType>) => Promise<unknown>
     createSop: (body: SopCreateRequest) => Promise<unknown>

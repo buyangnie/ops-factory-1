@@ -189,7 +189,7 @@ describe('API service integration', () => {
     const src = read('src/config/runtime.ts')
     expect(src).toContain('operationIntelligenceServiceUrl')
     expect(src).toContain('operationIntelligenceSecretKey')
-    expect(src).toContain("const OPERATION_INTELLIGENCE_PATH_PREFIX = '/operation-intelligence'")
+    expect(src).toContain("pathPrefix: '/operation-intelligence'")
     expect(src).toContain('OPERATION_INTELLIGENCE_SERVICE_URL')
     expect(src).toContain('runtime.OPERATION_INTELLIGENCE_SECRET_KEY')
   })

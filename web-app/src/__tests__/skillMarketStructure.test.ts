@@ -24,7 +24,7 @@ describe('skill market frontend structure', () => {
         const config = JSON.parse(read('../web-app/config.json')) as Record<string, unknown>
 
         expect(runtimeSource).toContain('skillMarketServiceUrl')
-        expect(runtimeSource).toContain("const SKILL_MARKET_PATH_PREFIX = '/skill-market'")
+        expect(runtimeSource).toContain("pathPrefix: '/skill-market'")
         expect(runtimeSource).toContain('SKILL_MARKET_SERVICE_URL')
         expect(config.skillMarketServiceUrl).toBe('http://127.0.0.1:8095')
     })
