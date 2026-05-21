@@ -71,7 +71,8 @@ function WhitelistFormModal({
     const validatePattern = useCallback((value: string): boolean => {
         const trimmed = value.trim()
         if (!trimmed) return false
-        return /^[\x00-\x7F]*$/.test(trimmed)
+        // 只允许字母、数字、下划线、连字符、点号、斜杠和空格（避免 URL 编码问题）
+        return /^[a-zA-Z0-9_\-./\s]+$/.test(trimmed)
     }, [])
 
     const handleSave = useCallback(async () => {
