@@ -302,6 +302,8 @@ if [ -n "${CC_JAR}" ] && [ -f "${SOURCE_DIR}${CC_JAR}" ]; then
     # 直接替换配置
     if [ -f "${SOURCE_DIR}${CC_CONFIG}" ]; then
         echo "yes" | cp "${SOURCE_DIR}${CC_CONFIG}" "${TARGET_CC_DIR}config.yaml"
+        # 修改 cors-origin 为 *
+        sed -i 's/^  cors-origin:.*/  cors-origin: "*"/' "${TARGET_CC_DIR}config.yaml"
     fi
 
     chown root:root "${TARGET_CC_DIR}${CC_JAR}"
