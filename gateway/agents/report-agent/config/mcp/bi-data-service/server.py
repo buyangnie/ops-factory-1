@@ -409,6 +409,46 @@ def _handle_analyze_sla_rate(args: Dict[str, Any], config: RuntimeConfig) -> Any
     return result
 
 
+def _handle_analyze_request_sla_rate(args: Dict[str, Any], config: RuntimeConfig) -> Any:
+    by_catalog = args.get("by_catalog", True)
+    by_department = args.get("by_department", False)
+    by_priority = args.get("by_priority", False)
+    by_time = args.get("by_time", False)
+    interval = args.get("interval", "week")
+
+    if interval not in VALID_INTERVALS:
+        raise ToolExecutionError(f"Invalid interval: {interval}. Valid: {', '.join(sorted(VALID_INTERVALS))}")
+
+    params = _build_date_params(args)
+
+    # 1. Overall + grouped SLA data from /metrics/requests
+    request_data = _bi_request("GET", "/metrics/requests", config, params=params or None)
+    result: Dict[str, Any] = {
+        "total": request_data.get("totalCount", 0),
+        "sla_rate": request_data.get("slaRate", 0),
+        "avg_csat": request_data.get("avgCsat", 0),
+        "avg_fulfillment_hours": request_data.get("avgFulfillmentHours", 0),
+    }
+
+    # 2. Grouped SLA breakdowns (response/resolution/overall rates per group)
+    if by_catalog:
+        result["by_catalog"] = request_data.get("slaByCatalog", [])
+
+    if by_priority:
+        result["by_priority"] = request_data.get("slaByPriority", [])
+
+    if by_department:
+        result["by_department"] = request_data.get("slaByDepartment", [])
+
+    # 3. by_time trend
+    if by_time:
+        sla_trend = _get_trends("requests", "sla_rate", interval, config, args)
+        sla_trend["name"] = "sla_rate"
+        result["by_time"] = _merge_trend_series([sla_trend])
+
+    return result
+
+
 def _handle_analyze_incident_volume(args: Dict[str, Any], config: RuntimeConfig) -> Any:
     by_priority = args.get("by_priority", True)
     by_category = args.get("by_category", False)
@@ -642,6 +682,10 @@ def _handle_analyze_request_performance(args: Dict[str, Any], config: RuntimeCon
         csat_trend["name"] = "csat"
         trends.append(csat_trend)
 
+        sla_trend = _get_trends("requests", "sla_rate", interval, config, args)
+        sla_trend["name"] = "sla_rate"
+        trends.append(sla_trend)
+
         result["by_time"] = _merge_trend_series(trends)
 
     return result
@@ -806,9 +850,10 @@ TOOLS = [
     {
         "name": "analyze_sla_rate",
         "description": (
-            "Analyze SLA compliance rate. Returns overall rate, response/resolution rates, breach count, and average times. "
+            "Analyze INCIDENT SLA compliance rate. Returns overall rate, response/resolution rates, breach count, and average times. "
             "Default includes by_priority breakdown (P1-P4). Optional: by_category (all categories), by_resolver (all resolvers), "
-            "by_time (multi-series weekly trend: response + resolution + P1/P2 rates). Use sla_type to focus on response or resolution only."
+            "by_time (multi-series weekly trend: response + resolution + P1/P2 rates). Use sla_type to focus on response or resolution only. "
+            "This tool covers Incident SLA only. For Request SLA, use analyze_request_sla_rate."
         ),
         "inputSchema": {
             "type": "object",
@@ -821,6 +866,28 @@ TOOLS = [
                              "enum": ["day", "week", "month"]},
                 "sla_type": {"type": "string", "description": "Focus on response, resolution, or both", "default": "both",
                              "enum": ["response", "resolution", "both"]},
+                "startDate": {"type": "string", "description": "Optional start date (ISO format)"},
+                "endDate": {"type": "string", "description": "Optional end date (ISO format)"},
+            },
+        },
+    },
+    {
+        "name": "analyze_request_sla_rate",
+        "description": (
+            "Analyze service request SLA compliance rate. Returns overall SLA rate (response AND resolution dual-check), "
+            "avg CSAT, avg fulfillment hours. Default includes by_catalog SLA breakdown (response/resolution/overall rates per group). "
+            "Optional: by_priority SLA breakdown, by_department SLA breakdown, by_time trend. "
+            "For Incident SLA, use analyze_sla_rate instead."
+        ),
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "by_catalog": {"type": "boolean", "description": "Include SLA breakdown by service catalog", "default": True},
+                "by_priority": {"type": "boolean", "description": "Include SLA breakdown by priority"},
+                "by_department": {"type": "boolean", "description": "Include SLA breakdown by requester department"},
+                "by_time": {"type": "boolean", "description": "Include time-series SLA rate trend"},
+                "interval": {"type": "string", "description": "Time interval: day, week, or month", "default": "week",
+                             "enum": ["day", "week", "month"]},
                 "startDate": {"type": "string", "description": "Optional start date (ISO format)"},
                 "endDate": {"type": "string", "description": "Optional end date (ISO format)"},
             },
@@ -889,7 +956,7 @@ TOOLS = [
         "name": "analyze_request_performance",
         "description": (
             "Analyze service request performance. Returns total count, fulfilled count, SLA rate, avg CSAT, avg fulfillment hours. "
-            "Default includes by_type distribution. Optional: by_department, by_time trend (volume + CSAT)."
+            "Default includes by_type distribution. Optional: by_department, by_time trend (volume + CSAT + SLA rate)."
         ),
         "inputSchema": {
             "type": "object",
@@ -963,6 +1030,8 @@ def dispatch_tool(name: str, args: Dict[str, Any], config: RuntimeConfig) -> Any
         return _handle_analyze_change_success_rate(args, config)
     if name == "analyze_request_performance":
         return _handle_analyze_request_performance(args, config)
+    if name == "analyze_request_sla_rate":
+        return _handle_analyze_request_sla_rate(args, config)
     if name == "analyze_problem_metrics":
         return _handle_analyze_problem_metrics(args, config)
     if name == "analyze_workforce_performance":

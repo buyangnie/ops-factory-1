@@ -98,6 +98,11 @@ class BusinessIntelligenceServiceTest {
                         "priority", "P1",
                         "response_sla_min", "15",
                         "resolution_sla_min", "240"
+                    ),
+                    Map.of(
+                        "priority", "P2",
+                        "response_sla_min", "60",
+                        "resolution_sla_min", "480"
                     )
                 ),
                 List.of(
@@ -119,7 +124,10 @@ class BusinessIntelligenceServiceTest {
                         "close_code", "Fulfilled",
                         "assigned_to", "Dora",
                         "requester_dept", "Finance",
-                        "satisfaction_score", "4.5"
+                        "satisfaction_score", "4.5",
+                        "priority", "P2",
+                        "response_time_minutes", "30",
+                        "resolution_time_minutes", "120"
                     )
                 ),
                 List.of(

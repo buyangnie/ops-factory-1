@@ -104,7 +104,7 @@
     },
     "tabDescriptions": {
       "executiveSummary": "Core scale and risk summary across four ITIL data categories.",
-      "slaAnalysis": "Multi-dimensional SLA compliance analysis with breach investigation.",
+      "slaAnalysis": "SLA compliance analysis for incidents and service requests.",
       "eventAnalysis": "Incident management KPIs, trend changes, and type distribution based on incident ticket data.",
       "changeAnalysis": "Change success rate trends, type distribution, risk levels, and plan compliance.",
       "requestAnalysis": "Request trends, SLA compliance, satisfaction scores, and top request categories.",
@@ -223,10 +223,10 @@
       "charts": {
         "volumeTrend": "Incident Volume Trend",
         "volumeSeries": "Incident Volume",
-        "slaSeries": "SLA Compliance (%)",
+        "slaSeries": "SLA Compliance",
         "mttrTrend": "Resolution Duration Trend",
-        "mttrSeries": "Average MTTR",
-        "p1p2MttrSeries": "P1/P2 MTTR",
+        "mttrSeries": "Average MTTR (h)",
+        "p1p2MttrSeries": "P1/P2 MTTR (h)",
         "priorityDistribution": "Priority Distribution",
         "typeDistribution": "Incident Type Distribution",
         "changeDensity": "Change Density",
@@ -442,13 +442,23 @@
       }
     },
     "sla": {
+      "sections": {
+        "incident": "Incident SLA",
+        "incidentDesc": "Multi-dimensional incident SLA compliance analysis with breach investigation.",
+        "request": "Request SLA",
+        "requestDesc": "Request SLA compliance correlated with satisfaction and service catalog analysis."
+      },
       "cards": {
         "overall": "Overall Compliance",
         "response": "Response Compliance",
         "resolution": "Resolution Compliance",
         "highPriority": "P1/P2 Compliance",
         "responseBreached": "Response Breaches",
-        "resolutionBreached": "Resolution Breaches"
+        "resolutionBreached": "Resolution Breaches",
+        "requestOverall": "Request SLA Compliance",
+        "requestBreached": "Request Breaches",
+        "requestAvgDelivery": "Avg Delivery Time",
+        "requestBreachedCsat": "Breached-CSAT Correlation"
       },
       "charts": {
         "trend": "SLA Compliance Trend",
@@ -458,12 +468,19 @@
         "seriesResponse": "Response Compliance",
         "seriesResolution": "Resolution Compliance",
         "seriesP1p2": "P1/P2 Compliance",
+        "seriesSlaRate": "SLA Compliance",
+        "seriesAvgCsat": "Avg Satisfaction",
         "axisTime": "Time",
         "axisPriority": "Priority",
-        "axisRate": "Compliance (%)"
+        "axisRate": "Compliance (%)",
+        "requestTrend": "Request SLA & Satisfaction Trend",
+        "requestCatalogComparison": "SLA by Service Catalog",
+        "requestViolationByDept": "Breaches by Department",
+        "requestViolationByCatalog": "Breaches by Service Catalog"
       },
       "tables": {
-        "violationSamples": "Breach Samples"
+        "violationSamples": "Breach Samples",
+        "requestViolationSamples": "Request Breach & Low-CSAT Samples"
       },
       "columns": {
         "id": "ID",
@@ -473,7 +490,10 @@
         "resolver": "Resolver",
         "responseTime": "Response Time",
         "resolutionTime": "Resolution Time",
-        "violationType": "Breach Type"
+        "violationType": "Breach Type",
+        "catalogItem": "Service Catalog",
+        "requesterDept": "Department",
+        "satisfaction": "Satisfaction"
       }
     },
     "correlation": {
