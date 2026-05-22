@@ -93,7 +93,7 @@ public class TikaConversionService {
         document.outputSettings().prettyPrint(false);
         document.select("script,style,meta,link,head,title").remove();
         Element body = document.body();
-        Element root = body != null && !body.children().isEmpty() ? body : document;
+        Element root = ((body != null && !body.children().isEmpty()) ? body : document);
         StringBuilder markdown = new StringBuilder();
         for (Node node : root.childNodes()) {
             appendBlock(node, markdown);

@@ -362,7 +362,7 @@ public class SopServiceTest {
                 .writeValueAsString(sop);
             Files.writeString(file, json, StandardCharsets.UTF_8);
         } catch (IOException e) {
-            throw new RuntimeException(e);
+            throw new IllegalStateException(e);
         }
     }
 }

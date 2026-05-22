@@ -391,7 +391,7 @@ public class HostGroupService {
             Files.writeString(file, json, StandardCharsets.UTF_8);
         } catch (IOException e) {
             log.error("Failed to write group file for id={}", id, e);
-            throw new RuntimeException("Failed to save host group", e);
+            throw new IllegalStateException("Failed to save host group", e);
         }
     }
 }

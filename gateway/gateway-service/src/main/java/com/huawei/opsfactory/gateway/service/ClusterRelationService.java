@@ -184,13 +184,13 @@ public class ClusterRelationService {
             try {
                 businessServiceService.getBusinessService(sourceId);
             } catch (IllegalArgumentException e) {
-                throw new IllegalArgumentException("Source business service not found: " + sourceId);
+                throw new IllegalArgumentException("Source business service not found: " + sourceId, e);
             }
         } else {
             try {
                 clusterService.getCluster(sourceId);
             } catch (IllegalArgumentException e) {
-                throw new IllegalArgumentException("Source cluster not found: " + sourceId);
+                throw new IllegalArgumentException("Source cluster not found: " + sourceId, e);
             }
         }
 
@@ -198,7 +198,7 @@ public class ClusterRelationService {
         try {
             clusterService.getCluster(targetId);
         } catch (IllegalArgumentException e) {
-            throw new IllegalArgumentException("Target cluster not found: " + targetId);
+            throw new IllegalArgumentException("Target cluster not found: " + targetId, e);
         }
 
         String id = UUID.randomUUID().toString();
@@ -250,13 +250,13 @@ public class ClusterRelationService {
                 try {
                     businessServiceService.getBusinessService(sourceId);
                 } catch (IllegalArgumentException e) {
-                    throw new IllegalArgumentException("Source business service not found: " + sourceId);
+                    throw new IllegalArgumentException("Source business service not found: " + sourceId, e);
                 }
             } else {
                 try {
                     clusterService.getCluster(sourceId);
                 } catch (IllegalArgumentException e) {
-                    throw new IllegalArgumentException("Source cluster not found: " + sourceId);
+                    throw new IllegalArgumentException("Source cluster not found: " + sourceId, e);
                 }
             }
             relation.put("sourceId", sourceId);
@@ -266,7 +266,7 @@ public class ClusterRelationService {
             try {
                 clusterService.getCluster(targetId);
             } catch (IllegalArgumentException e) {
-                throw new IllegalArgumentException("Target cluster not found: " + targetId);
+                throw new IllegalArgumentException("Target cluster not found: " + targetId, e);
             }
             relation.put("targetId", targetId);
         }
@@ -443,89 +443,104 @@ public class ClusterRelationService {
      */
     @SuppressWarnings("unchecked")
     public Map<String, Object> getGraphData(String groupId) {
-        // Collect clusters in group
+        Map<String, Map<String, Object>> clusterMap = collectGroupClusters(groupId);
+        List<Map<String, Object>> allRelations = listRelations(null);
+        List<Map<String, Object>> matchedEdges = new ArrayList<>();
+        Map<String, Map<String, Object>> bsNodes = new LinkedHashMap<>();
+        Map<String, Map<String, Object>> hostNodes = new LinkedHashMap<>();
+
+        processRelationsForGraph(allRelations, clusterMap, matchedEdges, bsNodes, hostNodes);
+        List<Map<String, Object>> nodes = buildGraphNodes(clusterMap, hostNodes, bsNodes);
+        List<Map<String, Object>> edges = buildGraphEdges(matchedEdges);
+
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("nodes", nodes);
+        result.put("edges", edges);
+        return result;
+    }
+
+    private Map<String, Map<String, Object>> collectGroupClusters(String groupId) {
         List<Map<String, Object>> groupClusters;
         if (groupId != null && !groupId.isEmpty()) {
             groupClusters = clusterService.listClusters(groupId, null);
-            // Also include clusters from sub-groups
             collectSubGroupClusters(groupId, groupClusters);
         } else {
             groupClusters = clusterService.listClusters(null, null);
         }
-
         Map<String, Map<String, Object>> clusterMap = new LinkedHashMap<>();
         for (Map<String, Object> c : groupClusters) {
             clusterMap.put((String) c.get("id"), c);
         }
+        return clusterMap;
+    }
 
-        // Scan all cluster-relations for matching edges (+1 hop)
-        List<Map<String, Object>> allRelations = listRelations(null);
-        List<Map<String, Object>> matchedEdges = new ArrayList<>();
-
-        // Track business service nodes to add
-        Map<String, Map<String, Object>> bsNodes = new LinkedHashMap<>();
-
-        // Track host nodes for flat topology
-        Map<String, Map<String, Object>> hostNodes = new LinkedHashMap<>();
+    private void processRelationsForGraph(List<Map<String, Object>> allRelations,
+            Map<String, Map<String, Object>> clusterMap,
+            List<Map<String, Object>> matchedEdges,
+            Map<String, Map<String, Object>> bsNodes,
+            Map<String, Map<String, Object>> hostNodes) {
 
         for (Map<String, Object> rel : allRelations) {
             String sourceId = (String) rel.get("sourceId");
             String targetId = (String) rel.get("targetId");
             String sourceType = (String) rel.getOrDefault("sourceType", "cluster");
-
             boolean sourceInGroup = clusterMap.containsKey(sourceId);
             boolean targetInGroup = clusterMap.containsKey(targetId);
 
             if (sourceInGroup || targetInGroup) {
-                // Add +1 hop clusters
-                if (sourceInGroup && !clusterMap.containsKey(targetId)) {
-                    try {
-                        Map<String, Object> tc = clusterService.getCluster(targetId);
-                        clusterMap.put(targetId, tc);
-                    } catch (IllegalArgumentException e) {
-                        log.debug("Skipping missing target cluster {} while building topology", targetId);
-                    }
-                }
-                if (targetInGroup && "cluster".equals(sourceType) && !clusterMap.containsKey(sourceId)) {
-                    try {
-                        Map<String, Object> sc = clusterService.getCluster(sourceId);
-                        clusterMap.put(sourceId, sc);
-                    } catch (IllegalArgumentException e) {
-                        log.debug("Skipping missing source cluster {} while building topology", sourceId);
-                    }
-                }
-
-                // Track business service nodes
-                if ("business-service".equals(sourceType) && !bsNodes.containsKey(sourceId)) {
-                    try {
-                        Map<String, Object> bs = businessServiceService.getBusinessService(sourceId);
-                        bsNodes.put(sourceId, bs);
-                    } catch (IllegalArgumentException e) {
-                        log.debug("Skipping missing business service {} while building topology", sourceId);
-                    }
-                }
-
+                addHopCluster(sourceInGroup, targetId, clusterMap);
+                addHopCluster(targetInGroup && "cluster".equals(sourceType), sourceId, clusterMap);
+                trackBusinessService(sourceType, sourceId, bsNodes);
                 matchedEdges.add(rel);
             }
 
-            // Track cluster→host membership relations for topology
             if ("cluster".equals(sourceType)) {
                 String desc = (String) rel.getOrDefault("description", "");
                 if (MEMBERSHIP_RELATION.equals(desc) && clusterMap.containsKey(sourceId)) {
                     matchedEdges.add(rel);
-                    if (!hostNodes.containsKey(targetId)) {
-                        try {
-                            Map<String, Object> h = hostService.getHost(targetId);
-                            hostNodes.put(targetId, h);
-                        } catch (IllegalArgumentException e) {
-                            log.debug("Skipping missing host {} while building topology", targetId);
-                        }
-                    }
+                    trackHostNode(targetId, hostNodes);
                 }
             }
         }
+    }
 
-        // Build nodes
+    private void addHopCluster(boolean condition, String clusterId, Map<String, Map<String, Object>> clusterMap) {
+        if (!condition || clusterMap.containsKey(clusterId)) {
+            return;
+        }
+        try {
+            clusterMap.put(clusterId, clusterService.getCluster(clusterId));
+        } catch (IllegalArgumentException e) {
+            log.debug("Skipping missing cluster {} while building topology", clusterId);
+        }
+    }
+
+    private void trackBusinessService(String sourceType, String sourceId, Map<String, Map<String, Object>> bsNodes) {
+        if (!"business-service".equals(sourceType) || bsNodes.containsKey(sourceId)) {
+            return;
+        }
+        try {
+            bsNodes.put(sourceId, businessServiceService.getBusinessService(sourceId));
+        } catch (IllegalArgumentException e) {
+            log.debug("Skipping missing business service {} while building topology", sourceId);
+        }
+    }
+
+    private void trackHostNode(String hostId, Map<String, Map<String, Object>> hostNodes) {
+        if (hostNodes.containsKey(hostId)) {
+            return;
+        }
+        try {
+            hostNodes.put(hostId, hostService.getHost(hostId));
+        } catch (IllegalArgumentException e) {
+            log.debug("Skipping missing host {} while building topology", hostId);
+        }
+    }
+
+    private List<Map<String, Object>> buildGraphNodes(Map<String, Map<String, Object>> clusterMap,
+            Map<String, Map<String, Object>> hostNodes,
+            Map<String, Map<String, Object>> bsNodes) {
+
         List<Map<String, Object>> nodes = new ArrayList<>();
         for (Map<String, Object> c : clusterMap.values()) {
             String cId = (String) c.get("id");
@@ -543,16 +558,11 @@ public class ClusterRelationService {
             node.put("nodeType", "cluster");
             nodes.add(node);
 
-            // Add host nodes for this cluster
             for (Map<String, Object> h : clusterHosts) {
-                String hId = (String) h.get("id");
-                if (!hostNodes.containsKey(hId)) {
-                    hostNodes.put(hId, h);
-                }
+                hostNodes.putIfAbsent((String) h.get("id"), h);
             }
         }
 
-        // Add host nodes
         for (Map<String, Object> h : hostNodes.values()) {
             String hClusterId = h.get("clusterId") != null ? h.get("clusterId").toString() : null;
             String hClusterType = null;
@@ -586,7 +596,10 @@ public class ClusterRelationService {
             nodes.add(node);
         }
 
-        // Build edges
+        return nodes;
+    }
+
+    private List<Map<String, Object>> buildGraphEdges(List<Map<String, Object>> matchedEdges) {
         List<Map<String, Object>> edges = new ArrayList<>();
         for (Map<String, Object> rel : matchedEdges) {
             String sourceType = (String) rel.getOrDefault("sourceType", "cluster");
@@ -602,11 +615,7 @@ public class ClusterRelationService {
             }
             edges.add(edge);
         }
-
-        Map<String, Object> result = new LinkedHashMap<>();
-        result.put("nodes", nodes);
-        result.put("edges", edges);
-        return result;
+        return edges;
     }
 
     // ── Neighbor Resolution ──────────────────────────────────────────
@@ -856,7 +865,7 @@ public class ClusterRelationService {
             Files.writeString(file, json, StandardCharsets.UTF_8);
         } catch (IOException e) {
             log.error("Failed to write cluster-relation file for id={}", id, e);
-            throw new RuntimeException("Failed to save cluster relation", e);
+            throw new IllegalStateException("Failed to save cluster relation", e);
         }
     }
 }

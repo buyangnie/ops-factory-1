@@ -99,7 +99,7 @@ class DvClientTest {
                 /* no-op for testing */ }
         };
         assertThrows(RuntimeException.class, () -> noSleepClient.executeWithRetry(() -> {
-            throw new RuntimeException("fail");
+            throw new IllegalStateException("fail");
         }, "testOp"));
     }
 

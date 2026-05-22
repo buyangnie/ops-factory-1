@@ -713,7 +713,7 @@ public class BusinessServiceService {
             Files.writeString(file, json, StandardCharsets.UTF_8);
         } catch (IOException e) {
             log.error("Failed to write business-service file for id={}", id, e);
-            throw new RuntimeException("Failed to save business service", e);
+            throw new IllegalStateException("Failed to save business service", e);
         }
     }
 }

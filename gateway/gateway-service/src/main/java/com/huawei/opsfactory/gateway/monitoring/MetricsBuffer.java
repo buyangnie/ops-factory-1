@@ -227,7 +227,9 @@ public class MetricsBuffer {
                 }
             }
             // Reset dirty since this is just a restore, not new data
-            dirty = false;
+            synchronized (this) {
+                dirty = false;
+            }
             log.info("Restored {} metrics snapshots from {} (discarded {} stale)", restored, persistPath,
                 loaded.size() - restored);
         } catch (IOException | IllegalArgumentException e) {

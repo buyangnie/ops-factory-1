@@ -29,7 +29,7 @@ public class PortAllocator {
             socket.setReuseAddress(true);
             return socket.getLocalPort();
         } catch (IOException e) {
-            throw new RuntimeException("Failed to allocate an available port", e);
+            throw new IllegalStateException("Failed to allocate an available port", e);
         }
     }
 }

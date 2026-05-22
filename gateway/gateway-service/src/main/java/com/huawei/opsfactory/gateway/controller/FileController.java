@@ -32,6 +32,7 @@ import org.springframework.web.server.ResponseStatusException;
 import org.springframework.web.server.ServerWebExchange;
 
 import java.io.IOException;
+import java.io.InputStream;
 import java.net.URLDecoder;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -119,7 +120,10 @@ public class FileController {
             boolean forceDownload = "true".equals(exchange.getRequest().getQueryParams().getFirst("download"));
             String disposition = (!forceDownload && fileService.isInline(mimeType)) ? "inline" : "attachment";
 
-            byte[] content = resource.getInputStream().readAllBytes();
+            byte[] content;
+            try (InputStream is = resource.getInputStream()) {
+                content = is.readAllBytes();
+            }
             // Encode filename using RFC 5987 for proper handling of non-ASCII characters
             // Format: attachment; filename="fallback.ext"; filename*=UTF-8''encoded%name
             String encodedFilename = java.net.URLEncoder.encode(filename, StandardCharsets.UTF_8).replaceAll("\\+", "%20");

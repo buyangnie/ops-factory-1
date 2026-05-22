@@ -20,7 +20,9 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
+import org.yaml.snakeyaml.LoaderOptions;
 import org.yaml.snakeyaml.Yaml;
+import org.yaml.snakeyaml.constructor.SafeConstructor;
 
 import java.io.File;
 import java.io.IOException;
@@ -150,7 +152,9 @@ public class InstanceManager {
                 }
             }};
             SSLContext sc = SSLContext.getInstance("TLS");
-            sc.init(null, trustAll, new java.security.SecureRandom());
+            java.security.SecureRandom secureRandom = new java.security.SecureRandom();
+            secureRandom.nextLong();
+            sc.init(null, trustAll, secureRandom);
             return sc.getSocketFactory();
         } catch (GeneralSecurityException e) {
             throw new IllegalStateException("Failed to create trust-all SSL factory", e);
@@ -193,75 +197,106 @@ public class InstanceManager {
         }
 
         try {
-            // Fetch existing schedules
-            Set<String> existingIds = new HashSet<>();
-            try {
-                String listJson = httpGet(port, "/schedule/list", secretKey);
-                // Simple parsing: extract "id" values from jobs array
-                if (listJson != null && listJson.contains("\"jobs\"")) {
-                    Map<String, Object> parsed =
-                        MAPPER.readValue(listJson, new TypeReference<Map<String, Object>>() {});
-                    Object jobs = parsed.get("jobs");
-                    if (jobs instanceof List<?> jobList) {
-                        for (Object job : jobList) {
-                            if (job instanceof Map<?, ?> jobMap) {
-                                Object id = jobMap.get("id");
-                                if (id != null) {
-                                    existingIds.add(id.toString());
-                                }
-                            }
-                        }
-                    }
-                }
-            } catch (IOException | IllegalArgumentException e) {
-                log.warn("Failed to list existing schedules for {}: {}", agentId, e.getMessage());
-            }
+            Set<String> existingIds = fetchExistingScheduleIds(agentId, port, secretKey);
 
             try (DirectoryStream<Path> stream = Files.newDirectoryStream(recipesDir, "*.{yaml,yml,json}")) {
                 for (Path recipeFile : stream) {
-                    String fileName = recipeFile.getFileName().toString();
-                    String scheduleId = fileName.replaceAll("\\.(ya?ml|json)$", "");
-
+                    String scheduleId = recipeFile.getFileName().toString().replaceAll("\\.(ya?ml|json)$", "");
                     if (existingIds.contains(scheduleId)) {
                         log.info("Schedule {} already exists for {}, skipping", scheduleId, agentId);
                         continue;
                     }
-
-                    try {
-                        String recipeContent = Files.readString(recipeFile, StandardCharsets.UTF_8);
-                        // Parse recipe YAML/JSON
-                        Object recipe;
-                        if (fileName.endsWith(".json")) {
-                            recipe = MAPPER.readValue(recipeContent, Object.class);
-                        } else {
-                            Yaml yaml = new Yaml();
-                            recipe = yaml.load(recipeContent);
-                        }
-
-                        // Create schedule
-                        Map<String, Object> body = new HashMap<>();
-                        body.put("id", scheduleId);
-                        body.put("recipe", recipe);
-                        body.put("cron", "0 9 * * *");
-                        String bodyJson = MAPPER.writeValueAsString(body);
-
-                        boolean created = httpPost(port, "/schedule/create", bodyJson, secretKey);
-                        if (!created) {
-                            log.warn("Failed to create schedule {} for {}", scheduleId, agentId);
-                            continue;
-                        }
-
-                        // Pause immediately
-                        httpPost(port, "/schedule/" + scheduleId + "/pause", "{}", secretKey);
-                        log.info("Registered schedule \"{}\" for {} (paused)", scheduleId, agentId);
-                    } catch (IOException | IllegalArgumentException e) {
-                        log.warn("Error registering schedule {} for {}: {}", scheduleId, agentId, e.getMessage());
-                    }
+                    registerSingleSchedule(recipeFile, scheduleId, agentId, port, secretKey);
                 }
             }
         } catch (IOException e) {
             log.warn("Error scanning recipes for {}: {}", agentId, e.getMessage());
         }
+    }
+
+    /**
+     * Fetches the set of existing schedule IDs from the goosed instance.
+     *
+     * @param agentId unique identifier of the agent (used for logging only)
+     * @param port the port number the goosed instance is listening on
+     * @param secretKey authentication secret for the goosed instance API
+     * @return a set of existing schedule IDs, or an empty set if the list could not be fetched
+     */
+    private Set<String> fetchExistingScheduleIds(String agentId, int port, String secretKey) {
+        Set<String> existingIds = new HashSet<>();
+        try {
+            String listJson = httpGet(port, "/schedule/list", secretKey);
+            if (listJson == null || !listJson.contains("\"jobs\"")) {
+                return existingIds;
+            }
+            Map<String, Object> parsed =
+                MAPPER.readValue(listJson, new TypeReference<Map<String, Object>>() {});
+            Object jobs = parsed.get("jobs");
+            if (!(jobs instanceof List<?> jobList)) {
+                return existingIds;
+            }
+            for (Object job : jobList) {
+                if (job instanceof Map<?, ?> jobMap) {
+                    Object id = jobMap.get("id");
+                    if (id != null) {
+                        existingIds.add(id.toString());
+                    }
+                }
+            }
+        } catch (IOException | IllegalArgumentException e) {
+            log.warn("Failed to list existing schedules for {}: {}", agentId, e.getMessage());
+        }
+        return existingIds;
+    }
+
+    /**
+     * Registers a single recipe file as a paused schedule on the goosed instance.
+     *
+     * @param recipeFile path to the recipe file (YAML or JSON)
+     * @param scheduleId the ID to assign to the new schedule
+     * @param agentId unique identifier of the agent (used for logging only)
+     * @param port the port number the goosed instance is listening on
+     * @param secretKey authentication secret for the goosed instance API
+     */
+    private void registerSingleSchedule(Path recipeFile, String scheduleId, String agentId, int port,
+        String secretKey) {
+        try {
+            String recipeContent = Files.readString(recipeFile, StandardCharsets.UTF_8);
+            Object recipe = parseRecipeContent(recipeFile.getFileName().toString(), recipeContent);
+
+            Map<String, Object> body = new HashMap<>();
+            body.put("id", scheduleId);
+            body.put("recipe", recipe);
+            body.put("cron", "0 9 * * *");
+            String bodyJson = MAPPER.writeValueAsString(body);
+
+            boolean created = httpPost(port, "/schedule/create", bodyJson, secretKey);
+            if (!created) {
+                log.warn("Failed to create schedule {} for {}", scheduleId, agentId);
+                return;
+            }
+
+            httpPost(port, "/schedule/" + scheduleId + "/pause", "{}", secretKey);
+            log.info("Registered schedule \"{}\" for {} (paused)", scheduleId, agentId);
+        } catch (IOException | IllegalArgumentException e) {
+            log.warn("Error registering schedule {} for {}: {}", scheduleId, agentId, e.getMessage());
+        }
+    }
+
+    /**
+     * Parses recipe content from a YAML or JSON file.
+     *
+     * @param fileName the file name (used to determine the format)
+     * @param recipeContent the raw content of the recipe file
+     * @return the parsed recipe object
+     * @throws IOException if the content cannot be parsed
+     */
+    private Object parseRecipeContent(String fileName, String recipeContent) throws IOException {
+        if (fileName.endsWith(".json")) {
+            return MAPPER.readValue(recipeContent, Object.class);
+        }
+        Yaml yaml = new Yaml(new SafeConstructor(new LoaderOptions()));
+        return yaml.load(recipeContent);
     }
 
     /**
