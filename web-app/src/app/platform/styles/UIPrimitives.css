@@ -196,6 +196,11 @@
     margin-bottom: var(--spacing-2);
 }
 
+.form-required {
+    color: var(--color-error);
+    margin-left: 2px;
+}
+
 .form-input {
     width: 100%;
     padding: var(--spacing-3) var(--spacing-4);

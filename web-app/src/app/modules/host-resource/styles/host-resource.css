@@ -2336,17 +2336,48 @@
 
 .hr-import-file-area {
     display: flex;
-    flex-direction: column;
+    flex-direction: row;
+    align-items: center;
     gap: var(--spacing-2, 8px);
 }
 
 .hr-import-file-input {
-    font-size: 0.8125rem;
+    display: none;
 }
 
-.hr-import-file-name {
+.hr-import-file-btn {
+    flex: 0 0 auto;
+    min-width: 100px;
+    padding: var(--spacing-2, 8px) var(--spacing-3, 12px);
+    font-size: 0.8125rem;
+    border: 1px solid var(--border-color, #e2e8f0);
+    border-radius: 6px;
+    background: #e2e8f0;
+    color: var(--text-primary, #1e293b);
+    cursor: pointer;
+    text-align: left;
+    transition: all 0.15s;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    font-weight: 500;
+}
+
+.hr-import-file-btn:hover:not(:disabled) {
+    border-color: var(--color-primary, #3b82f6);
+    background: #dbeafe;
+}
+
+.hr-import-file-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.hr-import-file-placeholder {
+    flex: 1;
     font-size: 0.75rem;
-    color: var(--color-primary, #3b82f6);
+    color: var(--text-secondary, #64748b);
+    padding: var(--spacing-1, 4px) 0;
 }
 
 .hr-import-encoding-hint {

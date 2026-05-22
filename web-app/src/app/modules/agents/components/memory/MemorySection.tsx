@@ -110,18 +110,25 @@ export default function MemorySection({ agentId }: MemorySectionProps) {
             {files.length === 0 ? (
                 <div className="prompts-empty">{t('memory.noFiles')}</div>
             ) : (
-                <div className="memory-file-list">
-                    {files.map(file => (
-                        <MemoryFileCard
-                            key={file.category}
-                            category={file.category}
-                            content={file.content}
-                            onSave={(content) => handleSave(file.category, content)}
-                            onDelete={() => handleDelete(file.category)}
-                            autoEdit={recentlyCreated === file.category}
-                        />
-                    ))}
-                </div>
+                <>
+                    {deleteConfirm && (
+                        <div style={{ marginTop: 'var(--spacing-2)', padding: 'var(--spacing-2) var(--spacing-3)', background: 'rgba(245, 158, 11, 0.1)', borderRadius: 'var(--radius-md)', fontSize: 'var(--font-size-sm)', color: '#b45309' }}>
+                            {t('memory.deleteConfirm')} <span style={{ display: 'inline-block', maxWidth: '200px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', verticalAlign: 'bottom' }} title={deleteConfirm}>「{deleteConfirm}」</span>
+                        </div>
+                    )}
+                    <div className="memory-file-list">
+                        {files.map(file => (
+                            <MemoryFileCard
+                                key={file.category}
+                                category={file.category}
+                                content={file.content}
+                                onSave={(content) => handleSave(file.category, content)}
+                                onDelete={() => handleDelete(file.category)}
+                                autoEdit={recentlyCreated === file.category}
+                            />
+                        ))}
+                    </div>
+                </>
             )}
 
             {/* New File Modal — same structure as Create Agent modal */}
@@ -140,10 +147,11 @@ export default function MemorySection({ agentId }: MemorySectionProps) {
                                 </div>
                             )}
                             <div className="form-group">
-                                <label className="form-label">{t('memory.categoryName')}</label>
+                                <label className="form-label">{t('memory.categoryName')} <span className="form-required">*</span></label>
                                 <input
                                     type="text"
                                     className="form-input"
+                                    maxLength={200}
                                     value={newCategory}
                                     onChange={e => { setNewCategory(e.target.value); setNewCategoryError('') }}
                                     placeholder="development"

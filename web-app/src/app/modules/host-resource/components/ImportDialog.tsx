@@ -239,9 +239,19 @@ export default function ImportDialog({ open, onClose, importing, progress, onImp
                             onChange={handleFileChange}
                             disabled={importing}
                             className="hr-import-file-input"
+                            style={{ display: 'none' }}
                         />
-                        {selectedFile && (
-                            <div className="hr-import-file-name">{selectedFile.name}</div>
+                        <button
+                            type="button"
+                            className="hr-import-file-btn"
+                            onClick={() => fileInputRef.current?.click()}
+                            disabled={importing}
+                            title={selectedFile ? selectedFile.name : t('hostResource.importSelectFile')}
+                        >
+                            {selectedFile ? selectedFile.name : t('hostResource.importSelectFile')}
+                        </button>
+                        {!selectedFile && (
+                            <div className="hr-import-file-placeholder">{t('hostResource.importNoFileSelected')}</div>
                         )}
                     </div>
                 </div>

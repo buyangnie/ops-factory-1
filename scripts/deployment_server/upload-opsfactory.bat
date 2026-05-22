@@ -27,8 +27,12 @@ set "FILES[5]=C:\zhulin\goose\agents.zip"
 set "FILES[6]=C:\zhulin\ops-factory\gateway\config.yaml"
 set "FILES[7]=C:\zhulin\ops-factory\operation-intelligence\target\operation-intelligence.jar"
 set "FILES[8]=C:\zhulin\ops-factory\operation-intelligence\scripts\dv_server.py"
+set "FILES[9]=C:\zhulin\ops-factory\control-center\target\control-center.jar"
+set "FILES[10]=C:\zhulin\ops-factory\knowledge-service\target\knowledge-service.jar"
 
 set "OI_CONFIG_SRC=C:\zhulin\ops-factory\operation-intelligence\config.yaml"
+set "CC_CONFIG_SRC=C:\zhulin\ops-factory\control-center\config.yaml"
+set "KS_CONFIG_SRC=C:\zhulin\ops-factory\knowledge-service\config.yaml"
 
 echo Configuration:
 echo   User: %USER%
@@ -170,7 +174,7 @@ echo.
 echo [Step 3] Uploading files...
 echo.
 
-for /L %%i in (0,1,8) do (
+for /L %%i in (0,1,10) do (
     set "CURRENT_FILE=!FILES[%%i]!"
     if exist "!CURRENT_FILE!" (
         set /a FILE_COUNT+=1
@@ -207,6 +211,24 @@ if !SUCCESS_COUNT! gtr 0 (
             echo   OI config uploaded as oi-config.yaml: SUCCESS
         ) else (
             echo   OI config upload: FAILED
+        )
+    )
+    echo Uploading CC config as cc-config.yaml...
+    if exist "%CC_CONFIG_SRC%" (
+        "%PSCP_PATH%" -pw %PASSWORD% -batch -P 22 "%CC_CONFIG_SRC%" %USER%@%HOST%:%REMOTE_PATH%cc-config.yaml
+        if !errorlevel! equ 0 (
+            echo   CC config uploaded as cc-config.yaml: SUCCESS
+        ) else (
+            echo   CC config upload: FAILED
+        )
+    )
+    echo Uploading KS config as ks-config.yaml...
+    if exist "%KS_CONFIG_SRC%" (
+        "%PSCP_PATH%" -pw %PASSWORD% -batch -P 22 "%KS_CONFIG_SRC%" %USER%@%HOST%:%REMOTE_PATH%ks-config.yaml
+        if !errorlevel! equ 0 (
+            echo   KS config uploaded as ks-config.yaml: SUCCESS
+        ) else (
+            echo   KS config upload: FAILED
         )
     )
     echo Attempting to execute remote script: /home/paas/gateway/handle_ops_app.sh

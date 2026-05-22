@@ -54,6 +54,7 @@ export default function HostResourcePage() {
     const [selected, setSelected] = useState<SelectedNode | null>(null)
     const [focusedHostId, setFocusedHostId] = useState<string | null>(null)
     const [selectedTopologyClusterId, setSelectedTopologyClusterId] = useState<string | null>(null)
+    const [selectedClusterIds, setSelectedClusterIds] = useState<Set<string>>(new Set())
     const [showModal, setShowModal] = useState(false)
     const [editingItem, setEditingItem] = useState<EditingItem>(null)
     const [currentPage, setCurrentPage] = useState(1)
@@ -237,6 +238,38 @@ export default function HostResourcePage() {
             return { ...node, type: 'group' as TreeNodeType }
         })
 
+        // Collect all valid group IDs
+        const validGroupIds = new Set(groups.map(g => g.id))
+        // Add clusters that are not associated with any valid group as top-level nodes
+        const orphanClusters = clusters.filter(c => !c.groupId || !validGroupIds.has(c.groupId))
+        for (const c of orphanClusters) {
+            const hostCount = clusterHostMap.get(c.id) || 0
+            tree.push({
+                id: c.id,
+                type: 'cluster' as TreeNodeType,
+                name: c.name,
+                subtitle: c.type + (hostCount > 0 ? ` (${hostCount} ${t('hostResource.hostCountUnit')})` : ''),
+                raw: c,
+            })
+        }
+
+        // Add business services that are not associated with any valid group as top-level nodes
+        const orphanBusinessServices = businessServices.filter(bs => !bs.groupId || !validGroupIds.has(bs.groupId))
+        for (const bs of orphanBusinessServices) {
+            const hostNames = bs.hostIds
+                .map(hid => allHosts.find(h => h.id === hid)?.name)
+                .filter(Boolean)
+                .join(', ')
+            const businessType = bs.businessTypeId ? businessTypesHook.businessTypes.find(bt => bt.id === bs.businessTypeId) : null
+            tree.push({
+                id: bs.id,
+                type: 'business-service' as TreeNodeType,
+                name: bs.name,
+                subtitle: hostNames || (businessType?.name || bs.code),
+                raw: bs,
+            })
+        }
+
         // Mark inheritedDisabled: a node is visually disabled if it or any ancestor group has enabled=false
         function markInherited(nodes: TreeNode[], ancestorOff: boolean) {
             for (const n of nodes) {
@@ -412,6 +445,101 @@ export default function HostResourcePage() {
         setFocusedHostId(prev => prev === host.id ? null : host.id)
     }, [])
 
+    const handleToggleClusterSelect = useCallback((id: string, type: TreeNodeType) => {
+        if (type === 'cluster' || type === 'business-service') {
+            setSelectedClusterIds(prev => {
+                const newSet = new Set(prev)
+                if (newSet.has(id)) {
+                    newSet.delete(id)
+                } else {
+                    newSet.add(id)
+                }
+                return newSet
+            })
+        }
+    }, [])
+
+    const handleSelectAllClusters = useCallback(() => {
+        const allClusterIds = new Set<string>()
+        function collectIds(nodes: TreeNode[]) {
+            for (const node of nodes) {
+                if (node.type === 'cluster' || node.type === 'business-service') {
+                    allClusterIds.add(node.id)
+                }
+                if (node.children) collectIds(node.children)
+            }
+        }
+        collectIds(treeData)
+
+        if (selectedClusterIds.size === allClusterIds.size) {
+            setSelectedClusterIds(new Set())
+        } else {
+            setSelectedClusterIds(allClusterIds)
+        }
+    }, [treeData, selectedClusterIds.size])
+
+    const handleBatchDeleteClusters = useCallback(async () => {
+        if (selectedClusterIds.size === 0) return
+
+        // Separate selected clusters and business services
+        const selectedClusters = clusters.filter(c => selectedClusterIds.has(c.id))
+        const selectedBusinessServices = businessServices.filter(bs => selectedClusterIds.has(bs.id))
+
+        if (selectedClusters.length === 0 && selectedBusinessServices.length === 0) return
+
+        // Build confirmation message
+        const parts: string[] = []
+        if (selectedClusters.length > 0) {
+            parts.push(t('hostResource.selectedClusters', { count: selectedClusters.length }))
+        }
+        if (selectedBusinessServices.length > 0) {
+            parts.push(t('hostResource.selectedBusinessServices', { count: selectedBusinessServices.length }))
+        }
+
+        // Check for hosts in selected clusters
+        let hasHosts = false
+        const hostCountMap = new Map<string, number>()
+        for (const h of allHosts) {
+            if (h.clusterId && selectedClusterIds.has(h.clusterId)) {
+                hasHosts = true
+                hostCountMap.set(h.clusterId, (hostCountMap.get(h.clusterId) || 0) + 1)
+            }
+        }
+
+        let confirmMessage = parts.join(', ')
+        if (hasHosts) {
+            confirmMessage += t('hostResource.confirmDeleteClustersWithHosts', { count: selectedClusterIds.size, totalHosts: [...hostCountMap.values()].reduce((a, b) => a + b, 0) })
+        }
+
+        const confirmed = await requestConfirm({
+            title: t('common.confirmTitle'),
+            message: confirmMessage,
+            variant: 'danger',
+            confirmLabel: t('common.delete'),
+        })
+        if (!confirmed) return
+
+        // Delete selected clusters
+        for (const cluster of selectedClusters) {
+            try {
+                await deleteCluster(cluster.id, true)
+            } catch (err) {
+                showToast('error', err instanceof Error ? err.message : 'Failed')
+            }
+        }
+
+        // Delete selected business services
+        for (const bs of selectedBusinessServices) {
+            try {
+                await deleteBusinessService(bs.id)
+            } catch (err) {
+                showToast('error', err instanceof Error ? err.message : 'Failed')
+            }
+        }
+
+        setSelectedClusterIds(new Set())
+    }, [selectedClusterIds, clusters, businessServices, allHosts, deleteCluster, deleteBusinessService, t, requestConfirm, showToast])
+
     const defaultGroupIdForCreate = selected?.type === 'group' || selected?.type === 'subgroup' ? selected.id : undefined
     const defaultClusterIdForCreate = selected?.type === 'cluster' ? selected.id : undefined
 
@@ -525,11 +653,41 @@ export default function HostResourcePage() {
                                     onChange={setTreeSearch}
                                 />
                             </div>
+                            {activeTab === 'overview' && selectedClusterIds.size > 0 && (
+                                <div style={{
+                                    display: 'flex', alignItems: 'center', gap: 12, padding: '12px 16px',
+                                    background: 'var(--surface-background, #f8fafc)', borderRadius: 6,
+                                    marginBottom: 'var(--spacing-3)', border: '1px solid var(--border-color, #e2e8f0)'
+                                }}>
+                                    <input
+                                        type="checkbox"
+                                        checked={selectedClusterIds.size > 0}
+                                        onChange={handleSelectAllClusters}
+                                        style={{ cursor: 'pointer' }}
+                                    />
+                                    <span style={{ fontSize: '0.875rem', color: 'var(--text-primary, #1e293b)' }}>
+                                        {selectedClusterIds.size > 0 ? t('common.selectedCount', { count: selectedClusterIds.size }) : t('common.selectAll')}
+                                    </span>
+                                    <div style={{ flex: 1 }} />
+                                    <button className="btn btn-secondary btn-sm" onClick={() => setSelectedClusterIds(new Set())}>
+                                        {t('common.cancel')}
+                                    </button>
+                                    <button
+                                        className="btn btn-primary btn-sm"
+                                        onClick={handleBatchDeleteClusters}
+                                        style={{ background: 'var(--color-error, #ef4444)', borderColor: 'var(--color-error, #ef4444)' }}
+                                    >
+                                        {t('common.delete')} ({selectedClusterIds.size})
+                                    </button>
+                                </div>
+                            )}
                             <ResourceTree
                                 tree={filteredTreeData}
                                 selectedId={selected?.id ?? null}
                                 selectedType={selected?.type ?? null}
+                                selectedIds={activeTab === 'overview' ? selectedClusterIds : undefined}
                                 onSelect={handleSelect}
+                                onToggleSelect={activeTab === 'overview' ? handleToggleClusterSelect : undefined}
                                 onEdit={handleTreeEdit}
                                 onDelete={handleTreeDelete}
                             />

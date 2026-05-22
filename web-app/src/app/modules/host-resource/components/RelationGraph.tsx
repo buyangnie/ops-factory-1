@@ -99,12 +99,21 @@ function computeLayerPositions(
         frontier = next
     }
 
+    // Split long layers into multiple rows to avoid single-line layout
+    const maxNodesPerRow = 6 // Maximum nodes per row before wrapping
+    const wrappedLayers: string[][] = []
+    for (const layer of layers) {
+        for (let i = 0; i < layer.length; i += maxNodesPerRow) {
+            wrappedLayers.push(layer.slice(i, i + maxNodesPerRow))
+        }
+    }
+
     // Adaptive positioning: fill the container with padding
     const result = new Map<string, { x: number; y: number }>()
     const usableW = Math.max(width - PAD * 2, 80)
     const usableH = Math.max(height - PAD * 2, 80)
-    const layerCount = layers.length
-    const maxLayerWidth = Math.max(...layers.map(l => l.length), 1)
+    const layerCount = wrappedLayers.length
+    const maxLayerWidth = Math.max(...wrappedLayers.map(l => l.length), 1)
 
     // Horizontal gap spreads nodes evenly across the usable width per layer
     const gapX = maxLayerWidth > 1 ? usableW / (maxLayerWidth - 1) : 0
@@ -112,7 +121,7 @@ function computeLayerPositions(
     const gapY = layerCount > 1 ? usableH / (layerCount - 1) : 0
 
     for (let li = 0; li < layerCount; li++) {
-        const layer = layers[li]
+        const layer = wrappedLayers[li]
         const y = PAD + gapY * li
         const layerWidth = layer.length > 1 ? gapX * (layer.length - 1) : 0
         const startX = PAD + (usableW - layerWidth) / 2

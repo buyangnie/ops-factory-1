@@ -38,11 +38,13 @@ export default function ClusterTypeTab({ clusterTypes, clusters, loading, onCrea
     const { t } = useTranslation()
     const { showToast } = useToast()
     const { requestConfirm } = useConfirmDialog()
+    const requiredStar = <span style={{ color: 'var(--color-error, #ef4444)', marginLeft: 2 }}>*</span>
     const [showModal, setShowModal] = useState(false)
     const [editing, setEditing] = useState<ClusterType | null>(null)
     const [form, setForm] = useState<FormData>(emptyForm)
     const [saving, setSaving] = useState(false)
     const [searchTerm, setSearchTerm] = useState('')
+    const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
 
     const filteredTypes = useMemo(() => {
         if (!searchTerm.trim()) return clusterTypes
@@ -75,10 +77,36 @@ export default function ClusterTypeTab({ clusterTypes, clusters, loading, onCrea
         if (!form.name.trim()) return
         setSaving(true)
         try {
+            const cleanedForm = {
+                ...form,
+                envVariables: form.envVariables.filter(ev => ev.key.trim() !== ''),
+            }
             if (editing) {
-                await onUpdate(editing.id, form)
+                // Check if type name or code is in use when editing
+                const inUseByName = clusters.filter(c => c.type === form.name)
+                const inUseByCode = clusters.filter(c => c.type === editing.code)
+                const nameChanged = form.name !== editing.name
+                const codeChanged = form.code !== editing.code
+
+                // Show warning if modifying code while it's in use
+                if (codeChanged && inUseByCode.length > 0) {
+                    const inUseClusters = inUseByCode.map(c => c.name).join(', ')
+                    showToast('warning', t('hostResource.clusterTypeInUse', { name: form.code, clusters: inUseClusters }))
+                    setSaving(false)
+                    return
+                }
+
+                // Show warning if modifying name while it's in use by same code
+                if (nameChanged && inUseByName.length > 0) {
+                    const inUseClusters = inUseByName.map(c => c.name).join(', ')
+                    showToast('warning', t('hostResource.clusterTypeInUse', { name: form.name, clusters: inUseClusters }))
+                    setSaving(false)
+                    return
+                }
+
+                await onUpdate(editing.id, cleanedForm)
             } else {
-                await onCreate(form)
+                await onCreate(cleanedForm)
             }
             setShowModal(false)
         } catch (err) {
@@ -86,12 +114,13 @@ export default function ClusterTypeTab({ clusterTypes, clusters, loading, onCrea
         } finally {
             setSaving(false)
         }
-    }, [editing, form, onCreate, onUpdate, showToast])
+    }, [editing, form, onCreate, onUpdate, showToast, t])
 
     const handleDelete = useCallback(async (item: ClusterType) => {
-        const inUse = clusters.filter(c => c.type === item.name)
-        if (inUse.length > 0) {
-            showToast('warning', t('hostResource.clusterTypeInUse', { name: item.name, clusters: inUse.map(c => c.name).join(', ') }))
+        const inUseByName = clusters.filter(c => c.type === item.name)
+        const inUseByCode = clusters.filter(c => c.type === item.code)
+        if (inUseByName.length > 0 || inUseByCode.length > 0) {
+            showToast('warning', t('hostResource.clusterTypeInUse', { name: item.name, clusters: inUseByName.map(c => c.name).join(', ') }))
             return
         }
         const confirmed = await requestConfirm({
@@ -108,6 +137,77 @@ export default function ClusterTypeTab({ clusterTypes, clusters, loading, onCrea
             }
         }
     }, [clusters, onDelete, t, requestConfirm, showToast])
+
+    const handleToggleSelect = useCallback((item: ClusterType) => {
+        setSelectedIds(prev => {
+            const newSet = new Set(prev)
+            if (newSet.has(item.id)) {
+                newSet.delete(item.id)
+            } else {
+                newSet.add(item.id)
+            }
+            return newSet
+        })
+    }, [])
+
+    const handleSelectAll = useCallback(() => {
+        if (selectedIds.size === filteredTypes.length) {
+            setSelectedIds(new Set())
+        } else {
+            setSelectedIds(new Set(filteredTypes.map(ct => ct.id)))
+        }
+    }, [filteredTypes.length, selectedIds.size])
+
+    const handleBatchDelete = useCallback(async () => {
+        const selectedItems = clusterTypes.filter(ct => selectedIds.has(ct.id))
+        if (selectedItems.length === 0) return
+
+        const inUseItems: ClusterType[] = []
+        for (const item of selectedItems) {
+            const inUse = clusters.filter(c => c.type === item.name)
+            if (inUse.length > 0) {
+                inUseItems.push(item)
+            }
+        }
+        if (inUseItems.length > 0) {
+            const names = inUseItems.map(item => item.name).join(', ')
+            showToast('warning', t('hostResource.clusterTypesInUseBatch', { names }))
+            return
+        }
+
+        const confirmed = await requestConfirm({
+            title: t('common.confirmTitle'),
+            message: t('hostResource.confirmDeleteClusterTypes', { count: selectedItems.length }),
+            variant: 'danger',
+            confirmLabel: t('common.delete'),
+        })
+
+        if (!confirmed) return
+
+        try {
+            const results = await Promise.allSettled(
+                Array.from(selectedIds).map(id => onDelete(id))
+            )
+
+            const successful = results.filter(r => r.status === 'fulfilled').length
+            const failed = results.filter(r => r.status === 'rejected').length
+            const totalCount = selectedIds.size
+
+            if (failed > 0) {
+                showToast('warning', t('hostResource.deletePartialResult', {
+                    success: successful,
+                    failed,
+                    total: totalCount
+                }))
+            } else {
+                showToast('success', t('hostResource.deleteSuccess', { count: totalCount }))
+            }
+
+            setSelectedIds(new Set())
+        } catch (err) {
+            showToast('error', err instanceof Error ? err.message : 'Failed')
+        }
+    }, [clusterTypes, clusters, selectedIds, onDelete, t, requestConfirm, showToast])
 
     const updateEnvVar = useCallback((index: number, field: 'key' | 'value', val: string) => {
         setForm(f => {
@@ -164,11 +264,41 @@ export default function ClusterTypeTab({ clusterTypes, clusters, loading, onCrea
                             </ListResultsMeta>
                         )}
                     </div>
+                    {selectedIds.size > 0 && (
+                        <div style={{
+                            display: 'flex', alignItems: 'center', gap: 12, padding: '12px 16px',
+                            background: 'var(--surface-background, #f8fafc)', borderRadius: 6,
+                            marginBottom: 'var(--spacing-3)', border: '1px solid var(--border-color, #e2e8f0)'
+                        }}>
+                            <input
+                                type="checkbox"
+                                checked={selectedIds.size === filteredTypes.length}
+                                onChange={handleSelectAll}
+                                style={{ cursor: 'pointer' }}
+                            />
+                            <span style={{ fontSize: '0.875rem', color: 'var(--text-primary, #1e293b)' }}>
+                                {selectedIds.size > 0 ? t('common.selectedCount', { count: selectedIds.size }) : t('common.selectAll')}
+                            </span>
+                            <div style={{ flex: 1 }} />
+                            <button className="btn btn-secondary btn-sm" onClick={() => setSelectedIds(new Set())}>
+                                {t('common.cancel')}
+                            </button>
+                            <button
+                                className="btn btn-primary btn-sm"
+                                onClick={handleBatchDelete}
+                                style={{ background: 'var(--color-error, #ef4444)', borderColor: 'var(--color-error, #ef4444)' }}
+                            >
+                                {t('common.delete')} ({selectedIds.size})
+                            </button>
+                        </div>
+                    )}
                     <div className="hr-type-def-grid">
                         {filteredTypes.map(ct => (
                             <TypeCard
                                 key={ct.id}
                                 item={ct}
+                                selected={selectedIds.has(ct.id)}
+                                onSelect={handleToggleSelect}
                                 onEdit={openEdit}
                                 onDelete={handleDelete}
                             />
@@ -187,7 +317,7 @@ export default function ClusterTypeTab({ clusterTypes, clusters, loading, onCrea
                         </div>
                         <div className="modal-body">
                             <div className="form-group">
-                                <label className="form-label">{t('hostResource.typeName')}</label>
+                                <label className="form-label">{t('hostResource.typeName')}{requiredStar}</label>
                                 <input
                                     className="form-input"
                                     value={form.name}

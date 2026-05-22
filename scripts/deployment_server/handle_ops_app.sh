@@ -33,6 +33,9 @@ load_config() {
         echo -e "  Gateway JAR: ${GATEWAY_JAR}"
         echo -e "  LIB ZIP: ${LIB_ZIP}"
         echo -e "  Agents ZIP: ${AGENTS_ZIP}"
+        echo -e "  OI JAR: ${OI_JAR}"
+        echo -e "  CC JAR: ${CC_JAR}"
+        echo -e "  KS JAR: ${KS_JAR}"
         echo -e "  ROOT_PASSWORD: ${ROOT_PASSWORD:0:8}****"
         echo -e "  日志级别: ${LOG_LEVEL}"
         echo ""
@@ -120,6 +123,16 @@ validate_source_files() {
         DV_SERVER=""
     fi
 
+    if [ ! -f "${SOURCE_DIR}${CC_JAR}" ]; then
+        print_warning "Control Center JAR不存在: ${SOURCE_DIR}${CC_JAR}，将跳过CC部署"
+        CC_JAR=""
+    fi
+
+    if [ ! -f "${SOURCE_DIR}${KS_JAR}" ]; then
+        print_warning "Knowledge Service JAR不存在: ${SOURCE_DIR}${KS_JAR}，将跳过KS部署"
+        KS_JAR=""
+    fi
+
     print_success "源文件验证通过"
 }
 
@@ -138,10 +151,12 @@ show_operations() {
     echo "  5. 同步 agents 目录（排除 config.yaml、secrets.yaml、goose/）"
     echo "  6. 部署 operation-intelligence（复制 JAR、合并配置）"
     echo "  7. 部署 dv_server.py mock 服务"
-    echo "  8. 合并 gateway config.yaml（保留环境特有的 server 设置）"
-    echo "  9. 复制 webapp"
-    echo "  10. 设置文件权限"
-    echo "  11. 重启所有服务（gateway + OI + dv_server + webapp）"
+    echo "  8. 部署 control-center（复制 JAR、合并配置）"
+    echo "  9. 部署 knowledge-service（复制 JAR、合并配置）"
+    echo "  10. 合并 gateway config.yaml（保留环境特有的 server 设置）"
+    echo "  11. 复制 webapp"
+    echo "  12. 设置文件权限"
+    echo "  13. 重启所有服务（gateway + OI + dv_server + CC + KS + webapp）"
     echo ""
 }
 
@@ -194,7 +209,7 @@ mkdir -p "${BACKUP_DIR}"
 # 2. 备份文件
 echo "创建备份到: ${BACKUP_DIR}"
 cd "${TARGET_HOME_DIR}"
-tar zcvf "backup_${timestamp}.tar.gz" webapp gateway/gateway/gateway-service.jar gateway/gateway/lib/ gateway/gateway/agents/ gateway/gateway/config.yaml
+tar zcvf "backup_${timestamp}.tar.gz" webapp gateway/gateway/gateway-service.jar gateway/gateway/lib/ gateway/gateway/agents/ gateway/gateway/config.yaml operation-intelligence/ control-center/ knowledge-service/
 mv "backup_${timestamp}.tar.gz" "${BACKUP_DIR}"
 
 echo "保留最近5个备份文件..."
@@ -271,7 +286,53 @@ if [ -n "${DV_SERVER}" ] && [ -f "${SOURCE_DIR}${DV_SERVER}" ]; then
     chmod +x "${DV_MOCK_DIR}dv_server.py"
 fi
 
-# 6. 合并 config.yaml
+# 8. 部署 control-center
+if [ -n "${CC_JAR}" ] && [ -f "${SOURCE_DIR}${CC_JAR}" ]; then
+    echo "正在部署 control-center..."
+    mkdir -p "${TARGET_CC_DIR}"
+
+    # 备份旧配置
+    if [ -f "${TARGET_CC_DIR}config.yaml" ]; then
+        cp "${TARGET_CC_DIR}config.yaml" "${TARGET_CC_DIR}config.yaml.bak.${timestamp}"
+    fi
+
+    # 复制新 JAR
+    echo "yes" | cp "${SOURCE_DIR}${CC_JAR}" "${TARGET_CC_DIR}${CC_JAR}"
+
+    # 直接替换配置
+    if [ -f "${SOURCE_DIR}${CC_CONFIG}" ]; then
+        echo "yes" | cp "${SOURCE_DIR}${CC_CONFIG}" "${TARGET_CC_DIR}config.yaml"
+        # 修改 cors-origin 为 *
+        sed -i 's/^  cors-origin:.*/  cors-origin: "*"/' "${TARGET_CC_DIR}config.yaml"
+    fi
+
+    chown root:root "${TARGET_CC_DIR}${CC_JAR}"
+    chmod 600 "${TARGET_CC_DIR}${CC_JAR}"
+fi
+
+# 9. 部署 knowledge-service
+if [ -n "${KS_JAR}" ] && [ -f "${SOURCE_DIR}${KS_JAR}" ]; then
+    echo "正在部署 knowledge-service..."
+    mkdir -p "${TARGET_KS_DIR}"
+
+    # 备份旧配置
+    if [ -f "${TARGET_KS_DIR}config.yaml" ]; then
+        cp "${TARGET_KS_DIR}config.yaml" "${TARGET_KS_DIR}config.yaml.bak.${timestamp}"
+    fi
+
+    # 复制新 JAR
+    echo "yes" | cp "${SOURCE_DIR}${KS_JAR}" "${TARGET_KS_DIR}${KS_JAR}"
+
+    # 直接替换配置
+    if [ -f "${SOURCE_DIR}${KS_CONFIG}" ]; then
+        echo "yes" | cp "${SOURCE_DIR}${KS_CONFIG}" "${TARGET_KS_DIR}config.yaml"
+    fi
+
+    chown root:root "${TARGET_KS_DIR}${KS_JAR}"
+    chmod 600 "${TARGET_KS_DIR}${KS_JAR}"
+fi
+
+# 10. 合并 config.yaml
 #    策略：以代码仓新 config 为基准，仅保留环境特有的 server 设置
 echo "正在合并 config.yaml..."
 cp "${TARGET_DIR}config.yaml" "${TARGET_DIR}config.yaml.bak.${timestamp}"
@@ -299,7 +360,7 @@ print('config.yaml 合并完成')
 "
 rm -f "${TARGET_DIR}config.yaml.bak.${timestamp}"
 
-# 9. 复制 webapp
+# 11. 复制 webapp
 if [ -n "${WEBAPP_ZIP}" ] && [ -f "${SOURCE_DIR}${WEBAPP_ZIP}" ]; then
     echo "正在复制 webapp..."
     rm -rf "${TARGET_WEBAPP_DIR}"/assets/*.js "${TARGET_WEBAPP_DIR}"/assets/*.css
@@ -307,12 +368,12 @@ if [ -n "${WEBAPP_ZIP}" ] && [ -f "${SOURCE_DIR}${WEBAPP_ZIP}" ]; then
     echo "A" | unzip "${SOURCE_DIR}${WEBAPP_ZIP}"
 fi
 
-# 8. 设置文件权限
+# 12. 设置文件权限
 echo "设置文件权限..."
 chown root:root "${TARGET_DIR}${GATEWAY_JAR}"
 chmod 600 "${TARGET_DIR}${GATEWAY_JAR}"
 
-# 9. 重启服务
+# 13. 重启服务
 echo "重启服务..."
 
 echo "正在停止gateway进程..."
@@ -321,6 +382,10 @@ echo "正在停止OI进程..."
 eval "${KILL_OI_COMMAND}" || true
 echo "正在停止DV mock进程..."
 eval "${KILL_DV_MOCK_COMMAND}" || true
+echo "正在停止CC进程..."
+eval "${KILL_CC_COMMAND}" || true
+echo "正在停止KS进程..."
+eval "${KILL_KS_COMMAND}" || true
 echo "正在停止WEBAPP进程..."
 eval "${KILL_WEBAPP_COMMAND}" || true
 pkill -9 goosed 2>/dev/null || true
@@ -346,6 +411,22 @@ if [ -f "${TARGET_OI_DIR}${OI_JAR}" ]; then
     echo "正在启动 operation-intelligence 服务..."
     cd "${TARGET_OI_DIR}"
     nohup java -jar ${OI_JAR} --spring.config.location=config.yaml > oi.log 2>&1 &
+    sleep 5
+fi
+
+# 启动 control-center 服务
+if [ -f "${TARGET_CC_DIR}${CC_JAR}" ]; then
+    echo "正在启动 control-center 服务..."
+    cd "${TARGET_CC_DIR}"
+    nohup java -jar ${CC_JAR} --spring.config.location=config.yaml > cc.log 2>&1 &
+    sleep 5
+fi
+
+# 启动 knowledge-service 服务
+if [ -f "${TARGET_KS_DIR}${KS_JAR}" ]; then
+    echo "正在启动 knowledge-service 服务..."
+    cd "${TARGET_KS_DIR}"
+    nohup java -jar ${KS_JAR} --spring.config.location=config.yaml > ks.log 2>&1 &
     sleep 5
 fi
 
@@ -449,6 +530,24 @@ EOF
             ps -ef | grep "http.server" | grep -v grep
         else
             print_warning "Webapp服务未运行，请检查日志"
+        fi
+
+        print_info "检查control-center服务状态..."
+        if pgrep -f "control-center.jar" > /dev/null; then
+            print_success "Control Center服务正在运行"
+            echo "进程信息："
+            ps -ef | grep "control-center.jar" | grep -v grep
+        else
+            print_warning "Control Center服务未运行，请检查日志"
+        fi
+
+        print_info "检查knowledge-service服务状态..."
+        if pgrep -f "knowledge-service.jar" > /dev/null; then
+            print_success "Knowledge Service服务正在运行"
+            echo "进程信息："
+            ps -ef | grep "knowledge-service.jar" | grep -v grep
+        else
+            print_warning "Knowledge Service服务未运行，请检查日志"
         fi
     else
         echo ""

@@ -40,6 +40,10 @@
     font-size: var(--font-size-base);
     font-weight: 700;
     color: var(--color-text-primary);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    max-width: 300px;
 }
 
 .memory-file-count {

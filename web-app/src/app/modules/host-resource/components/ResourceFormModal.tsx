@@ -2,6 +2,7 @@ import { useState, useCallback, useEffect, useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
 import type { HostGroup, Cluster, Host, CustomAttribute, HostCreateRequest, BusinessService, ClusterType, BusinessType, ClusterRelation } from '../../../../types/host'
 import { isValidIp } from '../../../../utils/ip-validation'
+import { validateAndSanitize } from '../../../../utils/inputValidation'
 import CustomAttributeEditor from './CustomAttributeEditor'
 import TopologyNodeIcon, { type TopologyNodeKind } from './TopologyNodeIcon'
 import SearchableSelect from '../../../platform/ui/forms/SearchableSelect'
@@ -153,6 +154,32 @@ export default function ResourceFormModal({
         return ids
     }, [groups])
 
+    // 获取环境组的所有父组ID（包括自身）
+    const getAncestorIds = useCallback((groupId: string): Set<string> => {
+        const ids = new Set<string>()
+        let currentGroupId: string | null = groupId
+        while (currentGroupId) {
+            ids.add(currentGroupId)
+            const group = groups.find(g => g.id === currentGroupId)
+            if (!group || !group.parentId) break
+            currentGroupId = group.parentId
+        }
+        return ids
+    }, [groups])
+
+    // 获取环境组及其所有祖先和后代ID（完整层级范围）
+    const getRelatedGroupIds = useCallback((groupId: string): Set<string> => {
+        const ancestorIds = getAncestorIds(groupId)
+        const descendantIds = new Set<string>()
+        for (const id of ancestorIds) {
+            const descendants = getDescendantIds(id)
+            for (const d of descendants) {
+                descendantIds.add(d)
+            }
+        }
+        return new Set([...ancestorIds, ...descendantIds])
+    }, [getAncestorIds, getDescendantIds, groups])
+
     const parentCandidates = useMemo(() => {
         const excludeIds = editingItem?.type === 'group' ? getDescendantIds(editingItem.data.id) : new Set<string>()
         // Allow 1st-level (no parentId) and 2nd-level (parentId points to a root group)
@@ -216,13 +243,15 @@ export default function ResourceFormModal({
 
     const handleAddClusterRelation = useCallback(async (sourceType: 'cluster' | 'business-service', sourceId: string) => {
         if (!newRelTargetId) return
+        const descResult = validateAndSanitize(newRelDesc, t('hostResource.relationDesc'))
+        if (!descResult.valid) { setError(t('hostResource.invalidChars')); return }
         setError(null)
         try {
             await onSaveClusterRelation({
                 sourceType,
                 sourceId,
                 targetId: newRelTargetId,
-                description: newRelDesc.trim(),
+                description: descResult.sanitized,
             })
             setNewRelTargetId('')
             setNewRelDesc('')
@@ -230,22 +259,24 @@ export default function ResourceFormModal({
         } catch (err) {
             setError(err instanceof Error ? err.message : 'Failed')
         }
-    }, [newRelTargetId, newRelDesc, onSaveClusterRelation, fetchClusterRelations])
+    }, [newRelTargetId, newRelDesc, onSaveClusterRelation, fetchClusterRelations, t])
 
     const handleSaveRelationEdit = useCallback(async () => {
         if (!editingRelId) return
+        const descResult = validateAndSanitize(editRelDesc, t('hostResource.relationDesc'))
+        if (!descResult.valid) { setError(t('hostResource.invalidChars')); return }
         setError(null)
         try {
             await onUpdateClusterRelation(editingRelId, {
                 targetId: editRelTargetId,
-                description: editRelDesc.trim(),
+                description: descResult.sanitized,
             })
             setEditingRelId(null)
             await fetchClusterRelations()
         } catch (err) {
             setError(err instanceof Error ? err.message : 'Failed')
         }
-    }, [editingRelId, editRelTargetId, editRelDesc, onUpdateClusterRelation, fetchClusterRelations])
+    }, [editingRelId, editRelTargetId, editRelDesc, onUpdateClusterRelation, fetchClusterRelations, t])
 
     const handleDeleteClusterRelation = useCallback(async (relId: string) => {
         setError(null)
@@ -259,23 +290,22 @@ export default function ResourceFormModal({
 
     const getModalTitle = () => {
         if (editingItem) {
-            const prefix = t('hostResource.edit', { defaultValue: 'Edit' })
             const typeLabels: Record<string, string> = {
-                group: t('hostResource.createGroup'),
-                cluster: t('hostResource.createCluster'),
-                'business-service': t('hostResource.createBusinessService'),
-                host: t('hostResource.createHost'),
+                group: t('hostResource.editGroupTitle', { defaultValue: 'Edit Group' }),
+                cluster: t('hostResource.editClusterTitle', { defaultValue: 'Edit Cluster' }),
+                'business-service': t('hostResource.editBusinessServiceTitle', { defaultValue: 'Edit Business Service' }),
+                host: t('hostResource.editHostTitle', { defaultValue: 'Edit Host' }),
             }
-            return `${prefix}${typeLabels[editingItem.type] ?? ''}`
+            return typeLabels[editingItem.type] ?? t('hostResource.editGroupTitle')
         }
         if (!selectedType) return t('hostResource.createResource')
         const typeLabels: Record<string, string> = {
-            group: t('hostResource.createGroup'),
-            cluster: t('hostResource.createCluster'),
-            'business-service': t('hostResource.createBusinessService'),
-            host: t('hostResource.createHost'),
+            group: t('hostResource.createGroupTitle', { defaultValue: 'Create Group' }),
+            cluster: t('hostResource.createClusterTitle', { defaultValue: 'Create Cluster' }),
+            'business-service': t('hostResource.createBusinessServiceTitle', { defaultValue: 'Create Business Service' }),
+            host: t('hostResource.createHostTitle', { defaultValue: 'Create Host' }),
         }
-        return `${t('hostResource.create', { defaultValue: 'Create' })}${typeLabels[selectedType] ?? ''}`
+        return typeLabels[selectedType] ?? t('hostResource.createGroupTitle')
     }
 
     const handleSave = useCallback(async () => {
@@ -283,32 +313,109 @@ export default function ResourceFormModal({
         setSaving(true)
         try {
             if (selectedType === 'group') {
-                if (!groupName.trim()) { setError(t('hostResource.nameRequired')); setSaving(false); return }
-                await onSaveGroup({ name: groupName.trim(), code: groupCode.trim(), parentId: groupParentId || null, description: groupDescription.trim(), enabled: groupEnabled })
+                const nameResult = validateAndSanitize(groupName, t('hostResource.groupName'))
+                if (!nameResult.valid) { setError(t('hostResource.invalidChars')); setSaving(false); return }
+
+                const codeResult = validateAndSanitize(groupCode, t('hostResource.groupCode'))
+                if (!codeResult.valid) { setError(t('hostResource.invalidChars')); setSaving(false); return }
+
+                const descResult = validateAndSanitize(groupDescription, t('hostResource.description'))
+                if (!descResult.valid) { setError(t('hostResource.invalidChars')); setSaving(false); return }
+
+                if (!nameResult.sanitized) { setError(t('hostResource.nameRequired')); setSaving(false); return }
+
+                await onSaveGroup({
+                    name: nameResult.sanitized,
+                    code: codeResult.sanitized,
+                    parentId: groupParentId || null,
+                    description: descResult.sanitized,
+                    enabled: groupEnabled
+                })
             } else if (selectedType === 'cluster') {
-                if (!clusterName.trim()) { setError(t('hostResource.nameRequired')); setSaving(false); return }
-                if (!clusterType.trim()) { setError(t('hostResource.clusterTypeRequired')); setSaving(false); return }
+                const nameResult = validateAndSanitize(clusterName, t('hostResource.clusterName'))
+                if (!nameResult.valid) { setError(t('hostResource.invalidChars')); setSaving(false); return }
+
+                const typeResult = validateAndSanitize(clusterType, t('hostResource.clusterType'))
+                if (!typeResult.valid) { setError(t('hostResource.invalidChars')); setSaving(false); return }
+
+                const purposeResult = validateAndSanitize(clusterPurpose, t('hostResource.purpose'))
+                if (!purposeResult.valid) { setError(t('hostResource.invalidChars')); setSaving(false); return }
+
+                const descResult = validateAndSanitize(clusterDescription, t('hostResource.description'))
+                if (!descResult.valid) { setError(t('hostResource.invalidChars')); setSaving(false); return }
+
+                if (!nameResult.sanitized) { setError(t('hostResource.nameRequired')); setSaving(false); return }
+                if (!typeResult.sanitized) { setError(t('hostResource.clusterTypeRequired')); setSaving(false); return }
                 if (!clusterGroupId) { setError(t('hostResource.parentGroupRequired')); setSaving(false); return }
+
+                // Check duplicate cluster name in same group
+                const editingClusterId = editingItem?.type === 'cluster' ? editingItem.data.id : null
+                const trimmedClusterName = nameResult.sanitized
+                const duplicateCluster = clusters.find(c =>
+                    c.name?.toLowerCase() === trimmedClusterName.toLowerCase() &&
+                    c.groupId === clusterGroupId &&
+                    c.id !== editingClusterId
+                )
+                if (duplicateCluster) {
+                    setError(t('hostResource.duplicateClusterName', { name: trimmedClusterName }))
+                    setSaving(false)
+                    return
+                }
+
                 await onSaveCluster({
-                    name: clusterName.trim(), type: clusterType.trim(), purpose: clusterPurpose.trim(),
-                    groupId: clusterGroupId || null, description: clusterDescription.trim(),
+                    name: nameResult.sanitized,
+                    type: typeResult.sanitized,
+                    purpose: purposeResult.sanitized,
+                    groupId: clusterGroupId || null,
+                    description: descResult.sanitized,
                 })
             } else if (selectedType === 'business-service') {
-                if (!bsName.trim()) { setError(t('hostResource.nameRequired')); setSaving(false); return }
+                const nameResult = validateAndSanitize(bsName, t('hostResource.bsName'))
+                if (!nameResult.valid) { setError(t('hostResource.invalidChars')); setSaving(false); return }
+
+                const codeResult = validateAndSanitize(bsCode, t('hostResource.bsCode'))
+                if (!codeResult.valid) { setError(t('hostResource.invalidChars')); setSaving(false); return }
+
+                const descResult = validateAndSanitize(bsDescription, t('hostResource.description'))
+                if (!descResult.valid) { setError(t('hostResource.invalidChars')); setSaving(false); return }
+
+                if (!nameResult.sanitized) { setError(t('hostResource.nameRequired')); setSaving(false); return }
                 if (!bsGroupId) { setError(t('hostResource.parentGroupRequired')); setSaving(false); return }
+
                 await onSaveBusinessService({
-                    name: bsName.trim(),
-                    code: bsCode.trim(),
+                    name: nameResult.sanitized,
+                    code: codeResult.sanitized,
                     groupId: bsGroupId || null,
                     businessTypeId: bsSelectedBusinessTypeId || null,
                     hostIds: editingItem?.type === 'business-service' ? (editingItem.data.hostIds ?? []) : [],
                     tags: bsTags.split(',').map(s => s.trim()).filter(Boolean),
                     priority: bsPriority.trim(),
-                    description: bsDescription.trim(),
+                    description: descResult.sanitized,
                     contactInfo: '',
                 })
             } else if (selectedType === 'host') {
-                if (!hostName.trim() || !hostIp.trim()) { setError(t('hostResource.nameAndIpRequired')); setSaving(false); return }
+                const nameResult = validateAndSanitize(hostName, t('hostResource.hostName'))
+                if (!nameResult.valid) { setError(t('hostResource.invalidChars')); setSaving(false); return }
+
+                const hostnameResult = validateAndSanitize(hostname, t('hostResource.hostname'))
+                if (!hostnameResult.valid) { setError(t('hostResource.invalidChars')); setSaving(false); return }
+
+                const osResult = validateAndSanitize(hostOs, t('hostResource.os'))
+                if (!osResult.valid) { setError(t('hostResource.invalidChars')); setSaving(false); return }
+
+                const locationResult = validateAndSanitize(hostLocation, t('hostResource.location'))
+                if (!locationResult.valid) { setError(t('hostResource.invalidChars')); setSaving(false); return }
+
+                const purposeResult = validateAndSanitize(hostPurpose, t('hostResource.purpose'))
+                if (!purposeResult.valid) { setError(t('hostResource.invalidChars')); setSaving(false); return }
+
+                const businessResult = validateAndSanitize(hostBusiness, t('hostResource.business'))
+                if (!businessResult.valid) { setError(t('hostResource.invalidChars')); setSaving(false); return }
+
+                const descResult = validateAndSanitize(hostDescription, t('hostResource.description'))
+                if (!descResult.valid) { setError(t('hostResource.invalidChars')); setSaving(false); return }
+
+                if (!nameResult.sanitized || !hostIp.trim()) { setError(t('hostResource.nameAndIpRequired')); setSaving(false); return }
                 if (!isValidIp(hostIp)) { setError(t('hostResource.ipInvalid')); setSaving(false); return }
                 if (hostBusinessIp.trim() && !isValidIp(hostBusinessIp)) { setError(t('hostResource.businessIpInvalid')); setSaving(false); return }
                 if (hostUsername && !/^[\x00-\x7F]*$/.test(hostUsername)) {
@@ -318,14 +425,40 @@ export default function ResourceFormModal({
                     setError(t('hostResource.credentialInvalidChars')); setSaving(false); return
                 }
                 const editingHostId = editingItem?.type === 'host' ? editingItem.data.id : null
-                const trimmedHostName = hostName.trim()
+                const trimmedHostName = nameResult.sanitized
                 const duplicate = hosts.some(h => h.name?.toLowerCase() === trimmedHostName.toLowerCase() && h.id !== editingHostId)
                 if (duplicate) { setError(t('hostResource.duplicateName', { name: trimmedHostName })); setSaving(false); return }
+
+                // SSH IP重复校验（在同一环境组层级中）
+                const cluster = hostClusterId ? clusters.find(c => c.id === hostClusterId) : null
+                const relatedGroupIds = cluster?.groupId ? getRelatedGroupIds(cluster.groupId) : new Set<string>()
+
+                const trimmedIp = hostIp.trim()
+                if (trimmedIp && relatedGroupIds.size > 0) {
+                    const duplicateIpHost = hosts.find(h => {
+                        if (h.id === editingHostId) return false
+                        if (!h.clusterId || !h.ip) return false
+                        const hostCluster = clusters.find(c => c.id === h.clusterId)
+                        if (!hostCluster?.groupId) return false
+                        const hostGroupIds = getRelatedGroupIds(hostCluster.groupId)
+                        return [...hostGroupIds].some(id => relatedGroupIds.has(id)) && h.ip.trim() === trimmedIp
+                    })
+                    if (duplicateIpHost) {
+                        setError(t('hostResource.duplicateIp', { ip: trimmedIp, host: duplicateIpHost.name }))
+                        setSaving(false)
+                        return
+                    }
+                }
+
                 const payload: Record<string, unknown> = {
-                    name: hostName.trim(), hostname: hostname.trim() || null, ip: hostIp.trim(), port: hostPort,
-                    os: hostOs.trim() || null, location: hostLocation.trim() || null, username: hostUsername.trim(),
-                    authType: hostAuthType, clusterId: hostClusterId || null, purpose: hostPurpose.trim() || null,
-                    business: hostBusiness.trim() || null, description: hostDescription.trim(),
+                    name: nameResult.sanitized,
+                    hostname: hostnameResult.sanitized || null,
+                    ip: hostIp.trim(), port: hostPort,
+                    os: osResult.sanitized || null, location: locationResult.sanitized || null,
+                    username: hostUsername.trim(),
+                    authType: hostAuthType, clusterId: hostClusterId || null,
+                    purpose: purposeResult.sanitized || null,
+                    business: businessResult.sanitized || null, description: descResult.sanitized,
                     customAttributes: hostCustomAttributes.filter(attr => attr.key.trim().length > 0),
                     businessIp: hostBusinessIp.trim() || null,
                     role: hostRole || null,
@@ -344,7 +477,8 @@ export default function ResourceFormModal({
         hostUsername, hostAuthType, hostCredential, hostClusterId, hostPurpose, hostBusiness,
         hostDescription, hostCustomAttributes, hostRole,
         bsName, bsCode, bsGroupId, bsSelectedBusinessTypeId, bsTags, bsPriority, bsDescription,
-        onSaveGroup, onSaveCluster, onSaveBusinessService, onSaveHost, onClose, t, editingItem, hosts])
+        onSaveGroup, onSaveCluster, onSaveBusinessService, onSaveHost, onClose, t, editingItem, hosts,
+        getRelatedGroupIds, clusters])
 
     const canSave = () => {
         if (selectedType === 'group') return groupName.trim().length > 0
@@ -632,10 +766,6 @@ export default function ResourceFormModal({
                                                         const bt = businessTypes.find(b => b.id === btId)
                                                         if (bt) {
                                                             setBsCode(bt.code)
-                                                            if (!editingItem) {
-                                                                setBsName(bt.name)
-                                                                setBsDescription(bt.description)
-                                                            }
                                                         }
                                                     } else {
                                                         setBsCode('')

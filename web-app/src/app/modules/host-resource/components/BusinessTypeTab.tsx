@@ -29,6 +29,7 @@ export default function BusinessTypeTab({ businessTypes, loading, onCreate, onUp
     const { t } = useTranslation()
     const { showToast } = useToast()
     const { requestConfirm } = useConfirmDialog()
+    const requiredStar = <span style={{ color: 'var(--color-error, #ef4444)', marginLeft: 2 }}>*</span>
     const [showModal, setShowModal] = useState(false)
     const [editing, setEditing] = useState<BusinessType | null>(null)
     const [form, setForm] = useState<FormData>(emptyForm)
@@ -148,7 +149,7 @@ export default function BusinessTypeTab({ businessTypes, loading, onCreate, onUp
                         </div>
                         <div className="modal-body">
                             <div className="form-group">
-                                <label className="form-label">{t('hostResource.typeName')}</label>
+                                <label className="form-label">{t('hostResource.typeName')}{requiredStar}</label>
                                 <input
                                     className="form-input"
                                     value={form.name}

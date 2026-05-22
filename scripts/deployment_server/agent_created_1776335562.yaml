@@ -1,6 +1,6 @@
 version: "1.0.0"
 title: "Windows Gateway 自动部署任务"
-description: "每天凌晨3点自动克隆代码、编译Gateway项目、编译Operation Intelligence项目、编译Agents MCP服务、编译Webapp项目、验证文件并上传到服务器的自动化部署任务"
+description: "每天凌晨3点自动克隆代码、编译Gateway项目、编译Operation Intelligence项目、编译Control Center项目、编译Agents MCP服务、编译Webapp项目、验证文件并上传到服务器的自动化部署任务"
 instructions: |
   执行以下步骤完成Gateway和Webapp项目的自动化部署：
 
@@ -20,6 +20,18 @@ instructions: |
       - 检查编译是否成功(errorlevel 为0表示成功)
       - 验证文件存在: C:\zhulin\ops-factory\operation-intelligence\target\operation-intelligence.jar
 
+  2c. 编译 control-center 项目
+      - 进入目录 C:\zhulin\ops-factory\control-center
+      - 执行 Maven 编译命令: C:\zhulin\apache-maven-3.9.14\bin\mvn clean package -DskipTests
+      - 检查编译是否成功(errorlevel 为0表示成功)
+      - 验证文件存在: C:\zhulin\ops-factory\control-center\target\control-center.jar
+
+  2d. 编译 knowledge-service 项目
+      - 进入目录 C:\zhulin\ops-factory\knowledge-service
+      - 执行 Maven 编译命令: C:\zhulin\apache-maven-3.9.14\bin\mvn clean package -DskipTests
+      - 检查编译是否成功(errorlevel 为0表示成功)
+      - 验证文件存在: C:\zhulin\ops-factory\knowledge-service\target\knowledge-service.jar
+      
   3. 编译 Agents MCP 服务
      - 以下3个MCP服务需要执行 npm install && npm run build（编译TypeScript为JavaScript）:
        a. cd C:\zhulin\ops-factory\gateway\agents\qa-agent\config\mcp\knowledge-service && npm install && npm run build
@@ -40,6 +52,14 @@ instructions: |
   5b. 准备 operation-intelligence 文件
       - 验证文件是否存在: C:\zhulin\ops-factory\operation-intelligence\target\operation-intelligence.jar
       - 如果文件不存在，OI 部署将被跳过（不影响 gateway/webapp）
+
+  5c. 准备 control-center 文件
+      - 验证文件是否存在: C:\zhulin\ops-factory\control-center\target\control-center.jar
+      - 如果文件不存在，CC 部署将被跳过（不影响 gateway/webapp）
+      
+  5d. 准备 knowledge-service 文件
+      - 验证文件是否存在: C:\zhulin\ops-factory\knowledge-service\target\knowledge-service.jar
+      - 如果文件不存在，KS 部署将被跳过（不影响 gateway/webapp）
 
   6. 执行文件上传脚本
      - 执行脚本: C:\zhulin\goose\upload-opsfactory.bat

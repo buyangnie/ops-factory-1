@@ -43,12 +43,34 @@ export default function CreateProviderModal({ mode, provider, onClose, onCreate,
     const [isSaving, setIsSaving] = useState(false)
     const [error, setError] = useState<string | null>(null)
 
-    const isValid = useMemo(() => {
-        if (isEdit) {
-            return Boolean(provider?.name) && Boolean(baseUrl.trim())
+    const validationErrors = useMemo(() => {
+        const errors: Record<string, string> = {}
+        const trimmedBaseUrl = baseUrl.trim()
+        const trimmedContextLimit = contextLimit.trim()
+
+        if (!isEdit) {
+            const trimmedName = name.trim()
+            if (!trimmedName) {
+                errors.name = t('agentConfigure.providerNameRequired')
+            } else if (!/^[A-Za-z0-9._-]+$/.test(trimmedName)) {
+                errors.name = t('agentConfigure.providerNameFormat')
+            }
         }
-        return /^[A-Za-z0-9._-]+$/.test(name.trim()) && Boolean(baseUrl.trim())
-    }, [baseUrl, isEdit, name, provider?.name])
+
+        if (!trimmedBaseUrl) {
+            errors.baseUrl = t('agentConfigure.baseUrlRequired')
+        } else if (!/^https?:\/\/[^\s]*$/i.test(trimmedBaseUrl)) {
+            errors.baseUrl = t('agentConfigure.baseUrlFormat')
+        }
+
+        if (trimmedContextLimit && !/^\d+$/.test(trimmedContextLimit)) {
+            errors.contextLimit = t('agentConfigure.contextLimitFormat')
+        }
+
+        return errors
+    }, [baseUrl, contextLimit, isEdit, name, t])
+
+    const isValid = Object.keys(validationErrors).length === 0
 
     const buildProviderPayload = (): UpdateProviderRequest => ({
         base_url: baseUrl.trim(),
@@ -63,7 +85,8 @@ export default function CreateProviderModal({ mode, provider, onClose, onCreate,
     const handleSave = async () => {
         setError(null)
         if (!isValid) {
-            setError(t('agentConfigure.providerValidation'))
+            const firstError = Object.values(validationErrors)[0]
+            setError(firstError)
             return
         }
         setIsSaving(true)
@@ -83,8 +106,8 @@ export default function CreateProviderModal({ mode, provider, onClose, onCreate,
     }
 
     return (
-        <div className="modal-overlay" onClick={onClose}>
-            <div className="modal modal-wide" onClick={(event) => event.stopPropagation()}>
+        <div className="modal-overlay">
+            <div className="modal modal-wide">
                 <div className="modal-header">
                     <h2 className="modal-title">{isEdit ? t('agentConfigure.editProvider') : t('agentConfigure.createProvider')}</h2>
                     <button type="button" className="modal-close" onClick={onClose}>&times;</button>
@@ -99,8 +122,9 @@ export default function CreateProviderModal({ mode, provider, onClose, onCreate,
                             <ReadonlyProviderField label={t('agentConfigure.providerName')} value={name} />
                         ) : (
                             <label className="form-group">
-                                <span className="form-label">{t('agentConfigure.providerName')}</span>
-                                <input className="form-input" value={name} onChange={event => setName(event.target.value)} />
+                                <span className="form-label">{t('agentConfigure.providerName')} <span className="form-required">*</span></span>
+                                <input className="form-input" maxLength={200} value={name} onChange={event => setName(event.target.value)} />
+                                {validationErrors.name && <span className="form-error">{validationErrors.name}</span>}
                             </label>
                         )}
                         {isEdit ? (
@@ -108,7 +132,7 @@ export default function CreateProviderModal({ mode, provider, onClose, onCreate,
                         ) : (
                             <label className="form-group">
                                 <span className="form-label">{t('agentConfigure.providerDisplayName')}</span>
-                                <input className="form-input" value={displayName} onChange={event => setDisplayName(event.target.value)} />
+                                <input className="form-input" maxLength={255} value={displayName} onChange={event => setDisplayName(event.target.value)} />
                             </label>
                         )}
                         <ReadonlyProviderField label={t('agentConfigure.providerEngine')} value={formatProviderEngine(provider?.engine)} />
@@ -117,26 +141,36 @@ export default function CreateProviderModal({ mode, provider, onClose, onCreate,
                             <input
                                 className="form-input"
                                 type="password"
+                                maxLength={5000}
                                 value={apiKey}
                                 onChange={event => setApiKey(event.target.value)}
                                 placeholder={t('agentConfigure.apiKeyPlaceholder')}
                             />
                         </label>
                         <label className="form-group agent-provider-form-wide">
-                            <span className="form-label">{t('agentConfigure.baseUrl')}</span>
-                            <input className="form-input" value={baseUrl} onChange={event => setBaseUrl(event.target.value)} />
+                            <span className="form-label">{t('agentConfigure.baseUrl')} <span className="form-required">*</span></span>
+                            <input className="form-input" maxLength={500} value={baseUrl} onChange={event => setBaseUrl(event.target.value)} placeholder={t('agentConfigure.baseUrlPlaceholder')} />
+                            {validationErrors.baseUrl && <span className="form-error">{validationErrors.baseUrl}</span>}
                         </label>
                         <label className="form-group">
                             <span className="form-label">{t('agentConfigure.modelName')}</span>
-                            <input className="form-input" value={modelName} onChange={event => setModelName(event.target.value)} />
+                            <input className="form-input" maxLength={255} value={modelName} onChange={event => setModelName(event.target.value)} />
                         </label>
                         <label className="form-group">
                             <span className="form-label">{t('agentConfigure.contextLimit')}</span>
-                            <input className="form-input" value={contextLimit} onChange={event => setContextLimit(event.target.value)} />
+                            <input
+                                className="form-input"
+                                type="number"
+                                min="1"
+                                pattern="\d*"
+                                value={contextLimit}
+                                onChange={event => setContextLimit(event.target.value)}
+                            />
+                            {validationErrors.contextLimit && <span className="form-error">{validationErrors.contextLimit}</span>}
                         </label>
                         <label className="form-group agent-provider-form-wide">
                             <span className="form-label">{t('agentConfigure.providerDescription')}</span>
-                            <textarea className="form-input" value={description} onChange={event => setDescription(event.target.value)} />
+                            <textarea className="form-input" maxLength={1000} value={description} onChange={event => setDescription(event.target.value)} />
                         </label>
                     </div>
                 </div>

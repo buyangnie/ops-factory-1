@@ -140,7 +140,7 @@ export default function MemoryFileCard({ category, content, onSave, onDelete, au
         <div className={`memory-file-card ${isEditing ? 'memory-file-card-editing' : ''}`}>
             <div className="memory-file-header">
                 <div className="memory-file-title">
-                    <span className="memory-file-name">{category}</span>
+                    <span className="memory-file-name" title={category}>{category}</span>
                     <span className="memory-file-count">
                         {entries.length > 0 && t('memory.entryCount', { count: entries.length })}
                     </span>
