@@ -65,11 +65,11 @@ export function useClusterRelations() {
         })
         const data = await res.json()
         if (data.success) {
-            await fetchRelations()
+            await Promise.all([fetchRelations(), fetchClusterGraph()])
             return data.relation
         }
         throw new Error(data.error || 'Failed to update cluster relation')
-    }, [userId, fetchRelations])
+    }, [userId, fetchRelations, fetchClusterGraph])
 
     const deleteRelation = useCallback(async (id: string) => {
         const res = await fetch(`${apiBase()}/${id}`, {
@@ -78,11 +78,11 @@ export function useClusterRelations() {
         })
         const data = await res.json()
         if (data.success) {
-            await fetchRelations()
+            await Promise.all([fetchRelations(), fetchClusterGraph()])
             return true
         }
         throw new Error(data.error || 'Failed to delete cluster relation')
-    }, [userId, fetchRelations])
+    }, [userId, fetchRelations, fetchClusterGraph])
 
     return {
         relations, clusterGraphData, loading,

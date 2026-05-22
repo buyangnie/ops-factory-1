@@ -19,10 +19,9 @@ export function AppShell({
 }) {
     const mainWrapperClass = [
         'main-wrapper',
-        isEmbed ? 'embed-mode' : '',
+        isEmbed ? 'embed-mode' : (isCollapsed ? 'sidebar-collapsed' : ''),
         isRightPanelOpen ? 'with-right-panel' : '',
         rightPanelMode,
-        isCollapsed ? 'sidebar-collapsed' : '',
     ].filter(Boolean).join(' ')
 
     return (
@@ -30,7 +29,7 @@ export function AppShell({
             {!isEmbed && sidebar}
             <div className={mainWrapperClass}>
                 <main className="main-content">{children}</main>
-                {!isEmbed && rightPanel}
+                {rightPanel}
             </div>
         </div>
     )

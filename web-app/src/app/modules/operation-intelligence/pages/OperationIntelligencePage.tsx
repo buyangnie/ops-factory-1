@@ -50,7 +50,7 @@ export default function OperationIntelligencePage() {
     useEffect(() => { fetchData() }, [fetchData])
 
     useEffect(() => {
-        const timer = setInterval(fetchData, 60000)
+        const timer = setInterval(() => fetchData(), 60000)
         return () => clearInterval(timer)
     }, [fetchData])
 
