@@ -20,6 +20,9 @@ import jakarta.annotation.PostConstruct;
  * requestId/userId/sessionId from Reactor Context to SLF4J MDC across
  * thread switches in reactive chains.
  *
+ * <p>MDC propagation can be disabled via the {@code gateway.logging.mdcPropagationEnabled}
+ * configuration property.
+ *
  * @author x00000000
  * @since 2026-05-25
  */
@@ -32,12 +35,26 @@ public class ReactorMdcConfiguration {
 
     public static final String SESSION_ID_KEY = "SESSION_ID";
 
+    private final GatewayProperties properties;
+
+    /**
+     * Creates the Reactor MDC configuration instance.
+     *
+     * @param properties gateway configuration properties
+     */
+    public ReactorMdcConfiguration(GatewayProperties properties) {
+        this.properties = properties;
+    }
+
     /**
      * Initializes Micrometer Context Propagation for Reactor.
      * Called automatically by Spring on application startup.
      */
     @PostConstruct
     public void initializeContextPropagation() {
+        if (!properties.getLogging().isMdcPropagationEnabled()) {
+            return;
+        }
         ContextRegistry registry = ContextRegistry.getInstance();
         registry.registerThreadLocalAccessor("requestId", () -> MDC.get("requestId"),
             value -> MDC.put("requestId", value), () -> MDC.remove("requestId"));
@@ -52,6 +69,9 @@ public class ReactorMdcConfiguration {
     /**
      * Marker class to ensure initialization happens once.
      *
+     * <p>This bean is created after the {@link #initializeContextPropagation()} method completes,
+     * guaranteeing that Reactor hooks are registered before the application serves requests.
+     *
      * @return the initializer instance
      */
     @Bean
@@ -60,7 +80,11 @@ public class ReactorMdcConfiguration {
     }
 
     /**
-     * Marker class to ensure hooks are initialized once.
+     * Marker class that ensures Reactor MDC hooks are initialized once.
+     *
+     * <p>The {@code @PostConstruct} method {@link #initializeContextPropagation()} registers the
+     * Micrometer context propagation hooks. This bean guarantees Spring completes that initialization
+     * before accepting traffic.
      */
     public static final class ReactorMdcInitializer {
     }

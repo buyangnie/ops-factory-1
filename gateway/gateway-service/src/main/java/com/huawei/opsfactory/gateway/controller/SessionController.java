@@ -106,6 +106,9 @@ public class SessionController {
     public Mono<String> startSession(@PathVariable("agentId") String agentId, @RequestBody String body,
         ServerWebExchange exchange) {
         String userId = exchange.getAttribute(UserContextFilter.USER_ID_ATTR);
+        if (userId == null) {
+            return Mono.just("{\"success\":false,\"error\":\"User ID is required\"}");
+        }
         String requestId = exchange.getAttribute(RequestContextFilter.REQUEST_ID_ATTR);
         long requestStart = System.currentTimeMillis();
         // Inject working_dir into the request body (override any client-supplied value)

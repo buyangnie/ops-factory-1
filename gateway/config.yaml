@@ -26,7 +26,7 @@ gateway:
   credential-encryption-key: changeit-changeit-changeit-32ch
   remote-execution: { default-timeout: 30, max-timeout: 120 }
   logging: { access-log-enabled: true, include-upstream-error-body: false, include-sse-chunk-preview: false,
-             sse-chunk-preview-max-chars: 160 }
+             sse-chunk-preview-max-chars: 160, mdc-propagation-enabled: true }
 logging:
   level: { root: INFO, com.huawei.opsfactory.gateway: INFO, com.huawei.opsfactory.gateway.controller.ReplyController: DEBUG,
            org.springframework: WARN, reactor: WARN, io.netty: WARN }

@@ -4,8 +4,8 @@
 
 package com.huawei.opsfactory.gateway.support;
 
-import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.CopyOnWriteArrayList;
 import ch.qos.logback.classic.spi.ILoggingEvent;
 import ch.qos.logback.core.AppenderBase;
 
@@ -18,7 +18,7 @@ import ch.qos.logback.core.AppenderBase;
 public final class TestLogAppender extends AppenderBase<ILoggingEvent> implements AutoCloseable {
     private final ch.qos.logback.classic.Logger logger;
 
-    private final List<ILoggingEvent> events = new ArrayList<>();
+    private final List<ILoggingEvent> events = new CopyOnWriteArrayList<>();
 
     private TestLogAppender(ch.qos.logback.classic.Logger logger) {
         this.logger = logger;

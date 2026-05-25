@@ -48,6 +48,7 @@ gateway:
     include-upstream-error-body: false
     include-sse-chunk-preview: false
     sse-chunk-preview-max-chars: 160
+    mdc-propagation-enabled: true      # Enable MDC context propagation in WebFlux reactive chains
 
   # Langfuse observability (optional)
   # env overrides: LANGFUSE_HOST / LANGFUSE_PUBLIC_KEY / LANGFUSE_SECRET_KEY
