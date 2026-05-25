@@ -10,7 +10,6 @@ import com.huawei.opsfactory.gateway.filter.RequestContextFilter;
 import com.huawei.opsfactory.gateway.filter.UserContextFilter;
 import com.huawei.opsfactory.gateway.hook.HookContext;
 import com.huawei.opsfactory.gateway.hook.HookPipeline;
-import com.huawei.opsfactory.gateway.logging.GatewayLogContext;
 import com.huawei.opsfactory.gateway.process.InstanceManager;
 import com.huawei.opsfactory.gateway.proxy.GoosedProxy;
 import com.huawei.opsfactory.gateway.service.AgentConfigService;
@@ -143,11 +142,9 @@ public class ReplyController {
         @RequestBody String body, ServerWebExchange exchange) {
         long requestStart = System.currentTimeMillis();
         String userId = exchange.getAttribute(UserContextFilter.USER_ID_ATTR);
-        String requestId = exchange.getAttribute(RequestContextFilter.REQUEST_ID_ATTR);
         HookContext ctx = new HookContext(body, agentId, userId);
-        GatewayLogContext.run(requestId, userId, sessionId,
-            () -> log.info("[SESSION-REPLY] request received " + "agentId={} userId={} sessionId={} bodyLen={}",
-                agentId, userId, sessionId, body.length()));
+        log.info("[SESSION-REPLY] request received agentId={} userId={} sessionId={} bodyLen={}", agentId, userId, sessionId,
+            body.length());
         String chatRequestId = extractRequestId(body);
 
         return hookPipeline.executeRequest(ctx)
@@ -160,30 +157,22 @@ public class ReplyController {
                     .then(snapshotFilesBeforeReply(agentId, userId, sessionId, chatRequestId))
                     .then(goosedProxy.proxySessionCommandWithBody(exchange.getResponse(), instance.getPort(), path,
                         HttpMethod.POST, processedBody, instance.getSecretKey()))
-                    .doOnSubscribe(sub -> GatewayLogContext.run(requestId, userId, sessionId,
-                        () -> log.info(
-                            "[SESSION-REPLY] forwarding agentId={} " + "userId={} sessionId={} port={} path={}",
-                            agentId, userId, sessionId, instance.getPort(), path)))
+                    .doOnSubscribe(sub -> log
+                        .info("[SESSION-REPLY] forwarding agentId={} userId={} sessionId={} port={} path={}", agentId,
+                            userId, sessionId, instance.getPort(), path))
                     .doOnSuccess(ignored -> {
                         if (exchange.getResponse().getStatusCode() == null
                             || !exchange.getResponse().getStatusCode().is2xxSuccessful()) {
                             removeFileSnapshot(agentId, userId, sessionId, chatRequestId);
                         }
-                        GatewayLogContext
-                            .run(requestId, userId, sessionId,
-                                () -> log.info(
-                                    "[SESSION-REPLY] completed agentId={} userId={} sessionId={} "
-                                        + "totalMs={} status={}",
-                                    agentId, userId, sessionId, System.currentTimeMillis() - requestStart,
-                                    exchange.getResponse().getStatusCode()));
+                        log.info("[SESSION-REPLY] completed agentId={} userId={} sessionId={} totalMs={} status={}", agentId,
+                            userId, sessionId, System.currentTimeMillis() - requestStart,
+                            exchange.getResponse().getStatusCode());
                     })
                     .doOnError(err -> {
                         removeFileSnapshot(agentId, userId, sessionId, chatRequestId);
-                        GatewayLogContext.run(requestId, userId, sessionId,
-                            () -> log.warn(
-                                "[SESSION-REPLY] failed agentId={} userId={} sessionId={} " + "totalMs={} error={}",
-                                agentId, userId, sessionId, System.currentTimeMillis() - requestStart,
-                                err.getMessage()));
+                        log.warn("[SESSION-REPLY] failed agentId={} userId={} sessionId={} totalMs={} error={}", agentId, userId,
+                            sessionId, System.currentTimeMillis() - requestStart, err.getMessage());
                     });
             }))
             .onErrorResume(err -> writeSessionError(exchange, err, agentId, userId, sessionId, chatRequestId,
@@ -204,10 +193,8 @@ public class ReplyController {
         @RequestHeader(value = "Last-Event-ID", required = false) String lastEventId, ServerWebExchange exchange) {
         long requestStart = System.currentTimeMillis();
         String userId = exchange.getAttribute(UserContextFilter.USER_ID_ATTR);
-        String requestId = exchange.getAttribute(RequestContextFilter.REQUEST_ID_ATTR);
-        GatewayLogContext.run(requestId, userId, sessionId,
-            () -> log.info("[SESSION-EVENTS] subscribe agentId={} " + "userId={} sessionId={} lastEventId={}", agentId,
-                userId, sessionId, lastEventId));
+        log.info("[SESSION-EVENTS] subscribe agentId={} userId={} sessionId={} lastEventId={}", agentId, userId, sessionId,
+            lastEventId);
 
         return instanceManager.getOrSpawn(agentId, userId).flatMap(instance -> {
             instance.touch();
@@ -217,16 +204,15 @@ public class ReplyController {
                 .then(goosedProxy.proxySessionEvents(exchange.getResponse(), instance.getPort(), path,
                     instance.getSecretKey(), lastEventId, agentId, userId, sessionId,
                     eventJson -> outputFilesBeforeTerminalEvent(agentId, userId, sessionId, eventJson)))
-                .doOnSubscribe(sub -> GatewayLogContext.run(requestId, userId, sessionId,
-                    () -> log.info("[SESSION-EVENTS] forwarding agentId={} userId={} sessionId={} " + "port={} path={}",
-                        agentId, userId, sessionId, instance.getPort(), path)))
-                .doOnSuccess(ignored -> GatewayLogContext.run(requestId, userId, sessionId,
-                    () -> log.info("[SESSION-EVENTS] ended agentId={} userId={} sessionId={} " + "totalMs={} status={}",
-                        agentId, userId, sessionId, System.currentTimeMillis() - requestStart,
-                        exchange.getResponse().getStatusCode())))
-                .doOnError(err -> GatewayLogContext.run(requestId, userId, sessionId,
-                    () -> log.warn("[SESSION-EVENTS] failed agentId={} userId={} sessionId={} " + "totalMs={} error={}",
-                        agentId, userId, sessionId, System.currentTimeMillis() - requestStart, err.getMessage())));
+                .doOnSubscribe(sub -> log
+                    .info("[SESSION-EVENTS] forwarding agentId={} userId={} sessionId={} port={} path={}", agentId,
+                        userId, sessionId, instance.getPort(), path))
+                .doOnSuccess(ignored -> log
+                    .info("[SESSION-EVENTS] ended agentId={} userId={} sessionId={} totalMs={} status={}", agentId,
+                        userId, sessionId, System.currentTimeMillis() - requestStart,
+                        exchange.getResponse().getStatusCode()))
+                .doOnError(err -> log.warn("[SESSION-EVENTS] failed agentId={} userId={} sessionId={} totalMs={} error={}",
+                    agentId, userId, sessionId, System.currentTimeMillis() - requestStart, err.getMessage()));
         })
             .onErrorResume(err -> writeSessionError(exchange, err, agentId, userId, sessionId, null,
                 "gateway_events_failed", requestStart));

@@ -5,12 +5,13 @@
 package com.huawei.opsfactory.gateway.filter;
 
 import com.huawei.opsfactory.gateway.config.GatewayProperties;
+import com.huawei.opsfactory.gateway.config.ReactorMdcConfiguration;
 
 import reactor.core.publisher.Mono;
+import reactor.util.context.Context;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.slf4j.MDC;
 import org.springframework.core.annotation.Order;
 import org.springframework.http.server.reactive.ServerHttpRequest;
 import org.springframework.stereotype.Component;
@@ -61,28 +62,18 @@ public class RequestContextFilter implements WebFilter {
 
         exchange.getAttributes().put(REQUEST_ID_ATTR, requestId);
         exchange.getResponse().getHeaders().set(REQUEST_ID_HEADER, requestId);
-        MDC.put("requestId", requestId);
 
-        return chain.filter(exchange).doFinally(signalType -> {
-            if (!properties.getLogging().isAccessLogEnabled()) {
-                MDC.remove("requestId");
-                MDC.remove("userId");
-                return;
-            }
-            Integer status = exchange.getResponse().getRawStatusCode();
-            String userId = exchange.getAttribute(UserContextFilter.USER_ID_ATTR);
-            try {
-                MDC.put("requestId", requestId);
-                if (userId != null && !userId.isBlank()) {
-                    MDC.put("userId", userId);
+        return chain.filter(exchange)
+            .contextWrite(Context.of(ReactorMdcConfiguration.REQUEST_ID_KEY, requestId))
+            .doFinally(signalType -> {
+                if (!properties.getLogging().isAccessLogEnabled()) {
+                    return;
                 }
+                Integer status = exchange.getResponse().getRawStatusCode();
+                String userId = exchange.getAttribute(UserContextFilter.USER_ID_ATTR);
                 log.info("HTTP {} {} completed status={} durationMs={}", request.getMethod(),
                     request.getURI().getPath(), status != null ? status : 200, System.currentTimeMillis() - startedAt);
-            } finally {
-                MDC.remove("requestId");
-                MDC.remove("userId");
-            }
-        });
+            });
     }
 
     private String resolveRequestId(ServerHttpRequest request) {
