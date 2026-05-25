@@ -87,7 +87,7 @@ public class GoosedProxy {
                     SslContextBuilder.forClient().trustManager(InsecureTrustManagerFactory.INSTANCE).build();
                 httpClient = httpClient.secure(t -> t.sslContext(sslContext).handshakeTimeout(Duration.ofSeconds(5)));
             } catch (SSLException e) {
-                throw new RuntimeException("Failed to configure TLS for goosed proxy", e);
+                throw new IllegalStateException("Failed to configure TLS for goosed proxy", e);
             }
         }
 

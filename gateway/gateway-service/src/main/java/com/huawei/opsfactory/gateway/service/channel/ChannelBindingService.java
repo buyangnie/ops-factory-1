@@ -319,10 +319,6 @@ public class ChannelBindingService {
         throw new IllegalArgumentException("Binding not found for channel '" + channelId + "'");
     }
 
-    private ChannelDetail requireChannel(String channelId) {
-        return requireChannel(channelId, "admin");
-    }
-
     private ChannelDetail requireChannel(String channelId, String ownerUserId) {
         ChannelDetail channel = channelConfigService.getChannel(channelId, ownerUserId);
         if (channel == null) {
@@ -419,10 +415,4 @@ public class ChannelBindingService {
         return base;
     }
 
-    private String maskExternalUserId(String externalUserId) {
-        if (externalUserId == null || externalUserId.length() <= 4) {
-            return externalUserId;
-        }
-        return externalUserId.substring(0, 2) + "***" + externalUserId.substring(externalUserId.length() - 2);
-    }
 }

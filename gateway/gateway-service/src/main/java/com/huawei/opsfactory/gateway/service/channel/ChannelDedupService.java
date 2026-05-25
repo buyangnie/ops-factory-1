@@ -91,10 +91,6 @@ public class ChannelDedupService {
         return true;
     }
 
-    private ChannelDetail requireChannel(String channelId) {
-        return requireChannel(channelId, "admin");
-    }
-
     private ChannelDetail requireChannel(String channelId, String ownerUserId) {
         ChannelDetail channel = channelConfigService.getChannel(channelId, ownerUserId);
         if (channel == null) {

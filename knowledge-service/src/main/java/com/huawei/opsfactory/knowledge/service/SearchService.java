@@ -150,13 +150,6 @@ public class SearchService {
             .toList();
     }
 
-    private <T> List<T> limit(List<T> items, int topK) {
-        if (topK <= 0 || items.size() <= topK) {
-            return items;
-        }
-        return new ArrayList<>(items.subList(0, topK));
-    }
-
     private List<SearchMatch> filterByThreshold(List<SearchMatch> matches, Double threshold) {
         if (threshold == null) {
             return matches;
@@ -188,10 +181,6 @@ public class SearchService {
 
     private double semanticScore(Map<String, Double> semanticByChunkId, String chunkId) {
         return semanticByChunkId.getOrDefault(chunkId, 0.0);
-    }
-
-    private double clamp(double value) {
-        return Math.max(0, Math.min(1, value));
     }
 
     public record SearchOptions(

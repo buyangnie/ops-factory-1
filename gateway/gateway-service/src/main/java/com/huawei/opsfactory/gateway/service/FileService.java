@@ -560,42 +560,83 @@ public class FileService {
         try {
             Files.createDirectories(dir);
 
-            // Read existing entries (if any)
-            Map<String, List<Map<String, String>>> entries = new LinkedHashMap<>();
-            if (Files.exists(file)) {
-                Map<String, Object> existing =
-                    MAPPER.readValue(Files.readString(file, StandardCharsets.UTF_8), new TypeReference<>() {});
-                Object raw = existing.get("entries");
-                if (raw instanceof Map<?, ?> rawMap) {
-                    for (Map.Entry<?, ?> e : rawMap.entrySet()) {
-                        if (e.getValue() instanceof List<?> list) {
-                            List<Map<String, String>> typed = new ArrayList<>();
-                            for (Object item : list) {
-                                if (item instanceof Map<?, ?> m) {
-                                    Map<String, String> entry = new LinkedHashMap<>();
-                                    m.forEach((k, v) -> entry.put(String.valueOf(k), String.valueOf(v)));
-                                    typed.add(entry);
-                                }
-                            }
-                            entries.put(String.valueOf(e.getKey()), typed);
-                        }
-                    }
-                }
-            }
-
-            // Add / replace entry for this messageId
+            Map<String, List<Map<String, String>>> entries = readCapsuleEntries(file);
             entries.put(messageId, files);
-
-            // Write back
-            Map<String, Object> wrapper = new LinkedHashMap<>();
-            wrapper.put("entries", entries);
-            Files.writeString(file, MAPPER.writerWithDefaultPrettyPrinter().writeValueAsString(wrapper),
-                StandardCharsets.UTF_8);
+            writeCapsuleEntries(file, entries);
 
             log.debug("Persisted {} file capsules for session {} message {}", files.size(), sessionId, messageId);
         } catch (IOException e) {
             log.warn("Failed to persist file capsules for session {}: {}", sessionId, e.getMessage());
         }
+    }
+
+    /**
+     * Reads file capsule entries from the JSON file, returning an empty map if the file does not exist
+     * or cannot be parsed.
+     *
+     * @param file path to the file-capsules.json file
+     * @return messageId-to-files mapping
+     * @throws IOException if the file cannot be read
+     */
+    private Map<String, List<Map<String, String>>> readCapsuleEntries(Path file) throws IOException {
+        if (!Files.exists(file)) {
+            return new LinkedHashMap<>();
+        }
+        Map<String, Object> existing =
+            MAPPER.readValue(Files.readString(file, StandardCharsets.UTF_8), new TypeReference<>() {});
+        Object raw = existing.get("entries");
+        if (!(raw instanceof Map<?, ?> rawMap)) {
+            return new LinkedHashMap<>();
+        }
+        return parseCapsuleMap(rawMap);
+    }
+
+    /**
+     * Converts a raw map (from JSON deserialization) into a typed messageId-to-files mapping.
+     *
+     * @param rawMap the raw map from JSON parsing
+     * @return typed mapping of message IDs to file entry lists
+     */
+    private Map<String, List<Map<String, String>>> parseCapsuleMap(Map<?, ?> rawMap) {
+        Map<String, List<Map<String, String>>> result = new LinkedHashMap<>();
+        for (Map.Entry<?, ?> e : rawMap.entrySet()) {
+            if (e.getValue() instanceof List<?> list) {
+                result.put(String.valueOf(e.getKey()), toStringMapList(list));
+            }
+        }
+        return result;
+    }
+
+    /**
+     * Converts a raw list of maps (from JSON deserialization) into a typed list of string-to-string maps.
+     *
+     * @param list the raw list from JSON parsing
+     * @return typed list of string-to-string maps
+     */
+    private List<Map<String, String>> toStringMapList(List<?> list) {
+        List<Map<String, String>> typed = new ArrayList<>();
+        for (Object item : list) {
+            if (item instanceof Map<?, ?> m) {
+                Map<String, String> entry = new LinkedHashMap<>();
+                m.forEach((k, v) -> entry.put(String.valueOf(k), String.valueOf(v)));
+                typed.add(entry);
+            }
+        }
+        return typed;
+    }
+
+    /**
+     * Writes file capsule entries to the JSON file with pretty-printing.
+     *
+     * @param file path to the file-capsules.json file
+     * @param entries the entries to write
+     * @throws IOException if the file cannot be written
+     */
+    private void writeCapsuleEntries(Path file, Map<String, List<Map<String, String>>> entries) throws IOException {
+        Map<String, Object> wrapper = new LinkedHashMap<>();
+        wrapper.put("entries", entries);
+        Files.writeString(file, MAPPER.writerWithDefaultPrettyPrinter().writeValueAsString(wrapper),
+            StandardCharsets.UTF_8);
     }
 
     /**
@@ -612,27 +653,7 @@ public class FileService {
             return Map.of();
         }
         try {
-            Map<String, Object> data =
-                MAPPER.readValue(Files.readString(file, StandardCharsets.UTF_8), new TypeReference<>() {});
-            Object raw = data.get("entries");
-            if (!(raw instanceof Map<?, ?> rawMap)) {
-                return Map.of();
-            }
-            Map<String, List<Map<String, String>>> result = new LinkedHashMap<>();
-            for (Map.Entry<?, ?> e : rawMap.entrySet()) {
-                if (e.getValue() instanceof List<?> list) {
-                    List<Map<String, String>> typed = new ArrayList<>();
-                    for (Object item : list) {
-                        if (item instanceof Map<?, ?> m) {
-                            Map<String, String> entry = new LinkedHashMap<>();
-                            m.forEach((k, v) -> entry.put(String.valueOf(k), String.valueOf(v)));
-                            typed.add(entry);
-                        }
-                    }
-                    result.put(String.valueOf(e.getKey()), typed);
-                }
-            }
-            return result;
+            return readCapsuleEntries(file);
         } catch (IOException e) {
             log.warn("Failed to read file capsules for session {}: {}", sessionId, e.getMessage());
             return Map.of();

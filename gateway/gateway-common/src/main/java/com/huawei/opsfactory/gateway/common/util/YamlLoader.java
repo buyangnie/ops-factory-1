@@ -4,7 +4,9 @@
 
 package com.huawei.opsfactory.gateway.common.util;
 
+import org.yaml.snakeyaml.LoaderOptions;
 import org.yaml.snakeyaml.Yaml;
+import org.yaml.snakeyaml.constructor.SafeConstructor;
 import org.yaml.snakeyaml.error.YAMLException;
 
 import java.io.IOException;
@@ -35,7 +37,7 @@ public final class YamlLoader {
             return Collections.emptyMap();
         }
         try (InputStream is = Files.newInputStream(path)) {
-            Yaml yaml = new Yaml();
+            Yaml yaml = new Yaml(new SafeConstructor(new LoaderOptions()));
             Map<String, Object> result = yaml.load(is);
             return result != null ? result : Collections.emptyMap();
         } catch (YAMLException e) {

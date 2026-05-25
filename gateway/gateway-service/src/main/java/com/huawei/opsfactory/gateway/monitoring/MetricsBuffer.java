@@ -55,7 +55,7 @@ public class MetricsBuffer {
 
     private int snapshotCount = 0;
 
-    private boolean dirty = false;
+    private volatile boolean dirty = false;
 
     private int timingWriteIndex = 0;
 

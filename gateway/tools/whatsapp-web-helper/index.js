@@ -18,7 +18,7 @@ function parseArgs(argv) {
   const args = {};
   for (let i = 2; i < argv.length; i += 1) {
     const current = argv[i];
-    if (!current.startsWith("--")) continue;
+    if (!current.startsWith("--")) { continue; }
     const key = current.slice(2);
     const next = argv[i + 1];
     if (!next || next.startsWith("--")) {
@@ -56,7 +56,7 @@ async function readJson(file) {
 }
 
 function normalizeWhatsAppE164(jid) {
-  if (!jid || typeof jid !== "string") return "";
+  if (!jid || typeof jid !== "string") { return ""; }
   const user = jid.split("@")[0] ?? "";
   const digits = user.replace(/:\d+$/, "");
   return digits ? `+${digits}` : "";
@@ -346,7 +346,7 @@ async function writeInboxMessage(inboxDir, messageId, payload) {
 
 function normalizeOutboundJid(peerId) {
   const digits = String(peerId ?? "").replace(/[^\d]/g, "");
-  if (!digits) return "";
+  if (!digits) { return ""; }
   return `${digits}@s.whatsapp.net`;
 }
 
@@ -392,7 +392,7 @@ const args = parseArgs(process.argv);
 const command = args.command ?? "login";
 
 if (command !== "login") {
-  console.error(`Unsupported command: ${command}`);
+  process.stderr.write(`Unsupported command: ${command}\n`);
   process.exit(1);
 }
 

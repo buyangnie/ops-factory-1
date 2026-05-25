@@ -328,7 +328,7 @@ public class SopService {
             Files.writeString(file, json, StandardCharsets.UTF_8);
         } catch (IOException e) {
             log.error("Failed to write SOP file for id={}", id, e);
-            throw new RuntimeException("Failed to save SOP", e);
+            throw new IllegalStateException("Failed to save SOP", e);
         }
     }
 }

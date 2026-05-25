@@ -16,6 +16,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 import java.util.Comparator;
+import java.util.stream.Stream;
 
 import jakarta.annotation.PostConstruct;
 
@@ -78,25 +79,27 @@ public class SystemUserMigrationService {
     }
 
     private void mergeLegacyIntoSystemDir(Path legacyDir, Path systemDir) throws IOException {
-        Files.walk(legacyDir).sorted(Comparator.comparingInt(Path::getNameCount)).forEach(source -> {
-            if (source.equals(legacyDir)) {
-                return;
-            }
-            Path relative = legacyDir.relativize(source);
-            Path target = systemDir.resolve(relative);
-            try {
-                if (Files.isDirectory(source)) {
-                    Files.createDirectories(target);
-                } else if (!Files.exists(target)) {
-                    Files.move(source, target, StandardCopyOption.ATOMIC_MOVE);
+        try (Stream<Path> walk = Files.walk(legacyDir)) {
+            walk.sorted(Comparator.comparingInt(Path::getNameCount)).forEach(source -> {
+                if (source.equals(legacyDir)) {
+                    return;
                 }
-            } catch (IOException e) {
-                throw new UncheckedIOException("Failed to merge " + source + " into " + target, e);
-            }
-        });
+                Path relative = legacyDir.relativize(source);
+                Path target = systemDir.resolve(relative);
+                try {
+                    if (Files.isDirectory(source)) {
+                        Files.createDirectories(target);
+                    } else if (!Files.exists(target)) {
+                        Files.move(source, target, StandardCopyOption.ATOMIC_MOVE);
+                    }
+                } catch (IOException e) {
+                    throw new UncheckedIOException("Failed to merge " + source + " into " + target, e);
+                }
+            });
+        }
 
-        try {
-            Files.walk(legacyDir).sorted(Comparator.reverseOrder()).forEach(path -> {
+        try (Stream<Path> walk = Files.walk(legacyDir)) {
+            walk.sorted(Comparator.reverseOrder()).forEach(path -> {
                 try {
                     Files.deleteIfExists(path);
                 } catch (IOException e) {

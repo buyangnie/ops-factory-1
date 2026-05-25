@@ -10,7 +10,9 @@ import com.huawei.opsfactory.gateway.config.GatewayProperties;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
+import org.yaml.snakeyaml.LoaderOptions;
 import org.yaml.snakeyaml.Yaml;
+import org.yaml.snakeyaml.constructor.SafeConstructor;
 
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
@@ -51,7 +53,7 @@ public class AgentSkillInstallService {
 
     private final GatewayProperties properties;
 
-    private final Yaml yaml = new Yaml();
+    private final Yaml yaml = new Yaml(new SafeConstructor(new LoaderOptions()));
 
     /**
      * Creates the agent skill install service instance.
@@ -175,12 +177,25 @@ public class AgentSkillInstallService {
         return Map.of("success", true, "skillId", skillId, "restartRequired", true);
     }
 
+    private static final long MAX_ZIP_ENTRY_SIZE = 100 * 1024 * 1024L; // 100MB
+
+    private static final int MAX_ZIP_ENTRIES = 1000;
+
     private void extractPackage(byte[] packageBytes, Path targetDir) throws IOException {
+        int entryCount = 0;
+        long totalExtracted = 0;
         try (ZipInputStream zis = new ZipInputStream(new ByteArrayInputStream(packageBytes))) {
             ZipEntry entry;
             while ((entry = zis.getNextEntry()) != null) {
+                if (++entryCount > MAX_ZIP_ENTRIES) {
+                    throw new IllegalStateException("Too many entries in skill package (max " + MAX_ZIP_ENTRIES + ")");
+                }
                 if (entry.isDirectory()) {
                     continue;
+                }
+                long entrySize = entry.getSize();
+                if (entrySize > 0 && entrySize > MAX_ZIP_ENTRY_SIZE) {
+                    throw new IllegalStateException("Zip entry too large: " + entry.getName());
                 }
                 String safeName = safeZipName(entry.getName());
                 if (safeName.startsWith("__MACOSX/") || safeName.endsWith("/.DS_Store")
@@ -192,8 +207,21 @@ public class AgentSkillInstallService {
                     throw new IllegalArgumentException("Skill package contains unsafe file path");
                 }
                 Files.createDirectories(destination.getParent());
+                long written = 0;
                 try (OutputStream out = Files.newOutputStream(destination)) {
-                    zis.transferTo(out);
+                    byte[] buffer = new byte[8192];
+                    int len;
+                    while ((len = zis.read(buffer)) > 0) {
+                        out.write(buffer, 0, len);
+                        written += len;
+                        if (written > MAX_ZIP_ENTRY_SIZE) {
+                            throw new IllegalStateException("Extracted entry exceeds size limit: " + entry.getName());
+                        }
+                    }
+                }
+                totalExtracted += written;
+                if (totalExtracted > MAX_ZIP_ENTRY_SIZE) {
+                    throw new IllegalStateException("Total extracted size exceeds limit");
                 }
             }
         }

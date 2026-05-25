@@ -98,8 +98,8 @@ class DvClientTest {
             void sleepBeforeRetry(long delayMs) {
                 /* no-op for testing */ }
         };
-        assertThrows(RuntimeException.class, () -> noSleepClient.executeWithRetry(() -> {
-            throw new RuntimeException("fail");
+        assertThrows(IllegalStateException.class, () -> noSleepClient.executeWithRetry(() -> {
+            throw new IllegalStateException("fail");
         }, "testOp"));
     }
 

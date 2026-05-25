@@ -317,7 +317,7 @@ public class ClusterService {
             Files.writeString(file, json, StandardCharsets.UTF_8);
         } catch (IOException e) {
             log.error("Failed to write cluster file for id={}", id, e);
-            throw new RuntimeException("Failed to save cluster", e);
+            throw new IllegalStateException("Failed to save cluster", e);
         }
     }
 }
