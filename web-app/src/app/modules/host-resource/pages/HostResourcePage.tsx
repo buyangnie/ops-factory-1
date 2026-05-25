@@ -1,8 +1,9 @@
-import { useState, useEffect, useCallback, useMemo } from 'react'
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
 import PageHeader from '../../../platform/ui/primitives/PageHeader'
 import ListSearchInput from '../../../platform/ui/list/ListSearchInput'
 import ListResultsMeta from '../../../platform/ui/list/ListResultsMeta'
+import SearchableSelect from '../../../platform/ui/forms/SearchableSelect'
 import { useHostGroups } from '../hooks/useHostGroups'
 import { useClusters } from '../hooks/useClusters'
 import { useHostResource } from '../hooks/useHostResource'
@@ -45,6 +46,10 @@ type EditingItem =
 type TabKey = 'overview' | 'topology' | 'cluster-types' | 'business-types' | 'sop-management' | 'whitelist'
 
 const PAGE_SIZE = 6
+const SIDEBAR_DEFAULT = 260
+const SIDEBAR_MIN = 200
+const SIDEBAR_MAX = 600
+const SIDEBAR_STORAGE_KEY = 'host-resource-sidebar-width'
 
 export default function HostResourcePage() {
     const { t } = useTranslation()
@@ -54,6 +59,7 @@ export default function HostResourcePage() {
     const [selected, setSelected] = useState<SelectedNode | null>(null)
     const [focusedHostId, setFocusedHostId] = useState<string | null>(null)
     const [selectedTopologyClusterId, setSelectedTopologyClusterId] = useState<string | null>(null)
+    const [topologyGroupId, setTopologyGroupId] = useState('')
     const [selectedClusterIds, setSelectedClusterIds] = useState<Set<string>>(new Set())
     const [showModal, setShowModal] = useState(false)
     const [editingItem, setEditingItem] = useState<EditingItem>(null)
@@ -63,6 +69,17 @@ export default function HostResourcePage() {
     const [showImportDialog, setShowImportDialog] = useState(false)
     const [testingId, setTestingId] = useState<string | null>(null)
     const [testResults, setTestResults] = useState<Record<string, { ok: boolean; msg: string }>>({})
+
+    // Resizable sidebar
+    const [sidebarWidth, setSidebarWidth] = useState(() => {
+        const stored = localStorage.getItem(SIDEBAR_STORAGE_KEY)
+        if (stored) {
+            const v = parseInt(stored, 10)
+            if (v >= SIDEBAR_MIN && v <= SIDEBAR_MAX) return v
+        }
+        return SIDEBAR_DEFAULT
+    })
+    const dragging = useRef(false)
 
     // Data hooks
     const { groups, fetchGroups, createGroup, updateGroup, deleteGroup } = useHostGroups()
@@ -80,7 +97,7 @@ export default function HostResourcePage() {
     const { exporting, exportAllAsZip } = useResourceExport()
     const { importing: csvImporting, progress: importProgress, importCsv } = useResourceImport({
         fetchGroups, fetchAllClusters, fetchAllHosts, fetchHostRelations, fetchBusinessServices, fetchGraph, fetchWhitelist: fetchWhitelistCommands,
-        groups, clusters, allHosts, businessServices,
+        groups, clusters, allHosts, businessServices, relations: hostRelations,
         clusterTypes: clusterTypesHook.clusterTypes,
         businessTypes: businessTypesHook.businessTypes,
         createGroup, updateGroup, createCluster, createHost,
@@ -98,6 +115,11 @@ export default function HostResourcePage() {
     useEffect(() => { fetchHostRelations() }, [fetchHostRelations])
     useEffect(() => { fetchBusinessServices() }, [fetchBusinessServices])
     useEffect(() => { fetchClusterGraph() }, [fetchClusterGraph])
+
+    // Re-fetch topology graph when switching to the topology tab or changing group filter
+    useEffect(() => {
+        if (activeTab === 'topology') fetchClusterGraph(topologyGroupId || undefined)
+    }, [activeTab, topologyGroupId, fetchClusterGraph])
 
     // Refresh host list respecting the current tree selection filter
     const refreshHostList = useCallback(() => {
@@ -595,6 +617,43 @@ export default function HostResourcePage() {
         setShowModal(true)
     }, [])
 
+    const handleResizeStart = useCallback((e: React.MouseEvent) => {
+        e.preventDefault()
+        dragging.current = true
+        const startX = e.clientX
+        const startWidth = sidebarWidth
+        const target = e.currentTarget
+        target.classList.add('hr-resize-active')
+
+        const onMouseMove = (ev: MouseEvent) => {
+            if (!dragging.current) return
+            const delta = ev.clientX - startX
+            const next = Math.min(SIDEBAR_MAX, Math.max(SIDEBAR_MIN, startWidth + delta))
+            setSidebarWidth(next)
+        }
+        const onMouseUp = () => {
+            dragging.current = false
+            target.classList.remove('hr-resize-active')
+            document.removeEventListener('mousemove', onMouseMove)
+            document.removeEventListener('mouseup', onMouseUp)
+            document.body.style.cursor = ''
+            document.body.style.userSelect = ''
+            setSidebarWidth(w => {
+                localStorage.setItem(SIDEBAR_STORAGE_KEY, String(w))
+                return w
+            })
+        }
+        document.body.style.cursor = 'col-resize'
+        document.body.style.userSelect = 'none'
+        document.addEventListener('mousemove', onMouseMove)
+        document.addEventListener('mouseup', onMouseUp)
+    }, [sidebarWidth])
+
+    const handleResizeReset = useCallback(() => {
+        setSidebarWidth(SIDEBAR_DEFAULT)
+        localStorage.setItem(SIDEBAR_STORAGE_KEY, String(SIDEBAR_DEFAULT))
+    }, [])
+
     const tabs: { key: TabKey; label: string }[] = [
         { key: 'overview', label: t('hostResource.tabOverview') },
         { key: 'topology', label: t('hostResource.tabTopology') },
@@ -645,7 +704,7 @@ export default function HostResourcePage() {
 
                     <div className="hr-layout-main">
                         {/* Left: Resource Tree */}
-                        <div className="hr-tree-sidebar">
+                        <div className="hr-tree-sidebar" style={{ width: sidebarWidth }}>
                             <div className="hr-tree-search">
                                 <ListSearchInput
                                     value={treeSearch}
@@ -692,6 +751,13 @@ export default function HostResourcePage() {
                                 onDelete={handleTreeDelete}
                             />
                         </div>
+
+                        {/* Resize Handle */}
+                        <div
+                            className="hr-resize-handle"
+                            onMouseDown={handleResizeStart}
+                            onDoubleClick={handleResizeReset}
+                        />
 
                         {/* Right: Host Cards */}
                         <div className="hr-cards-area">
@@ -777,6 +843,19 @@ export default function HostResourcePage() {
                                     <h3 className="hr-topology-pane-title">{t('hostResource.clusterRelationsTitle')}</h3>
                                     <p className="hr-topology-pane-subtitle">{t('hostResource.clusterRelationsSubtitle')}</p>
                                 </div>
+                                <SearchableSelect
+                                    value={topologyGroupId}
+                                    onChange={(v) => {
+                                        setTopologyGroupId(v)
+                                        setSelectedTopologyClusterId(null)
+                                    }}
+                                    options={[
+                                        { value: '', label: t('hostResource.allGroups') },
+                                        ...groups.map(g => ({ value: g.id, label: g.name })),
+                                    ]}
+                                    placeholder={t('hostResource.filterByGroup')}
+                                    style={{ minWidth: 180 }}
+                                />
                             </div>
                             <RelationGraph
                                 data={topologyGraphData}

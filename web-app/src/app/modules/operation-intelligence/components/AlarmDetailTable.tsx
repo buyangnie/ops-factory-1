@@ -1,8 +1,5 @@
-import { useState, useEffect } from 'react'
-import { useTranslation } from 'react-i18next'
-import { useUser } from '../../../platform/providers/UserContext'
-import { getIndicatorDetail } from '../../../../services/operationIntelligenceAPI'
-import Pagination from '../../../platform/ui/primitives/Pagination'
+import { useMemo } from 'react'
+import IndicatorDataTable from './IndicatorDataTable'
 
 interface AlarmDetailTableProps {
     envCode: string
@@ -10,84 +7,28 @@ interface AlarmDetailTableProps {
     endTime: number
 }
 
+const td = (row: Record<string, unknown>, key: string) => String(row[key] ?? '')
+
 export default function AlarmDetailTable({ envCode, startTime, endTime }: AlarmDetailTableProps) {
-    const { t } = useTranslation()
-    const { userId } = useUser()
-    const [data, setData] = useState<Record<string, unknown>[]>([])
-    const [page, setPage] = useState(1)
-    const [total, setTotal] = useState(0)
-    const [error, setError] = useState<string | null>(null)
-
-    useEffect(() => {
-        if (!envCode) {
-            return
-        }
-        setError(null)
-        getIndicatorDetail('/qos/getAlarmIndicatorDetail', envCode, startTime, endTime, page, 10, userId)
-            .then((res: { results?: Record<string, unknown>[]; total?: number }) => {
-                setData(res.results || [])
-                setTotal(res.total || 0)
-            })
-            .catch((err) => {
-                setData([])
-                setTotal(0)
-                setError(err instanceof Error ? err.message : t('operationIntelligence.loadFailed'))
-            })
-    }, [envCode, startTime, endTime, page, userId, t])
-
-    if (error) {
-        return (
-            <div className="conn-banner conn-banner-error">
-                {t('operationIntelligence.loadFailedWithReason', { error })}
-            </div>
-        )
-    }
-
-    if (data.length === 0) {
-        return (
-            <div className="empty-state">
-                <div className="empty-state-title">{t('operationIntelligence.noData')}</div>
-            </div>
-        )
-    }
+    const columns = useMemo(() => [
+        { headerKey: 'timestamp', render: (row: Record<string, unknown>) => row.occurUtc ? new Date(Number(row.occurUtc)).toLocaleString() : '' },
+        { headerKey: 'alarmName', render: (row: Record<string, unknown>) => td(row, 'alarmName') },
+        { headerKey: 'severity', render: (row: Record<string, unknown>) => td(row, 'severity') },
+        { headerKey: 'dn', render: (row: Record<string, unknown>) => td(row, 'dn') },
+        { headerKey: 'count', render: (row: Record<string, unknown>) => td(row, 'count') },
+        { headerKey: 'alarmDesc', render: (row: Record<string, unknown>) => td(row, 'moi') },
+        { headerKey: 'alarmDetail', render: (row: Record<string, unknown>) => td(row, 'additionalInformation') },
+    ], [])
 
     return (
-        <div className="alarm-detail-table">
-            <table>
-                <thead>
-                    <tr>
-                        <th>{t('operationIntelligence.timestamp')}</th>
-                        <th>{t('operationIntelligence.alarmName')}</th>
-                        <th>{t('operationIntelligence.severity')}</th>
-                        <th>{t('operationIntelligence.dn')}</th>
-                        <th>{t('operationIntelligence.count')}</th>
-                        <th>{t('operationIntelligence.alarmDesc')}</th>
-                        <th>{t('operationIntelligence.alarmDetail')}</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {data.map((row, i) => (
-                        <tr key={row.alarmName ? `${row.alarmName}-${row.occurUtc}-${i}` : i}>
-                            <td>{row.occurUtc ? new Date(Number(row.occurUtc)).toLocaleString() : ''}</td>
-                            <td>{String(row.alarmName ?? '')}</td>
-                            <td>{String(row.severity ?? '')}</td>
-                            <td>{String(row.dn ?? '')}</td>
-                            <td>{String(row.count ?? '')}</td>
-                            <td>{String(row.moi ?? '')}</td>
-                            <td>{String(row.additionalInformation ?? '')}</td>
-                        </tr>
-                    ))}
-                </tbody>
-            </table>
-            {total > 10 && (
-                <Pagination
-                    currentPage={page}
-                    totalPages={Math.ceil(total / 10)}
-                    pageSize={10}
-                    totalItems={total}
-                    onPageChange={setPage}
-                />
-            )}
-        </div>
+        <IndicatorDataTable
+            className="alarm-detail-table"
+            endpoint="/qos/getAlarmIndicatorDetail"
+            envCode={envCode}
+            startTime={startTime}
+            endTime={endTime}
+            rowKey={(row, i) => row.alarmName ? `${row.alarmName}-${row.occurUtc}-${i}` : i}
+            columns={columns}
+        />
     )
 }

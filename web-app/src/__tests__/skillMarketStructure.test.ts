@@ -21,10 +21,10 @@ describe('skill market frontend structure', () => {
 
     it('declares runtime URL configuration for the service', () => {
         const runtimeSource = read('src/config/runtime.ts')
-        const config = JSON.parse(read('../web-app/config.json')) as Record<string, unknown>
+        const config = JSON.parse(read('../web-app/config.standalone.json.example')) as Record<string, unknown>
 
         expect(runtimeSource).toContain('skillMarketServiceUrl')
-        expect(runtimeSource).toContain("const SKILL_MARKET_PATH_PREFIX = '/skill-market'")
+        expect(runtimeSource).toContain("pathPrefix: '/skill-market'")
         expect(runtimeSource).toContain('SKILL_MARKET_SERVICE_URL')
         expect(config.skillMarketServiceUrl).toBe('http://127.0.0.1:8095')
     })
@@ -49,6 +49,7 @@ describe('skill market frontend structure', () => {
         const skillSection = read('src/app/modules/agents/components/skill/SkillSection.tsx')
         const drawerSource = read('src/app/modules/agents/components/skill/SkillMarketDrawer.tsx')
         const hookSource = read('src/app/modules/agents/hooks/useAgentSkillMarket.ts')
+        const apiSource = read('src/services/skillMarketAPI.ts')
 
         expect(agentPage).toContain('SkillMarketDrawer')
         expect(agentPage).toContain('setIsSkillMarketOpen(true)')
@@ -57,8 +58,9 @@ describe('skill market frontend structure', () => {
         expect(skillSection).toContain("t('market.browseMarket')")
         expect(drawerSource).toContain('useAgentSkillMarket')
         expect(drawerSource).toContain('onInstalled')
-        expect(hookSource).toContain('SKILL_MARKET_SERVICE_URL')
-        expect(hookSource).toContain('/skills/install')
+        expect(hookSource).toContain('skillMarketAPI')
+        expect(apiSource).toContain('SKILL_MARKET_SERVICE_URL')
+        expect(apiSource).toContain('/skills/install')
         expect(skillSection).not.toContain('AddSkillFromMarketModal')
     })
 
@@ -97,6 +99,7 @@ describe('skill market frontend structure', () => {
     it('supports edit and delete confirmation actions', () => {
         const pageSource = read('src/app/modules/skill-market/pages/SkillMarketPage.tsx')
         const hookSource = read('src/app/modules/skill-market/hooks/useSkillMarket.ts')
+        const apiSource = read('src/services/skillMarketAPI.ts')
 
         expect(pageSource).toContain('DeleteSkillDialog')
         expect(pageSource).toContain('SkillFormDialog')
@@ -104,7 +107,7 @@ describe('skill market frontend structure', () => {
         expect(pageSource).toContain('handleEdit')
         expect(hookSource).toContain('fetchSkill')
         expect(hookSource).toContain('updateSkill')
-        expect(hookSource).toContain("method: 'PUT'")
+        expect(apiSource).toContain("method: 'PUT'")
         expect(pageSource).toContain("mode === 'create'")
         expect(pageSource).toContain('skill-market-editor-meta')
         expect(pageSource).toContain('skillMarket.directoryName')

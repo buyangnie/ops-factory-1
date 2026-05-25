@@ -189,19 +189,19 @@ describe('API service integration', () => {
     const src = read('src/config/runtime.ts')
     expect(src).toContain('operationIntelligenceServiceUrl')
     expect(src).toContain('operationIntelligenceSecretKey')
-    expect(src).toContain("const OPERATION_INTELLIGENCE_PATH_PREFIX = '/operation-intelligence'")
+    expect(src).toContain("pathPrefix: '/operation-intelligence'")
     expect(src).toContain('OPERATION_INTELLIGENCE_SERVICE_URL')
     expect(src).toContain('runtime.OPERATION_INTELLIGENCE_SECRET_KEY')
   })
 
-  it('config.json and config.json.example declare service URL and secret', () => {
-    const config = JSON.parse(read('../web-app/config.json')) as Record<string, unknown>
-    const example = JSON.parse(read('../web-app/config.json.example')) as Record<string, unknown>
+  it('standalone and embed config templates declare service URL and secret', () => {
+    const standalone = JSON.parse(read('../web-app/config.standalone.json.example')) as Record<string, unknown>
+    const embed = JSON.parse(read('../web-app/config.embed.json.example')) as Record<string, unknown>
 
-    expect(config.operationIntelligenceServiceUrl).toBe('http://127.0.0.1:8096')
-    expect(config.operationIntelligenceSecretKey).toBeTruthy()
-    expect(example.operationIntelligenceServiceUrl).toBe('http://127.0.0.1:8096')
-    expect(example.operationIntelligenceSecretKey).toBeTruthy()
+    expect(standalone.operationIntelligenceServiceUrl).toBe('http://127.0.0.1:8096')
+    expect(standalone.operationIntelligenceSecretKey).toBeTruthy()
+    expect(embed.operationIntelligenceServiceUrl).toBe('')
+    expect(embed.operationIntelligenceSecretKey).toBeTruthy()
   })
 })
 

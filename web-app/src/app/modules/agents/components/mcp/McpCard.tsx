@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
 import type { McpEntry } from '../../../../../types/mcp'
 import { getMcpDisplayName } from '../../../../../types/mcp'
@@ -58,6 +59,26 @@ function TrashIcon() {
   )
 }
 
+function CardActionButton({ labelKey, className, icon, onClick }: {
+  labelKey: string
+  className?: string
+  icon: ReactNode
+  onClick: () => void
+}) {
+  const { t } = useTranslation()
+  return (
+    <button
+      type="button"
+      className={className}
+      onClick={onClick}
+      title={t(labelKey)}
+      aria-label={t(labelKey)}
+    >
+      {icon}
+    </button>
+  )
+}
+
 interface McpCardProps {
   entry: McpEntry
   onToggle: (name: string, enabled: boolean) => void
@@ -99,37 +120,28 @@ export default function McpCard({ entry, onToggle, onEdit, onConfigKnowledge, on
       {(isCustom || onConfigKnowledge) && (onEdit || onConfigKnowledge || onDelete) && (
         <div className="mcp-card-actions">
           {onConfigKnowledge && (
-            <button
-              type="button"
+            <CardActionButton
+              labelKey="mcp.configKnowledge"
               className="card-icon-action"
+              icon={<ConfigureIcon />}
               onClick={() => onConfigKnowledge(entry)}
-              title={t('mcp.configKnowledge')}
-              aria-label={t('mcp.configKnowledge')}
-            >
-              <ConfigureIcon />
-            </button>
+            />
           )}
           {onEdit && (
-            <button
-              type="button"
+            <CardActionButton
+              labelKey="common.edit"
               className="card-icon-action"
+              icon={<EditIcon />}
               onClick={() => onEdit(entry)}
-              title={t('common.edit')}
-              aria-label={t('common.edit')}
-            >
-              <EditIcon />
-            </button>
+            />
           )}
           {onDelete && (
-            <button
-              type="button"
+            <CardActionButton
+              labelKey="common.delete"
               className="card-icon-action card-icon-action-danger"
+              icon={<TrashIcon />}
               onClick={() => onDelete(entry.name)}
-              title={t('common.delete')}
-              aria-label={t('common.delete')}
-            >
-              <TrashIcon />
-            </button>
+            />
           )}
         </div>
       )}

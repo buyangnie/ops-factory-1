@@ -4,14 +4,14 @@ import { PreviewProvider, usePreview } from './app/platform/providers/PreviewCon
 import { InboxProvider } from './app/platform/providers/InboxContext'
 import { SidebarProvider, useSidebar } from './app/platform/providers/SidebarContext'
 import { RightPanelProvider, useRightPanel } from './app/platform/providers/RightPanelContext'
-import { getUrlParam } from './utils/urlParams'
+import { isEmbedMode } from './utils/urlParams'
 import { buildRoutes } from './app/platform/RouteBuilder'
 import { AppShell } from './app/platform/AppShell'
 import { RightPanelHost } from './app/platform/RightPanelHost'
 import { useEnabledModules } from './app/platform/useEnabledModules'
 import { useRouteDiagnostics } from './app/platform/logging/useRouteDiagnostics'
 
-const IS_EMBED = getUrlParam('embed') === 'true'
+const IS_EMBED = isEmbedMode()
 
 function AppContent() {
     const { previewFile, isPreviewFullscreen } = usePreview()

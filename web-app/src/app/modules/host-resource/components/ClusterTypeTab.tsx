@@ -1,6 +1,7 @@
 import { useState, useCallback, useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
 import TypeCard from './TypeCard'
+import TypeFormModal from './TypeFormModal'
 import ListSearchInput from '../../../platform/ui/list/ListSearchInput'
 import ListResultsMeta from '../../../platform/ui/list/ListResultsMeta'
 import { useToast } from '../../../platform/providers/ToastContext'
@@ -38,7 +39,6 @@ export default function ClusterTypeTab({ clusterTypes, clusters, loading, onCrea
     const { t } = useTranslation()
     const { showToast } = useToast()
     const { requestConfirm } = useConfirmDialog()
-    const requiredStar = <span style={{ color: 'var(--color-error, #ef4444)', marginLeft: 2 }}>*</span>
     const [showModal, setShowModal] = useState(false)
     const [editing, setEditing] = useState<ClusterType | null>(null)
     const [form, setForm] = useState<FormData>(emptyForm)
@@ -82,13 +82,11 @@ export default function ClusterTypeTab({ clusterTypes, clusters, loading, onCrea
                 envVariables: form.envVariables.filter(ev => ev.key.trim() !== ''),
             }
             if (editing) {
-                // Check if type name or code is in use when editing
                 const inUseByName = clusters.filter(c => c.type === form.name)
                 const inUseByCode = clusters.filter(c => c.type === editing.code)
                 const nameChanged = form.name !== editing.name
                 const codeChanged = form.code !== editing.code
 
-                // Show warning if modifying code while it's in use
                 if (codeChanged && inUseByCode.length > 0) {
                     const inUseClusters = inUseByCode.map(c => c.name).join(', ')
                     showToast('warning', t('hostResource.clusterTypeInUse', { name: form.code, clusters: inUseClusters }))
@@ -96,7 +94,6 @@ export default function ClusterTypeTab({ clusterTypes, clusters, loading, onCrea
                     return
                 }
 
-                // Show warning if modifying name while it's in use by same code
                 if (nameChanged && inUseByName.length > 0) {
                     const inUseClusters = inUseByName.map(c => c.name).join(', ')
                     showToast('warning', t('hostResource.clusterTypeInUse', { name: form.name, clusters: inUseClusters }))
@@ -265,28 +262,23 @@ export default function ClusterTypeTab({ clusterTypes, clusters, loading, onCrea
                         )}
                     </div>
                     {selectedIds.size > 0 && (
-                        <div style={{
-                            display: 'flex', alignItems: 'center', gap: 12, padding: '12px 16px',
-                            background: 'var(--surface-background, #f8fafc)', borderRadius: 6,
-                            marginBottom: 'var(--spacing-3)', border: '1px solid var(--border-color, #e2e8f0)'
-                        }}>
+                        <div className="hr-batch-bar">
                             <input
                                 type="checkbox"
                                 checked={selectedIds.size === filteredTypes.length}
                                 onChange={handleSelectAll}
-                                style={{ cursor: 'pointer' }}
+                                className="hr-batch-bar-checkbox"
                             />
-                            <span style={{ fontSize: '0.875rem', color: 'var(--text-primary, #1e293b)' }}>
+                            <span className="hr-batch-bar-label">
                                 {selectedIds.size > 0 ? t('common.selectedCount', { count: selectedIds.size }) : t('common.selectAll')}
                             </span>
-                            <div style={{ flex: 1 }} />
+                            <div className="hr-batch-bar-spacer" />
                             <button className="btn btn-secondary btn-sm" onClick={() => setSelectedIds(new Set())}>
                                 {t('common.cancel')}
                             </button>
                             <button
-                                className="btn btn-primary btn-sm"
+                                className="btn btn-primary btn-sm hr-batch-bar-delete"
                                 onClick={handleBatchDelete}
-                                style={{ background: 'var(--color-error, #ef4444)', borderColor: 'var(--color-error, #ef4444)' }}
                             >
                                 {t('common.delete')} ({selectedIds.size})
                             </button>
@@ -307,50 +299,16 @@ export default function ClusterTypeTab({ clusterTypes, clusters, loading, onCrea
                 </>
             )}
 
-            {/* Modal */}
             {showModal && (
-                <div className="hr-host-modal modal-overlay">
-                    <div className="modal-content">
-                        <div className="modal-header">
-                            <h3>{editing ? t('hostResource.editClusterType') : t('hostResource.createClusterType')}</h3>
-                            <button className="modal-close" onClick={() => setShowModal(false)}>×</button>
-                        </div>
-                        <div className="modal-body">
-                            <div className="form-group">
-                                <label className="form-label">{t('hostResource.typeName')}{requiredStar}</label>
-                                <input
-                                    className="form-input"
-                                    value={form.name}
-                                    onChange={e => setForm(f => ({ ...f, name: e.target.value }))}
-                                    placeholder={t('hostResource.typeName')}
-                                />
-                            </div>
-                            <div className="form-group">
-                                <label className="form-label">{t('hostResource.typeCode')}</label>
-                                <input
-                                    className="form-input"
-                                    value={form.code}
-                                    onChange={e => setForm(f => ({ ...f, code: e.target.value }))}
-                                    placeholder={t('hostResource.typeCode')}
-                                />
-                            </div>
-                            <div className="form-group">
-                                <label className="form-label">{t('hostResource.description')}</label>
-                                <input
-                                    className="form-input"
-                                    value={form.description}
-                                    onChange={e => setForm(f => ({ ...f, description: e.target.value }))}
-                                />
-                            </div>
-                            <div className="form-group">
-                                <label className="form-label">{t('hostResource.typeColor')}</label>
-                                <input
-                                    type="color"
-                                    value={form.color}
-                                    onChange={e => setForm(f => ({ ...f, color: e.target.value }))}
-                                    style={{ width: 48, height: 32, padding: 2, cursor: 'pointer' }}
-                                />
-                            </div>
+                <TypeFormModal
+                    title={editing ? t('hostResource.editClusterType') : t('hostResource.createClusterType')}
+                    form={form}
+                    setForm={setForm}
+                    saving={saving}
+                    onSave={handleSave}
+                    onClose={() => setShowModal(false)}
+                    extraFields={
+                        <>
                             <div className="form-group">
                                 <label className="form-label">{t('hostResource.clusterMode')}</label>
                                 <select
@@ -361,17 +319,6 @@ export default function ClusterTypeTab({ clusterTypes, clusters, loading, onCrea
                                     <option value="peer">{t('hostResource.clusterModePeer')}</option>
                                     <option value="primary-backup">{t('hostResource.clusterModePrimaryBackup')}</option>
                                 </select>
-                            </div>
-                            <div className="form-group">
-                                <label className="form-label">{t('hostResource.knowledge')}</label>
-                                <textarea
-                                    className="form-input"
-                                    rows={5}
-                                    value={form.knowledge}
-                                    onChange={e => setForm(f => ({ ...f, knowledge: e.target.value }))}
-                                    placeholder={t('hostResource.knowledgeHint')}
-                                    style={{ resize: 'vertical' }}
-                                />
                             </div>
                             <div className="form-group">
                                 <label className="form-label">{t('hostResource.commandPrefix')}</label>
@@ -407,21 +354,9 @@ export default function ClusterTypeTab({ clusterTypes, clusters, loading, onCrea
                                     + {t('hostResource.addEnvVar')}
                                 </button>
                             </div>
-                        </div>
-                        <div className="modal-footer">
-                            <button className="btn btn-secondary" onClick={() => setShowModal(false)}>
-                                {t('common.cancel')}
-                            </button>
-                            <button
-                                className="btn btn-primary"
-                                onClick={handleSave}
-                                disabled={saving || !form.name.trim()}
-                            >
-                                {saving ? t('common.saving') : t('common.save')}
-                            </button>
-                        </div>
-                    </div>
-                </div>
+                        </>
+                    }
+                />
             )}
         </div>
     )

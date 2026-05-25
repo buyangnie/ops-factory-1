@@ -93,7 +93,7 @@ export function useResourceExport() {
                 { key: 'businessIp' }, { key: 'port' }, { key: 'os' },
                 { key: 'location' }, { key: 'username' }, { key: 'authType' },
                 { key: 'credential' }, { key: 'business' }, { key: 'cluster' },
-                { key: 'purpose' }, { key: 'tags' }, { key: 'description' },
+                { key: 'purpose' }, { key: 'role' }, { key: 'tags' }, { key: 'description' },
             ]
             const hostRows = allHosts.map(h => ({
                 name: h.name,
@@ -109,6 +109,7 @@ export function useResourceExport() {
                 business: h.business || '',
                 cluster: h.clusterId ? (clusterMap.get(h.clusterId)?.name ?? '') : '',
                 purpose: h.purpose || '',
+                role: h.role || '',
                 tags: Array.isArray(h.tags) ? h.tags.join(';') : '',
                 description: h.description || '',
             }))

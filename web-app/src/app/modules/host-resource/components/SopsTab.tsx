@@ -638,40 +638,45 @@ function SopFormModal({
                             </div>
                         </div>
 
-                        {node.type === 'browser' ? (
-                            <>
-                                <div className="form-group sop-workflow-compact-field">
-                                    <label className="form-label">{t('remoteDiagnosis.sops.browserUrl')}</label>
-                                    <input
-                                        className="form-input"
-                                        placeholder="https://example.com"
-                                        value={node.browserUrl ?? ''}
-                                        onChange={e => handleNodeChange(idx, 'browserUrl', e.target.value)}
-                                    />
-                                </div>
-                                <div className="form-group sop-workflow-compact-field">
-                                    <label className="form-label">{t('remoteDiagnosis.sops.browserAction')}</label>
-                                    <textarea
-                                        className="form-input"
-                                        rows={3}
-                                        placeholder={t('remoteDiagnosis.sops.browserActionPlaceholder')}
-                                        value={node.browserAction ?? ''}
-                                        onChange={e => handleNodeChange(idx, 'browserAction', e.target.value)}
-                                    />
-                                </div>
-                                <div className="form-group sop-workflow-compact-field">
-                                    <label className="form-label">{t('remoteDiagnosis.sops.browserMode')}</label>
-                                    <select
-                                        className="form-input"
-                                        value={node.browserMode ?? 'headless'}
-                                        onChange={e => handleNodeChange(idx, 'browserMode', e.target.value)}
-                                    >
-                                        <option value="headless">{t('remoteDiagnosis.sops.chromiumMode')}</option>
-                                        <option value="headed">{t('remoteDiagnosis.sops.headedMode')}</option>
-                                    </select>
-                                </div>
-                            </>
-                        ) : node.type === 'end' ? null : (
+                        {(() => {
+                            if (node.type === 'browser') {
+                                return (
+                                    <>
+                                        <div className="form-group sop-workflow-compact-field">
+                                            <label className="form-label">{t('remoteDiagnosis.sops.browserUrl')}</label>
+                                            <input
+                                                className="form-input"
+                                                placeholder="https://example.com"
+                                                value={node.browserUrl ?? ''}
+                                                onChange={e => handleNodeChange(idx, 'browserUrl', e.target.value)}
+                                            />
+                                        </div>
+                                        <div className="form-group sop-workflow-compact-field">
+                                            <label className="form-label">{t('remoteDiagnosis.sops.browserAction')}</label>
+                                            <textarea
+                                                className="form-input"
+                                                rows={3}
+                                                placeholder={t('remoteDiagnosis.sops.browserActionPlaceholder')}
+                                                value={node.browserAction ?? ''}
+                                                onChange={e => handleNodeChange(idx, 'browserAction', e.target.value)}
+                                            />
+                                        </div>
+                                        <div className="form-group sop-workflow-compact-field">
+                                            <label className="form-label">{t('remoteDiagnosis.sops.browserMode')}</label>
+                                            <select
+                                                className="form-input"
+                                                value={node.browserMode ?? 'headless'}
+                                                onChange={e => handleNodeChange(idx, 'browserMode', e.target.value)}
+                                            >
+                                                <option value="headless">{t('remoteDiagnosis.sops.chromiumMode')}</option>
+                                                <option value="headed">{t('remoteDiagnosis.sops.headedMode')}</option>
+                                            </select>
+                                        </div>
+                                    </>
+                                )
+                            }
+                            if (node.type === 'end') return null
+                            return (
                             <>
                                 <div className="form-group sop-workflow-compact-field">
                                     <label className="form-label">{t('remoteDiagnosis.sops.nodeTags')}</label>
@@ -713,7 +718,8 @@ function SopFormModal({
                                     onChange={v => handleNodeChange(idx, 'variables', v)}
                                 />
                             </>
-                        )}
+                        )
+                        })()}
 
                         <div className="form-group sop-workflow-compact-field">
                             <label className="form-label">{t('remoteDiagnosis.sops.nodeOutputFormat')}</label>
@@ -830,7 +836,8 @@ function SopExpandableRow({ sop, onEdit, onDelete, onToggleEnabled }: {
                 <tr className="sop-workflow-detail-row">
                     <td colSpan={6}>
                         <div className="sop-workflow-detail-panel">
-                            {isNL ? (
+                            {(() => {
+                                if (isNL) return (
                                 <div>
                                     {sop.tags && sop.tags.length > 0 && (
                                         <div style={{ marginBottom: 'var(--spacing-3)' }}>
@@ -853,7 +860,8 @@ function SopExpandableRow({ sop, onEdit, onDelete, onToggleEnabled }: {
                                         </pre>
                                     </div>
                                 </div>
-                            ) : sop.nodes && sop.nodes.length > 0 ? (
+                                )
+                                if (sop.nodes && sop.nodes.length > 0) return (
                                 <div className="sop-workflow-node-list">
                                     {sop.nodes.map((node, i) => (
                                         <div key={node.id || i} className="sop-workflow-node-card">
@@ -880,28 +888,33 @@ function SopExpandableRow({ sop, onEdit, onDelete, onToggleEnabled }: {
                                                 </span>
                                             </div>
                                             <div className="sop-workflow-node-grid">
-                                                {node.type === 'browser' ? (
-                                                    <>
-                                                        <div className="sop-workflow-node-item">
-                                                            <span className="sop-workflow-node-label">
-                                                                {t('remoteDiagnosis.sops.browserUrl')}
-                                                            </span>
-                                                            <code className="sop-workflow-code-pill">
-                                                                {node.browserUrl || '—'}
-                                                            </code>
-                                                        </div>
-                                                        {node.browserAction && (
-                                                            <div className="sop-workflow-node-item" style={{ gridColumn: '1 / -1' }}>
-                                                                <span className="sop-workflow-node-label">
-                                                                    {t('remoteDiagnosis.sops.browserAction')}
-                                                                </span>
-                                                                <span className="sop-workflow-node-value">
-                                                                    {node.browserAction}
-                                                                </span>
-                                                            </div>
-                                                        )}
-                                                    </>
-                                                ) : node.type === 'end' ? null : (
+                                                {(() => {
+                                                    if (node.type === 'browser') {
+                                                        return (
+                                                            <>
+                                                                <div className="sop-workflow-node-item">
+                                                                    <span className="sop-workflow-node-label">
+                                                                        {t('remoteDiagnosis.sops.browserUrl')}
+                                                                    </span>
+                                                                    <code className="sop-workflow-code-pill">
+                                                                        {node.browserUrl || '—'}
+                                                                    </code>
+                                                                </div>
+                                                                {node.browserAction && (
+                                                                    <div className="sop-workflow-node-item" style={{ gridColumn: '1 / -1' }}>
+                                                                        <span className="sop-workflow-node-label">
+                                                                            {t('remoteDiagnosis.sops.browserAction')}
+                                                                        </span>
+                                                                        <span className="sop-workflow-node-value">
+                                                                            {node.browserAction}
+                                                                        </span>
+                                                                    </div>
+                                                                )}
+                                                            </>
+                                                        )
+                                                    }
+                                                    if (node.type === 'end') return null
+                                                    return (
                                                     <>
                                                         {node.tags && node.tags.length > 0 && (
                                                             <div className="sop-workflow-node-item">
@@ -936,7 +949,8 @@ function SopExpandableRow({ sop, onEdit, onDelete, onToggleEnabled }: {
                                                             </div>
                                                         )}
                                                     </>
-                                                )}
+                                                )
+                                                })()}
                                                 {node.transitions && node.transitions.length > 0 && (
                                                     <div className="sop-workflow-node-item" style={{ gridColumn: '1 / -1' }}>
                                                         <span className="sop-workflow-node-label">
@@ -953,11 +967,13 @@ function SopExpandableRow({ sop, onEdit, onDelete, onToggleEnabled }: {
                                         </div>
                                     ))}
                                 </div>
-                            ) : (
-                                <div style={{ color: 'var(--color-text-muted)', fontSize: 'var(--font-size-sm)' }}>
-                                    No nodes defined.
-                                </div>
-                            )}
+                                )
+                                return (
+                                    <div style={{ color: 'var(--color-text-muted)', fontSize: 'var(--font-size-sm)' }}>
+                                        No nodes defined.
+                                    </div>
+                                )
+                            })()}
                         </div>
                     </td>
                 </tr>
@@ -1077,36 +1093,41 @@ export function SopsTab() {
 
                 {error && <div className="conn-banner conn-banner-error">{error}</div>}
 
-                {isLoading ? (
-                    <div className="sop-workflow-empty-shell">
-                        <div className="empty-state">
-                            <h3 className="empty-state-title">{t('common.loading')}</h3>
-                        </div>
-                    </div>
-                ) : sops.length === 0 ? (
-                    <div className="sop-workflow-empty-shell">
-                        <div className="empty-state">
-                            <svg
-                                className="empty-state-icon"
-                                viewBox="0 0 24 24"
-                                fill="none"
-                                stroke="currentColor"
-                                strokeWidth="1.5"
-                            >
-                                <path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
-                            </svg>
-                            <h3 className="empty-state-title">{t('remoteDiagnosis.sops.noSops')}</h3>
-                            <p className="empty-state-description">
-                                {t('remoteDiagnosis.sops.noSopsHint')}
-                            </p>
-                        </div>
-                    </div>
-                ) : (
-                    (() => {
-                        const totalPages = Math.max(1, Math.ceil(filteredSops.length / PAGE_SIZE))
-                        const safePage = Math.min(currentPage, totalPages)
-                        const paginatedSops = filteredSops.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE)
-                        return <>
+                {(() => {
+                    if (isLoading) {
+                        return (
+                            <div className="sop-workflow-empty-shell">
+                                <div className="empty-state">
+                                    <h3 className="empty-state-title">{t('common.loading')}</h3>
+                                </div>
+                            </div>
+                        )
+                    }
+                    if (sops.length === 0) {
+                        return (
+                            <div className="sop-workflow-empty-shell">
+                                <div className="empty-state">
+                                    <svg
+                                        className="empty-state-icon"
+                                        viewBox="0 0 24 24"
+                                        fill="none"
+                                        stroke="currentColor"
+                                        strokeWidth="1.5"
+                                    >
+                                        <path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+                                    </svg>
+                                    <h3 className="empty-state-title">{t('remoteDiagnosis.sops.noSops')}</h3>
+                                    <p className="empty-state-description">
+                                        {t('remoteDiagnosis.sops.noSopsHint')}
+                                    </p>
+                                </div>
+                            </div>
+                        )
+                    }
+                    const totalPages = Math.max(1, Math.ceil(filteredSops.length / PAGE_SIZE))
+                    const safePage = Math.min(currentPage, totalPages)
+                    const paginatedSops = filteredSops.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE)
+                    return <>
                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 'var(--spacing-3)', marginBottom: 'var(--spacing-3)' }}>
                         <ListSearchInput
                             value={searchTerm}
@@ -1178,8 +1199,7 @@ export function SopsTab() {
                         </div>
                     )}
                 </>
-                    })()
-                )}
+                })()}
             </section>
 
             {(showAddModal || editingSop) && (

@@ -143,6 +143,8 @@ export default function ImportDialog({ open, onClose, importing, progress, onImp
                 return t('hostResource.importErrorSourceNodeNotFound', { node: err.params?.node })
             case 'import.rowError':
                 return t('hostResource.importErrorRowError', { message: err.params?.message })
+            case 'import.duplicate':
+                return t('hostResource.importErrorDuplicate', { type: err.params?.type, name: err.params?.name })
             case 'import.setParentFailed':
                 return t('hostResource.importErrorSetParentFailed', { message: err.params?.message })
             case 'import.importFailed':
@@ -286,7 +288,7 @@ export default function ImportDialog({ open, onClose, importing, progress, onImp
                             <ul className="hr-import-error-list">
                                 {result.errors.map((err, idx) => (
                                     <li key={idx} className="hr-import-error-item">
-                                        <span className="hr-import-error-row">Row {err.row}:</span> {translateError(err)}
+                                        <span className="hr-import-error-row">{t('hostResource.importErrorRow', { row: err.row })}</span> {translateError(err)}
                                     </li>
                                 ))}
                             </ul>

@@ -225,27 +225,36 @@ describe('useChat — session event state machine', () => {
         return new Promise(resolve => setTimeout(resolve, 0))
     }
 
-    it('waits for Finish after ActiveRequests no longer lists the request', async () => {
-        let submittedRequestId = ''
-        const client = {
-            submitSessionReply: async (_sessionId: string, request: { request_id: string }) => {
-                submittedRequestId = request.request_id
-                return { request_id: request.request_id }
+    function createMockClient(
+        makeGen: (requestId: string, signal?: AbortSignal) => AsyncGenerator<SessionSSEEvent>,
+        extra?: Partial<GoosedClient>,
+    ): GoosedClient {
+        let requestId = ''
+        return {
+            submitSessionReply: async (_: string, req: { request_id: string }) => {
+                requestId = req.request_id
+                return { request_id: req.request_id }
             },
-            subscribeSessionEvents: async function *(_sessionId: string, options: { signal?: AbortSignal } = {}): AsyncGenerator<SessionSSEEvent> {
-                while (!submittedRequestId && !options.signal?.aborted) {
-                    await delay()
-                }
-                if (options.signal?.aborted) return
-
-                yield { event: { type: 'ActiveRequests', request_ids: [submittedRequestId] } }
-                yield { event: { type: 'ActiveRequests', request_ids: [] } }
-                yield { event: { type: 'Finish', chat_request_id: submittedRequestId, token_state: tokenState } }
+            subscribeSessionEvents: async function*(_: string, opts: { signal?: AbortSignal } = {}) {
+                while (!requestId && !opts.signal?.aborted) await delay()
+                if (opts.signal?.aborted) return
+                yield* makeGen(requestId, opts.signal)
             },
             getSession: async () => ({ conversation: [] }),
+            ...extra,
         } as unknown as GoosedClient
+    }
 
-        const { result } = renderHook(() => useChat({ sessionId: 'session-1', client }))
+    function renderChat(client: GoosedClient) {
+        return renderHook(() => useChat({ sessionId: 'session-1', client }))
+    }
+
+    it('waits for Finish after ActiveRequests no longer lists the request', async () => {
+        const { result } = renderChat(createMockClient(async function*(rId) {
+            yield { event: { type: 'ActiveRequests', request_ids: [rId] } }
+            yield { event: { type: 'ActiveRequests', request_ids: [] } }
+            yield { event: { type: 'Finish', chat_request_id: rId, token_state: tokenState } }
+        }))
 
         act(() => {
             result.current.sendMessage('hello')
@@ -258,41 +267,24 @@ describe('useChat — session event state machine', () => {
     })
 
     it('does not treat ActiveRequests empty as completed without a terminal event', async () => {
-        let submittedRequestId = ''
-        const client = {
-            submitSessionReply: async (_sessionId: string, request: { request_id: string }) => {
-                submittedRequestId = request.request_id
-                return { request_id: request.request_id }
-            },
-            subscribeSessionEvents: async function *(_sessionId: string, options: { signal?: AbortSignal } = {}): AsyncGenerator<SessionSSEEvent> {
-                while (!submittedRequestId && !options.signal?.aborted) {
-                    await delay()
-                }
-                if (options.signal?.aborted) return
-
-                yield { event: { type: 'ActiveRequests', request_ids: [submittedRequestId] } }
-                yield {
-                    event: {
-                        type: 'Message',
-                        chat_request_id: submittedRequestId,
-                        message: {
-                            id: 'assistant-1',
-                            role: 'assistant',
-                            created: 1776928807,
-                            content: [{ type: 'text', text: 'done without finish' }],
-                            metadata: { userVisible: true, agentVisible: true },
-                        },
+        const { result } = renderChat(createMockClient(async function*(rId, signal) {
+            yield { event: { type: 'ActiveRequests', request_ids: [rId] } }
+            yield {
+                event: {
+                    type: 'Message',
+                    chat_request_id: rId,
+                    message: {
+                        id: 'assistant-1',
+                        role: 'assistant',
+                        created: 1776928807,
+                        content: [{ type: 'text', text: 'done without finish' }],
+                        metadata: { userVisible: true, agentVisible: true },
                     },
-                }
-                yield { event: { type: 'ActiveRequests', request_ids: [] } }
-                while (!options.signal?.aborted) {
-                    await delay()
-                }
-            },
-            getSession: async () => ({ conversation: [] }),
-        } as unknown as GoosedClient
-
-        const { result } = renderHook(() => useChat({ sessionId: 'session-1', client }))
+                },
+            }
+            yield { event: { type: 'ActiveRequests', request_ids: [] } }
+            while (!signal?.aborted) await delay()
+        }))
 
         act(() => {
             result.current.sendMessage('hello')
@@ -306,28 +298,10 @@ describe('useChat — session event state machine', () => {
     })
 
     it('clears cancellation locally without waiting for a terminal event', async () => {
-        let submittedRequestId = ''
-        const client = {
-            submitSessionReply: async (_sessionId: string, request: { request_id: string }) => {
-                submittedRequestId = request.request_id
-                return { request_id: request.request_id }
-            },
-            cancelSessionReply: async () => undefined,
-            subscribeSessionEvents: async function *(_sessionId: string, options: { signal?: AbortSignal } = {}): AsyncGenerator<SessionSSEEvent> {
-                while (!submittedRequestId && !options.signal?.aborted) {
-                    await delay()
-                }
-                if (options.signal?.aborted) return
-
-                yield { event: { type: 'ActiveRequests', request_ids: [submittedRequestId] } }
-                while (!options.signal?.aborted) {
-                    await delay()
-                }
-            },
-            getSession: async () => ({ conversation: [] }),
-        } as unknown as GoosedClient
-
-        const { result } = renderHook(() => useChat({ sessionId: 'session-1', client }))
+        const { result } = renderChat(createMockClient(async function*(rId, signal) {
+            yield { event: { type: 'ActiveRequests', request_ids: [rId] } }
+            while (!signal?.aborted) await delay()
+        }, { cancelSessionReply: async () => undefined }))
 
         act(() => {
             result.current.sendMessage('hello')
@@ -357,37 +331,14 @@ describe('useChat — session event state machine', () => {
     })
 
     it('ignores late ActiveRequests that still list the cancelled request', async () => {
-        let submittedRequestId = ''
         let cancelSubmitted = false
-        const client = {
-            submitSessionReply: async (_sessionId: string, request: { request_id: string }) => {
-                submittedRequestId = request.request_id
-                return { request_id: request.request_id }
-            },
-            cancelSessionReply: async () => {
-                cancelSubmitted = true
-            },
-            subscribeSessionEvents: async function *(_sessionId: string, options: { signal?: AbortSignal } = {}): AsyncGenerator<SessionSSEEvent> {
-                while (!submittedRequestId && !options.signal?.aborted) {
-                    await delay()
-                }
-                if (options.signal?.aborted) return
-
-                yield { event: { type: 'ActiveRequests', request_ids: [submittedRequestId] } }
-                while (!cancelSubmitted && !options.signal?.aborted) {
-                    await delay()
-                }
-                if (options.signal?.aborted) return
-
-                yield { event: { type: 'ActiveRequests', request_ids: [submittedRequestId] } }
-                while (!options.signal?.aborted) {
-                    await delay()
-                }
-            },
-            getSession: async () => ({ conversation: [] }),
-        } as unknown as GoosedClient
-
-        const { result } = renderHook(() => useChat({ sessionId: 'session-1', client }))
+        const { result } = renderChat(createMockClient(async function*(rId, signal) {
+            yield { event: { type: 'ActiveRequests', request_ids: [rId] } }
+            while (!cancelSubmitted && !signal?.aborted) await delay()
+            if (signal?.aborted) return
+            yield { event: { type: 'ActiveRequests', request_ids: [rId] } }
+            while (!signal?.aborted) await delay()
+        }, { cancelSessionReply: async () => { cancelSubmitted = true } }))
 
         act(() => {
             result.current.sendMessage('hello')
@@ -408,32 +359,16 @@ describe('useChat — session event state machine', () => {
     })
 
     it('keeps the UI cancelled when cancel submission fails', async () => {
-        let submittedRequestId = ''
         let cancelAttempts = 0
-        const client = {
-            submitSessionReply: async (_sessionId: string, request: { request_id: string }) => {
-                submittedRequestId = request.request_id
-                return { request_id: request.request_id }
-            },
+        const { result } = renderChat(createMockClient(async function*(rId, signal) {
+            yield { event: { type: 'ActiveRequests', request_ids: [rId] } }
+            while (!signal?.aborted) await delay()
+        }, {
             cancelSessionReply: async () => {
                 cancelAttempts += 1
                 throw new Error('cancel failed')
             },
-            subscribeSessionEvents: async function *(_sessionId: string, options: { signal?: AbortSignal } = {}): AsyncGenerator<SessionSSEEvent> {
-                while (!submittedRequestId && !options.signal?.aborted) {
-                    await delay()
-                }
-                if (options.signal?.aborted) return
-
-                yield { event: { type: 'ActiveRequests', request_ids: [submittedRequestId] } }
-                while (!options.signal?.aborted) {
-                    await delay()
-                }
-            },
-            getSession: async () => ({ conversation: [] }),
-        } as unknown as GoosedClient
-
-        const { result } = renderHook(() => useChat({ sessionId: 'session-1', client }))
+        }))
 
         act(() => {
             result.current.sendMessage('hello')
@@ -463,34 +398,13 @@ describe('useChat — session event state machine', () => {
     })
 
     it('stays cancelled when ActiveRequests later no longer lists the request', async () => {
-        let submittedRequestId = ''
         let cancelSubmitted = false
-        const client = {
-            submitSessionReply: async (_sessionId: string, request: { request_id: string }) => {
-                submittedRequestId = request.request_id
-                return { request_id: request.request_id }
-            },
-            cancelSessionReply: async () => {
-                cancelSubmitted = true
-            },
-            subscribeSessionEvents: async function *(_sessionId: string, options: { signal?: AbortSignal } = {}): AsyncGenerator<SessionSSEEvent> {
-                while (!submittedRequestId && !options.signal?.aborted) {
-                    await delay()
-                }
-                if (options.signal?.aborted) return
-
-                yield { event: { type: 'ActiveRequests', request_ids: [submittedRequestId] } }
-                while (!cancelSubmitted && !options.signal?.aborted) {
-                    await delay()
-                }
-                if (options.signal?.aborted) return
-
-                yield { event: { type: 'ActiveRequests', request_ids: [] } }
-            },
-            getSession: async () => ({ conversation: [] }),
-        } as unknown as GoosedClient
-
-        const { result } = renderHook(() => useChat({ sessionId: 'session-1', client }))
+        const { result } = renderChat(createMockClient(async function*(rId, signal) {
+            yield { event: { type: 'ActiveRequests', request_ids: [rId] } }
+            while (!cancelSubmitted && !signal?.aborted) await delay()
+            if (signal?.aborted) return
+            yield { event: { type: 'ActiveRequests', request_ids: [] } }
+        }, { cancelSessionReply: async () => { cancelSubmitted = true } }))
 
         act(() => {
             result.current.sendMessage('hello')
@@ -511,35 +425,14 @@ describe('useChat — session event state machine', () => {
     })
 
     it('stays cancelled when a terminal event arrives after local cancellation', async () => {
-        let submittedRequestId = ''
         let cancelSubmitted = false
-        const client = {
-            submitSessionReply: async (_sessionId: string, request: { request_id: string }) => {
-                submittedRequestId = request.request_id
-                return { request_id: request.request_id }
-            },
-            cancelSessionReply: async () => {
-                cancelSubmitted = true
-            },
-            subscribeSessionEvents: async function *(_sessionId: string, options: { signal?: AbortSignal } = {}): AsyncGenerator<SessionSSEEvent> {
-                while (!submittedRequestId && !options.signal?.aborted) {
-                    await delay()
-                }
-                if (options.signal?.aborted) return
-
-                yield { event: { type: 'ActiveRequests', request_ids: [submittedRequestId] } }
-                while (!cancelSubmitted && !options.signal?.aborted) {
-                    await delay()
-                }
-                if (options.signal?.aborted) return
-
-                yield { event: { type: 'ActiveRequests', request_ids: [] } }
-                yield { event: { type: 'Finish', chat_request_id: submittedRequestId, token_state: tokenState } }
-            },
-            getSession: async () => ({ conversation: [] }),
-        } as unknown as GoosedClient
-
-        const { result } = renderHook(() => useChat({ sessionId: 'session-1', client }))
+        const { result } = renderChat(createMockClient(async function*(rId, signal) {
+            yield { event: { type: 'ActiveRequests', request_ids: [rId] } }
+            while (!cancelSubmitted && !signal?.aborted) await delay()
+            if (signal?.aborted) return
+            yield { event: { type: 'ActiveRequests', request_ids: [] } }
+            yield { event: { type: 'Finish', chat_request_id: rId, token_state: tokenState } }
+        }, { cancelSessionReply: async () => { cancelSubmitted = true } }))
 
         act(() => {
             result.current.sendMessage('hello')
@@ -559,33 +452,18 @@ describe('useChat — session event state machine', () => {
     })
 
     it('handles OutputFiles that arrive after Finish as a session-level event', async () => {
-        let submittedRequestId = ''
-        const client = {
-            submitSessionReply: async (_sessionId: string, request: { request_id: string }) => {
-                submittedRequestId = request.request_id
-                return { request_id: request.request_id }
-            },
-            subscribeSessionEvents: async function *(_sessionId: string, options: { signal?: AbortSignal } = {}): AsyncGenerator<SessionSSEEvent> {
-                while (!submittedRequestId && !options.signal?.aborted) {
-                    await delay()
-                }
-                if (options.signal?.aborted) return
-
-                yield { event: { type: 'ActiveRequests', request_ids: [submittedRequestId] } }
-                yield { event: { type: 'Finish', chat_request_id: submittedRequestId, token_state: tokenState } }
-                yield {
-                    event: {
-                        type: 'OutputFiles',
-                        sessionId: 'session-1',
-                        chat_request_id: submittedRequestId,
-                        files: [{ path: 'report.md', name: 'report.md', ext: 'md' }],
-                    },
-                }
-            },
-            getSession: async () => ({ conversation: [] }),
-        } as unknown as GoosedClient
-
-        const { result } = renderHook(() => useChat({ sessionId: 'session-1', client }))
+        const { result } = renderChat(createMockClient(async function*(rId) {
+            yield { event: { type: 'ActiveRequests', request_ids: [rId] } }
+            yield { event: { type: 'Finish', chat_request_id: rId, token_state: tokenState } }
+            yield {
+                event: {
+                    type: 'OutputFiles',
+                    sessionId: 'session-1',
+                    chat_request_id: rId,
+                    files: [{ path: 'report.md', name: 'report.md', ext: 'md' }],
+                },
+            }
+        }))
 
         act(() => {
             result.current.sendMessage('hello')
@@ -602,22 +480,21 @@ describe('useChat — session event state machine', () => {
     it('restores an active request and waits for Finish after ActiveRequests becomes empty', async () => {
         let subscriptionCount = 0
         const client = {
-            submitSessionReply: async (_sessionId: string, request: { request_id: string }) => ({ request_id: request.request_id }),
-            subscribeSessionEvents: async function *(_sessionId: string, options: { signal?: AbortSignal } = {}): AsyncGenerator<SessionSSEEvent> {
+            submitSessionReply: async (_: string, req: { request_id: string }) => ({ request_id: req.request_id }),
+            subscribeSessionEvents: async function*(_: string, opts: { signal?: AbortSignal } = {}): AsyncGenerator<SessionSSEEvent> {
                 subscriptionCount += 1
                 if (subscriptionCount === 1) {
                     yield { event: { type: 'ActiveRequests', request_ids: ['restored-request'] } }
                     return
                 }
-                if (options.signal?.aborted) return
-
+                if (opts.signal?.aborted) return
                 yield { event: { type: 'ActiveRequests', request_ids: [] } }
                 yield { event: { type: 'Finish', chat_request_id: 'restored-request', token_state: tokenState } }
             },
             getSession: async () => ({ conversation: [] }),
         } as unknown as GoosedClient
 
-        const { result } = renderHook(() => useChat({ sessionId: 'session-1', client }))
+        const { result } = renderChat(client)
 
         await waitFor(() => {
             expect(result.current.chatState).toBe(ChatState.Idle)
@@ -628,25 +505,10 @@ describe('useChat — session event state machine', () => {
     })
 
     it('keeps an accepted request reconnecting when the events stream disconnects', async () => {
-        let submittedRequestId = ''
-        const client = {
-            submitSessionReply: async (_sessionId: string, request: { request_id: string }) => {
-                submittedRequestId = request.request_id
-                return { request_id: request.request_id }
-            },
-            subscribeSessionEvents: async function *(_sessionId: string, options: { signal?: AbortSignal } = {}): AsyncGenerator<SessionSSEEvent> {
-                while (!submittedRequestId && !options.signal?.aborted) {
-                    await delay()
-                }
-                if (options.signal?.aborted) return
-
-                yield { event: { type: 'ActiveRequests', request_ids: [submittedRequestId] } }
-                throw new TypeError('network disconnected')
-            },
-            getSession: async () => ({ conversation: [] }),
-        } as unknown as GoosedClient
-
-        const { result } = renderHook(() => useChat({ sessionId: 'session-1', client }))
+        const { result } = renderChat(createMockClient(async function*(rId) {
+            yield { event: { type: 'ActiveRequests', request_ids: [rId] } }
+            throw new TypeError('network disconnected')
+        }))
 
         act(() => {
             result.current.sendMessage('hello')
@@ -660,44 +522,28 @@ describe('useChat — session event state machine', () => {
     })
 
     it('merges stale history instead of overwriting live restored messages while streaming', async () => {
-        let submittedRequestId = ''
         let releaseFinish: (() => void) | null = null
-        const finishGate = new Promise<void>(resolve => {
-            releaseFinish = resolve
-        })
-        const client = {
-            submitSessionReply: async (_sessionId: string, request: { request_id: string }) => {
-                submittedRequestId = request.request_id
-                return { request_id: request.request_id }
-            },
-            subscribeSessionEvents: async function *(_sessionId: string, options: { signal?: AbortSignal } = {}): AsyncGenerator<SessionSSEEvent> {
-                while (!submittedRequestId && !options.signal?.aborted) {
-                    await delay()
-                }
-                if (options.signal?.aborted) return
+        const finishGate = new Promise<void>(resolve => { releaseFinish = resolve })
 
-                yield { event: { type: 'ActiveRequests', request_ids: [submittedRequestId] } }
-                yield {
-                    event: {
-                        type: 'Message',
-                        chat_request_id: submittedRequestId,
-                        message: {
-                            id: 'assistant-live',
-                            role: 'assistant',
-                            created: 1776928807,
-                            content: [{ type: 'text', text: 'live response' }],
-                            metadata: { userVisible: true, agentVisible: true },
-                        },
+        const { result } = renderChat(createMockClient(async function*(rId, signal) {
+            yield { event: { type: 'ActiveRequests', request_ids: [rId] } }
+            yield {
+                event: {
+                    type: 'Message',
+                    chat_request_id: rId,
+                    message: {
+                        id: 'assistant-live',
+                        role: 'assistant',
+                        created: 1776928807,
+                        content: [{ type: 'text', text: 'live response' }],
+                        metadata: { userVisible: true, agentVisible: true },
                     },
-                }
-                await finishGate
-                if (options.signal?.aborted) return
-                yield { event: { type: 'Finish', chat_request_id: submittedRequestId } }
-            },
-            getSession: async () => ({ conversation: [] }),
-        } as unknown as GoosedClient
-
-        const { result } = renderHook(() => useChat({ sessionId: 'session-1', client }))
+                },
+            }
+            await finishGate
+            if (signal?.aborted) return
+            yield { event: { type: 'Finish', chat_request_id: rId } }
+        }))
 
         act(() => {
             result.current.sendMessage('hello')
@@ -728,44 +574,28 @@ describe('useChat — session event state machine', () => {
     })
 
     it('keeps the live message version when stale history has the same message id', async () => {
-        let submittedRequestId = ''
         let releaseFinish: (() => void) | null = null
-        const finishGate = new Promise<void>(resolve => {
-            releaseFinish = resolve
-        })
-        const client = {
-            submitSessionReply: async (_sessionId: string, request: { request_id: string }) => {
-                submittedRequestId = request.request_id
-                return { request_id: request.request_id }
-            },
-            subscribeSessionEvents: async function *(_sessionId: string, options: { signal?: AbortSignal } = {}): AsyncGenerator<SessionSSEEvent> {
-                while (!submittedRequestId && !options.signal?.aborted) {
-                    await delay()
-                }
-                if (options.signal?.aborted) return
+        const finishGate = new Promise<void>(resolve => { releaseFinish = resolve })
 
-                yield { event: { type: 'ActiveRequests', request_ids: [submittedRequestId] } }
-                yield {
-                    event: {
-                        type: 'Message',
-                        chat_request_id: submittedRequestId,
-                        message: {
-                            id: 'assistant-same-id',
-                            role: 'assistant',
-                            created: 1776928807,
-                            content: [{ type: 'text', text: 'live response with new tokens' }],
-                            metadata: { userVisible: true, agentVisible: true },
-                        },
+        const { result } = renderChat(createMockClient(async function*(rId, signal) {
+            yield { event: { type: 'ActiveRequests', request_ids: [rId] } }
+            yield {
+                event: {
+                    type: 'Message',
+                    chat_request_id: rId,
+                    message: {
+                        id: 'assistant-same-id',
+                        role: 'assistant',
+                        created: 1776928807,
+                        content: [{ type: 'text', text: 'live response with new tokens' }],
+                        metadata: { userVisible: true, agentVisible: true },
                     },
-                }
-                await finishGate
-                if (options.signal?.aborted) return
-                yield { event: { type: 'Finish', chat_request_id: submittedRequestId } }
-            },
-            getSession: async () => ({ conversation: [] }),
-        } as unknown as GoosedClient
-
-        const { result } = renderHook(() => useChat({ sessionId: 'session-1', client }))
+                },
+            }
+            await finishGate
+            if (signal?.aborted) return
+            yield { event: { type: 'Finish', chat_request_id: rId } }
+        }))
 
         act(() => {
             result.current.sendMessage('hello')

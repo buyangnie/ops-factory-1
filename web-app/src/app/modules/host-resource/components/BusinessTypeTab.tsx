@@ -1,6 +1,7 @@
 import { useState, useCallback, useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
 import TypeCard from './TypeCard'
+import TypeFormModal from './TypeFormModal'
 import ListSearchInput from '../../../platform/ui/list/ListSearchInput'
 import ListResultsMeta from '../../../platform/ui/list/ListResultsMeta'
 import { useToast } from '../../../platform/providers/ToastContext'
@@ -29,7 +30,6 @@ export default function BusinessTypeTab({ businessTypes, loading, onCreate, onUp
     const { t } = useTranslation()
     const { showToast } = useToast()
     const { requestConfirm } = useConfirmDialog()
-    const requiredStar = <span style={{ color: 'var(--color-error, #ef4444)', marginLeft: 2 }}>*</span>
     const [showModal, setShowModal] = useState(false)
     const [editing, setEditing] = useState<BusinessType | null>(null)
     const [form, setForm] = useState<FormData>(emptyForm)
@@ -139,76 +139,15 @@ export default function BusinessTypeTab({ businessTypes, loading, onCreate, onUp
                 </>
             )}
 
-            {/* Modal */}
             {showModal && (
-                <div className="hr-host-modal modal-overlay">
-                    <div className="modal-content">
-                        <div className="modal-header">
-                            <h3>{editing ? t('hostResource.editBusinessType') : t('hostResource.createBusinessType')}</h3>
-                            <button className="modal-close" onClick={() => setShowModal(false)}>×</button>
-                        </div>
-                        <div className="modal-body">
-                            <div className="form-group">
-                                <label className="form-label">{t('hostResource.typeName')}{requiredStar}</label>
-                                <input
-                                    className="form-input"
-                                    value={form.name}
-                                    onChange={e => setForm(f => ({ ...f, name: e.target.value }))}
-                                    placeholder={t('hostResource.typeName')}
-                                />
-                            </div>
-                            <div className="form-group">
-                                <label className="form-label">{t('hostResource.typeCode')}</label>
-                                <input
-                                    className="form-input"
-                                    value={form.code}
-                                    onChange={e => setForm(f => ({ ...f, code: e.target.value }))}
-                                    placeholder={t('hostResource.typeCode')}
-                                />
-                            </div>
-                            <div className="form-group">
-                                <label className="form-label">{t('hostResource.description')}</label>
-                                <input
-                                    className="form-input"
-                                    value={form.description}
-                                    onChange={e => setForm(f => ({ ...f, description: e.target.value }))}
-                                />
-                            </div>
-                            <div className="form-group">
-                                <label className="form-label">{t('hostResource.typeColor')}</label>
-                                <input
-                                    type="color"
-                                    value={form.color}
-                                    onChange={e => setForm(f => ({ ...f, color: e.target.value }))}
-                                    style={{ width: 48, height: 32, padding: 2, cursor: 'pointer' }}
-                                />
-                            </div>
-                            <div className="form-group">
-                                <label className="form-label">{t('hostResource.knowledge')}</label>
-                                <textarea
-                                    className="form-input"
-                                    rows={5}
-                                    value={form.knowledge}
-                                    onChange={e => setForm(f => ({ ...f, knowledge: e.target.value }))}
-                                    placeholder={t('hostResource.knowledgeHint')}
-                                    style={{ resize: 'vertical' }}
-                                />
-                            </div>
-                        </div>
-                        <div className="modal-footer">
-                            <button className="btn btn-secondary" onClick={() => setShowModal(false)}>
-                                {t('common.cancel')}
-                            </button>
-                            <button
-                                className="btn btn-primary"
-                                onClick={handleSave}
-                                disabled={saving || !form.name.trim()}
-                            >
-                                {saving ? t('common.saving') : t('common.save')}
-                            </button>
-                        </div>
-                    </div>
-                </div>
+                <TypeFormModal
+                    title={editing ? t('hostResource.editBusinessType') : t('hostResource.createBusinessType')}
+                    form={form}
+                    setForm={setForm}
+                    saving={saving}
+                    onSave={handleSave}
+                    onClose={() => setShowModal(false)}
+                />
             )}
         </div>
     )

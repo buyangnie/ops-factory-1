@@ -21,168 +21,114 @@ interface RuntimeConfig {
 }
 
 const LOOPBACK_HOSTS = new Set(['127.0.0.1', 'localhost', '::1'])
-const GATEWAY_PATH_PREFIX = '/gateway'
-const CONTROL_CENTER_PATH_PREFIX = '/control-center'
-const KNOWLEDGE_PATH_PREFIX = '/knowledge'
-const BUSINESS_INTELLIGENCE_PATH_PREFIX = '/business-intelligence'
-const SKILL_MARKET_PATH_PREFIX = '/skill-market'
-const OPERATION_INTELLIGENCE_PATH_PREFIX = '/operation-intelligence'
 
 function isLoopbackHost(host: string): boolean {
     return LOOPBACK_HOSTS.has(host)
 }
 
-function resolveGatewayUrl(raw: string | undefined): string {
+interface ServiceEndpoint {
+    pathPrefix: string
+    fallbackPort: number
+}
+
+const SERVICE_ENDPOINTS: Record<string, ServiceEndpoint> = {
+    gateway:                  { pathPrefix: '/gateway',                 fallbackPort: 3000 },
+    knowledge:                { pathPrefix: '/knowledge',               fallbackPort: 8092 },
+    controlCenter:            { pathPrefix: '/control-center',          fallbackPort: 8094 },
+    businessIntelligence:     { pathPrefix: '/business-intelligence',   fallbackPort: 8093 },
+    skillMarket:              { pathPrefix: '/skill-market',            fallbackPort: 8095 },
+    operationIntelligence:    { pathPrefix: '/operation-intelligence',  fallbackPort: 8096 },
+}
+
+function resolveServiceUrl(raw: string | undefined, endpoint: ServiceEndpoint): string {
     const pageHost = window.location.hostname || '127.0.0.1'
     const pageProtocol = window.location.protocol || 'http:'
-    const fallbackOrigin = `${pageProtocol}//${pageHost}:3000`
+    const fallbackOrigin = `${pageProtocol}//${pageHost}:${endpoint.fallbackPort}`
 
-    if (!raw) return `${GATEWAY_PATH_PREFIX}`
+    if (!raw) return endpoint.pathPrefix
 
     try {
         const url = new URL(raw)
         if (isLoopbackHost(url.hostname) && url.hostname !== pageHost) {
             url.hostname = pageHost
         }
-        return `${url.origin}${GATEWAY_PATH_PREFIX}`
+        return `${url.origin}${endpoint.pathPrefix}`
     } catch {
-        return `${fallbackOrigin}${GATEWAY_PATH_PREFIX}`
+        return `${fallbackOrigin}${endpoint.pathPrefix}`
     }
 }
-
-function resolveKnowledgeServiceUrl(raw: string | undefined): string {
-    const pageHost = window.location.hostname || '127.0.0.1'
-    const pageProtocol = window.location.protocol || 'http:'
-    const fallbackOrigin = `${pageProtocol}//${pageHost}:8092`
-
-    if (!raw) return `${KNOWLEDGE_PATH_PREFIX}`
-
-    try {
-        const url = new URL(raw)
-        if (isLoopbackHost(url.hostname) && url.hostname !== pageHost) {
-            url.hostname = pageHost
-        }
-        return `${url.origin}${KNOWLEDGE_PATH_PREFIX}`
-    } catch {
-        return `${fallbackOrigin}${KNOWLEDGE_PATH_PREFIX}`
-    }
-}
-
-function resolveControlCenterUrl(raw: string | undefined): string {
-    const pageHost = window.location.hostname || '127.0.0.1'
-    const pageProtocol = window.location.protocol || 'http:'
-    const fallbackOrigin = `${pageProtocol}//${pageHost}:8094`
-
-    if (!raw) return `${CONTROL_CENTER_PATH_PREFIX}`
-
-    try {
-        const url = new URL(raw)
-        if (isLoopbackHost(url.hostname) && url.hostname !== pageHost) {
-            url.hostname = pageHost
-        }
-        return `${url.origin}${CONTROL_CENTER_PATH_PREFIX}`
-    } catch {
-        return `${fallbackOrigin}${CONTROL_CENTER_PATH_PREFIX}`
-    }
-}
-
-function resolveBusinessIntelligenceServiceUrl(raw: string | undefined): string {
-    const pageHost = window.location.hostname || '127.0.0.1'
-    const pageProtocol = window.location.protocol || 'http:'
-    const fallbackOrigin = `${pageProtocol}//${pageHost}:8093`
-
-    if (!raw) return `${BUSINESS_INTELLIGENCE_PATH_PREFIX}`
-
-    try {
-        const url = new URL(raw)
-        if (isLoopbackHost(url.hostname) && url.hostname !== pageHost) {
-            url.hostname = pageHost
-        }
-        return `${url.origin}${BUSINESS_INTELLIGENCE_PATH_PREFIX}`
-    } catch {
-        return `${fallbackOrigin}${BUSINESS_INTELLIGENCE_PATH_PREFIX}`
-    }
-}
-
-function resolveSkillMarketServiceUrl(raw: string | undefined): string {
-    const pageHost = window.location.hostname || '127.0.0.1'
-    const pageProtocol = window.location.protocol || 'http:'
-    const fallbackOrigin = `${pageProtocol}//${pageHost}:8095`
-
-    if (!raw) return `${SKILL_MARKET_PATH_PREFIX}`
-
-    try {
-        const url = new URL(raw)
-        if (isLoopbackHost(url.hostname) && url.hostname !== pageHost) {
-            url.hostname = pageHost
-        }
-        return `${url.origin}${SKILL_MARKET_PATH_PREFIX}`
-    } catch {
-        return `${fallbackOrigin}${SKILL_MARKET_PATH_PREFIX}`
-    }
-}
-
-function resolveOperationIntelligenceServiceUrl(raw: string | undefined): string {
-    const pageHost = window.location.hostname || '127.0.0.1'
-    const pageProtocol = window.location.protocol || 'http:'
-    const fallbackOrigin = `${pageProtocol}//${pageHost}:8096`
-
-    if (!raw) return `${OPERATION_INTELLIGENCE_PATH_PREFIX}`
-
-    try {
-        const url = new URL(raw)
-        if (isLoopbackHost(url.hostname) && url.hostname !== pageHost) {
-            url.hostname = pageHost
-        }
-        return `${url.origin}${OPERATION_INTELLIGENCE_PATH_PREFIX}`
-    } catch {
-        return `${fallbackOrigin}${OPERATION_INTELLIGENCE_PATH_PREFIX}`
-    }
-}
-
-const DEFAULT_SECRET_KEY = 'test'
 
 export const runtime = {
-    GATEWAY_URL: resolveGatewayUrl(undefined),
-    GATEWAY_SECRET_KEY: DEFAULT_SECRET_KEY,
-    CONTROL_CENTER_URL: resolveControlCenterUrl(undefined),
-    CONTROL_CENTER_SECRET_KEY: DEFAULT_SECRET_KEY,
-    KNOWLEDGE_SERVICE_URL: resolveKnowledgeServiceUrl(undefined),
-    BUSINESS_INTELLIGENCE_SERVICE_URL: resolveBusinessIntelligenceServiceUrl(undefined),
-    SKILL_MARKET_SERVICE_URL: resolveSkillMarketServiceUrl(undefined),
-    OPERATION_INTELLIGENCE_SERVICE_URL: resolveOperationIntelligenceServiceUrl(undefined),
-    OPERATION_INTELLIGENCE_SECRET_KEY: DEFAULT_SECRET_KEY,
+    GATEWAY_URL: resolveServiceUrl(undefined, SERVICE_ENDPOINTS.gateway),
+    GATEWAY_SECRET_KEY: '',
+    CONTROL_CENTER_URL: resolveServiceUrl(undefined, SERVICE_ENDPOINTS.controlCenter),
+    CONTROL_CENTER_SECRET_KEY: '',
+    KNOWLEDGE_SERVICE_URL: resolveServiceUrl(undefined, SERVICE_ENDPOINTS.knowledge),
+    BUSINESS_INTELLIGENCE_SERVICE_URL: resolveServiceUrl(undefined, SERVICE_ENDPOINTS.businessIntelligence),
+    SKILL_MARKET_SERVICE_URL: resolveServiceUrl(undefined, SERVICE_ENDPOINTS.skillMarket),
+    OPERATION_INTELLIGENCE_SERVICE_URL: resolveServiceUrl(undefined, SERVICE_ENDPOINTS.operationIntelligence),
+    OPERATION_INTELLIGENCE_SECRET_KEY: '',
 }
 
 function setRuntimeConfig(config: RuntimeConfig): void {
-    runtime.GATEWAY_URL = resolveGatewayUrl(config.gatewayUrl)
-    runtime.GATEWAY_SECRET_KEY = config.gatewaySecretKey || DEFAULT_SECRET_KEY
-    runtime.CONTROL_CENTER_URL = resolveControlCenterUrl(config.controlCenterUrl)
-    runtime.CONTROL_CENTER_SECRET_KEY = config.controlCenterSecretKey || DEFAULT_SECRET_KEY
-    runtime.KNOWLEDGE_SERVICE_URL = resolveKnowledgeServiceUrl(config.knowledgeServiceUrl)
-    runtime.BUSINESS_INTELLIGENCE_SERVICE_URL = resolveBusinessIntelligenceServiceUrl(config.businessIntelligenceServiceUrl)
-    runtime.SKILL_MARKET_SERVICE_URL = resolveSkillMarketServiceUrl(config.skillMarketServiceUrl)
-    runtime.OPERATION_INTELLIGENCE_SERVICE_URL = resolveOperationIntelligenceServiceUrl(config.operationIntelligenceServiceUrl)
-    runtime.OPERATION_INTELLIGENCE_SECRET_KEY = config.operationIntelligenceSecretKey || DEFAULT_SECRET_KEY
+    runtime.GATEWAY_URL = resolveServiceUrl(config.gatewayUrl, SERVICE_ENDPOINTS.gateway)
+    runtime.GATEWAY_SECRET_KEY = config.gatewaySecretKey ?? ''
+    runtime.CONTROL_CENTER_URL = resolveServiceUrl(config.controlCenterUrl, SERVICE_ENDPOINTS.controlCenter)
+    runtime.CONTROL_CENTER_SECRET_KEY = config.controlCenterSecretKey ?? ''
+    runtime.KNOWLEDGE_SERVICE_URL = resolveServiceUrl(config.knowledgeServiceUrl, SERVICE_ENDPOINTS.knowledge)
+    runtime.BUSINESS_INTELLIGENCE_SERVICE_URL = resolveServiceUrl(config.businessIntelligenceServiceUrl, SERVICE_ENDPOINTS.businessIntelligence)
+    runtime.SKILL_MARKET_SERVICE_URL = resolveServiceUrl(config.skillMarketServiceUrl, SERVICE_ENDPOINTS.skillMarket)
+    runtime.OPERATION_INTELLIGENCE_SERVICE_URL = resolveServiceUrl(config.operationIntelligenceServiceUrl, SERVICE_ENDPOINTS.operationIntelligence)
+    runtime.OPERATION_INTELLIGENCE_SECRET_KEY = config.operationIntelligenceSecretKey ?? ''
     configureWebappLogging(config.logging)
 }
 
 async function loadRuntimeConfig(): Promise<RuntimeConfig> {
-    const response = await trackedFetch('/config.json', {
-        cache: 'no-store',
-        category: 'app',
-        name: 'app.context_init',
-    })
-    if (!response.ok) {
-        throw new Error(`Failed to load /config.json (${response.status})`)
+    // Resolve config.json relative to the HTML page directory at runtime,
+    // so it works regardless of deployment path (e.g. /adc-static/.../dist/)
+    const baseDir = window.location.pathname.replace(/[^/]*$/, '')
+    const configUrl = baseDir + 'config.json'
+    try {
+        const response = await trackedFetch(configUrl, {
+            cache: 'no-store',
+            category: 'app',
+            name: 'app.context_init',
+        })
+        if (!response.ok) {
+            throw new Error(`Failed to load ${configUrl} (HTTP ${response.status}). Check that config.json is deployed alongside index.html.`)
+        }
+        return (await response.json()) as RuntimeConfig
+    } catch (error) {
+        if (error instanceof Error && error.message.startsWith('Failed to load')) {
+            throw error
+        }
+        throw new Error(`Failed to load ${configUrl}: ${error instanceof Error ? error.message : String(error)}. Check that config.json is deployed alongside index.html.`)
     }
-
-    return (await response.json()) as RuntimeConfig
 }
 
 export async function initializeRuntimeConfig(): Promise<void> {
     const config = await loadRuntimeConfig()
     setRuntimeConfig(config)
+
+    // Verify gateway connectivity — wrong URL or secret key will surface here
+    // instead of failing silently on every API call later.
+    try {
+        const healthUrl = `${runtime.GATEWAY_URL}/status`
+        const res = await trackedFetch(healthUrl, {
+            headers: { 'x-secret-key': runtime.GATEWAY_SECRET_KEY },
+            cache: 'no-store',
+            category: 'app',
+            name: 'app.gateway_health_check',
+        })
+        if (!res.ok) {
+            throw new Error(`Gateway health check failed (HTTP ${res.status}) at ${healthUrl}. Check gatewayUrl and gatewaySecretKey in config.json.`)
+        }
+    } catch (error) {
+        if (error instanceof Error && error.message.startsWith('Gateway health check')) {
+            throw error
+        }
+        throw new Error(`Cannot reach gateway at ${runtime.GATEWAY_URL}: ${error instanceof Error ? error.message : String(error)}. Check gatewayUrl in config.json.`)
+    }
 }
 
 /** Build gateway request headers with secret key and optional user ID. */

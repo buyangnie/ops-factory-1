@@ -6,6 +6,7 @@ import {
     type SessionLocatorState,
 } from '../../../utils/sessionLocator'
 import type { SelectedSkill } from '../../../types/message'
+import { isEmbedMode } from '../../../utils/urlParams'
 
 const CHAT_LOCATOR_STORAGE_KEY = 'opsfactory:chat:session-locator'
 const START_NEW_QUERY_PARAM = 'startNew'
@@ -227,14 +228,20 @@ export function resolveChatRouteState(searchParams: URLSearchParams, locationSta
         }
     }
 
-    const storedLocator = readPersistedChatSessionLocator()
-    if (storedLocator) {
-        return {
-            initialMessage,
-            initialSelectedSkill,
-            locatorState: { kind: 'ready', locator: storedLocator },
-            preferredAgentId,
-            source: 'storage',
+    // In embedded mode, skip sessionStorage auto-resume.
+    // The portal controls the session lifecycle — it should pass
+    // ?sessionId=&agent= explicitly if it wants to resume a session.
+    const isEmbed = isEmbedMode()
+    if (!isEmbed) {
+        const storedLocator = readPersistedChatSessionLocator()
+        if (storedLocator) {
+            return {
+                initialMessage,
+                initialSelectedSkill,
+                locatorState: { kind: 'ready', locator: storedLocator },
+                preferredAgentId,
+                source: 'storage',
+            }
         }
     }
 

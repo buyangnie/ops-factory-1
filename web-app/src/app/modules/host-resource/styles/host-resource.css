@@ -46,14 +46,30 @@
 
 /* Resource Tree: left sidebar, full height of upper half */
 .hr-tree-sidebar {
-    width: 260px;
-    min-width: 240px;
+    min-width: 200px;
+    max-width: 600px;
     min-height: 0;
-    border-right: 1px solid var(--border-color, #e2e8f0);
     overflow-y: auto;
     padding: var(--spacing-2) 0;
     display: flex;
     flex-direction: column;
+}
+
+/* Resize handle between sidebar and content */
+.hr-resize-handle {
+    width: 6px;
+    cursor: col-resize;
+    background: transparent;
+    flex-shrink: 0;
+    position: relative;
+    transition: background 0.15s;
+    border-left: 1px solid var(--border-color, #e2e8f0);
+}
+
+.hr-resize-handle:hover,
+.hr-resize-handle.hr-resize-active {
+    background: color-mix(in srgb, var(--color-primary, #3b82f6) 18%, transparent);
+    border-left-color: var(--color-primary, #3b82f6);
 }
 
 .hr-tree-search {
@@ -1408,9 +1424,11 @@
 
 .hr-type-def-grid {
     display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
+    grid-template-columns: repeat(3, calc((100% - 32px) / 3));
     gap: var(--spacing-4, 16px);
     padding: var(--spacing-4, 16px);
+    width: 100%;
+    box-sizing: border-box;
 }
 
 .hr-type-def-card {
@@ -1420,6 +1438,8 @@
     padding: var(--spacing-4, 16px);
     display: flex;
     flex-direction: column;
+    height: 220px;
+    box-sizing: border-box;
     transition: box-shadow 0.15s, border-color 0.15s;
 }
 
@@ -1433,7 +1453,7 @@
     align-items: center;
     gap: var(--spacing-2, 8px);
     margin-bottom: var(--spacing-2, 8px);
-    min-width: 0;
+    min-height: 24px;
 }
 
 .hr-type-def-card-color {
@@ -1459,6 +1479,9 @@
     color: var(--text-secondary, #64748b);
     line-height: 1.4;
     margin-bottom: var(--spacing-2, 8px);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 
 .hr-type-def-card-desc-truncate {
@@ -1487,15 +1510,17 @@
     -webkit-box-orient: vertical;
     overflow: hidden;
     flex: 1;
+    min-height: 0;
 }
 
 .hr-type-def-card-footer {
     display: flex;
     justify-content: flex-end;
     gap: var(--spacing-1, 4px);
-    margin-top: var(--spacing-3, 12px);
+    margin-top: auto;
     padding-top: var(--spacing-2, 8px);
     border-top: 1px solid var(--border-color, #e2e8f0);
+    flex-shrink: 0;
 }
 
 /* ── Type Tab Content ─────────────────────────────────── */
@@ -1504,6 +1529,8 @@
     flex: 1;
     overflow-y: auto;
     min-height: 0;
+    width: 100%;
+    box-sizing: border-box;
 }
 
 .hr-type-tab-header {
@@ -2508,4 +2535,35 @@
 .form-required {
     color: var(--color-error, #ef4444);
     margin-left: 2px;
+}
+
+/* ── Batch Selection Bar ───────────────────────────────── */
+
+.hr-batch-bar {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 16px;
+    background: var(--surface-background, #f8fafc);
+    border-radius: 6px;
+    margin-bottom: var(--spacing-3);
+    border: 1px solid var(--border-color, #e2e8f0);
+}
+
+.hr-batch-bar-checkbox {
+    cursor: pointer;
+}
+
+.hr-batch-bar-label {
+    font-size: 0.875rem;
+    color: var(--text-primary, #1e293b);
+}
+
+.hr-batch-bar-spacer {
+    flex: 1;
+}
+
+.hr-batch-bar-delete {
+    background: var(--color-error, #ef4444);
+    border-color: var(--color-error, #ef4444);
 }

@@ -8,6 +8,11 @@ import {
     stripCitations,
 } from '../utils/citationParser'
 
+const baseCitation = {
+    documentId: null as string | null,
+    url: null as string | null,
+}
+
 describe('citationParser', () => {
     it('parses chunk-level citation markers', () => {
         const text = '答案{{cite:1|值班流程|chk_001|src_001|6-7|先检索再展开上下文|}}。'
@@ -15,14 +20,13 @@ describe('citationParser', () => {
 
         expect(citations).toEqual([
             {
+                ...baseCitation,
                 index: 1,
                 title: '值班流程',
-                documentId: null,
                 chunkId: 'chk_001',
                 sourceId: 'src_001',
                 pageLabel: '6-7',
                 snippet: '先检索再展开上下文',
-                url: null,
             },
         ])
     })
@@ -37,26 +41,8 @@ describe('citationParser', () => {
         const citations = parseCitations(text)
 
         expect(citations).toEqual([
-            {
-                index: 1,
-                title: 'chk_001',
-                documentId: null,
-                chunkId: 'chk_001',
-                sourceId: null,
-                pageLabel: null,
-                snippet: null,
-                url: null,
-            },
-            {
-                index: 2,
-                title: 'chk_002',
-                documentId: null,
-                chunkId: 'chk_002',
-                sourceId: null,
-                pageLabel: null,
-                snippet: null,
-                url: null,
-            },
+            { ...baseCitation, index: 1, title: 'chk_001', chunkId: 'chk_001', sourceId: null, pageLabel: null, snippet: null },
+            { ...baseCitation, index: 2, title: 'chk_002', chunkId: 'chk_002', sourceId: null, pageLabel: null, snippet: null },
         ])
         expect(replaceCitationsWithPlaceholders(text)).toBe('答案[CITE_1](#cite-1)补充[CITE_2](#cite-2)。')
     })
@@ -73,27 +59,25 @@ describe('citationParser', () => {
         const citations = parseCitations('答案{{cite:chk_001}}。')
         const merged = mergeCitationMetadata(citations, [
             {
+                ...baseCitation,
                 index: 1,
                 title: '部署方案',
-                documentId: null,
                 chunkId: 'chk_001',
                 sourceId: 'src_ac8da09a7cfd',
                 pageLabel: '6-7',
                 snippet: '先检索，再按需抓取完整 chunk。',
-                url: null,
             },
         ])
 
         expect(merged).toEqual([
             {
+                ...baseCitation,
                 index: 1,
                 title: '部署方案',
-                documentId: null,
                 chunkId: 'chk_001',
                 sourceId: 'src_ac8da09a7cfd',
                 pageLabel: '6-7',
                 snippet: '先检索，再按需抓取完整 chunk。',
-                url: null,
             },
         ])
     })
@@ -208,30 +192,18 @@ describe('citationParser', () => {
             },
         ]
 
-        expect(extractSourceDocuments(messages)).toEqual([
-            {
-                index: 1,
-                title: '部署方案',
-                documentId: 'doc_001',
-                chunkId: 'chk_001',
-                sourceId: 'src_001',
-                pageLabel: '6-7',
-                snippet: '完整证据正文',
-                url: null,
-            },
-        ])
+        const expectedCitation = {
+            index: 1,
+            title: '部署方案',
+            documentId: 'doc_001',
+            chunkId: 'chk_001',
+            sourceId: 'src_001',
+            pageLabel: '6-7',
+            snippet: '完整证据正文',
+            url: null,
+        }
 
-        expect(extractFetchedDocuments(messages)).toEqual([
-            {
-                index: 1,
-                title: '部署方案',
-                documentId: 'doc_001',
-                chunkId: 'chk_001',
-                sourceId: 'src_001',
-                pageLabel: '6-7',
-                snippet: '完整证据正文',
-                url: null,
-            },
-        ])
+        expect(extractSourceDocuments(messages)).toEqual([expectedCitation])
+        expect(extractFetchedDocuments(messages)).toEqual([expectedCitation])
     })
 })

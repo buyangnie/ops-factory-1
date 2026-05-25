@@ -1,8 +1,8 @@
 import { useCallback, useState } from 'react'
-import type { SkillMarketEntry, SkillMarketListResponse } from '../../../../types/skillMarket'
-import { runtime, gatewayHeaders } from '../../../../config/runtime'
+import type { SkillMarketEntry } from '../../../../types/skillMarket'
 import { getErrorMessage } from '../../../../utils/errorMessages'
 import { useUser } from '../../../platform/providers/UserContext'
+import { fetchSkillList, installSkillToAgent } from '../../../../services/skillMarketAPI'
 
 interface UseAgentSkillMarketResult {
     skills: SkillMarketEntry[]
@@ -21,14 +21,8 @@ export function useAgentSkillMarket(): UseAgentSkillMarketResult {
     const fetchSkills = useCallback(async () => {
         setIsLoading(true)
         setError(null)
-
         try {
-            const response = await fetch(`${runtime.SKILL_MARKET_SERVICE_URL}/skills`, {
-                signal: AbortSignal.timeout(10000),
-            })
-            if (!response.ok) throw new Error(await response.text())
-            const data = await response.json() as SkillMarketListResponse
-            setSkills(data.items || [])
+            setSkills(await fetchSkillList())
         } catch (err) {
             setError(getErrorMessage(err))
         } finally {
@@ -37,27 +31,8 @@ export function useAgentSkillMarket(): UseAgentSkillMarketResult {
     }, [])
 
     const installSkill = useCallback(async (agentId: string, skillId: string) => {
-        try {
-            const response = await fetch(`${runtime.GATEWAY_URL}/agents/${encodeURIComponent(agentId)}/skills/install`, {
-                method: 'POST',
-                headers: gatewayHeaders(userId),
-                body: JSON.stringify({ skillId }),
-            })
-            if (response.status === 409) {
-                return { success: false, conflict: true, error: await response.text() }
-            }
-            if (!response.ok) throw new Error(await response.text())
-            return { success: true }
-        } catch (err) {
-            return { success: false, error: getErrorMessage(err) }
-        }
+        return installSkillToAgent(agentId, skillId, userId!)
     }, [userId])
 
-    return {
-        skills,
-        isLoading,
-        error,
-        fetchSkills,
-        installSkill,
-    }
+    return { skills, isLoading, error, fetchSkills, installSkill }
 }

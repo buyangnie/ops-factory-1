@@ -1,14 +1,16 @@
 import { useCallback, useState } from 'react'
-import type { SkillMarketDetail, SkillMarketEntry, SkillMarketListResponse, SkillMarketMutationResponse } from '../../../../types/skillMarket'
-import { runtime, gatewayHeaders } from '../../../../config/runtime'
+import type { SkillMarketDetail, SkillMarketEntry } from '../../../../types/skillMarket'
 import { getErrorMessage } from '../../../../utils/errorMessages'
 import { useUser } from '../../../platform/providers/UserContext'
-
-interface ApiErrorBody {
-    code?: string
-    message?: string
-    error?: string
-}
+import {
+    fetchSkillList as apiFetchSkillList,
+    fetchSkillDetail,
+    createSkill as apiCreateSkill,
+    updateSkill as apiUpdateSkill,
+    deleteSkill as apiDeleteSkill,
+    importSkill as apiImportSkill,
+    installSkillToAgent,
+} from '../../../../services/skillMarketAPI'
 
 interface UseSkillMarketResult {
     skills: SkillMarketEntry[]
@@ -33,13 +35,7 @@ export function useSkillMarket(): UseSkillMarketResult {
         setIsLoading(true)
         setError(null)
         try {
-            const params = query.trim() ? `?q=${encodeURIComponent(query.trim())}` : ''
-            const response = await fetch(`${runtime.SKILL_MARKET_SERVICE_URL}/skills${params}`, {
-                signal: AbortSignal.timeout(10000),
-            })
-            if (!response.ok) throw new Error(await response.text())
-            const data = await response.json() as SkillMarketListResponse
-            setSkills(data.items || [])
+            setSkills(await apiFetchSkillList(query))
         } catch (err) {
             setError(getErrorMessage(err))
         } finally {
@@ -49,13 +45,7 @@ export function useSkillMarket(): UseSkillMarketResult {
 
     const createSkill = useCallback(async (payload: { id: string; name: string; description: string; instructions: string }) => {
         try {
-            const response = await fetch(`${runtime.SKILL_MARKET_SERVICE_URL}/skills`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(payload),
-            })
-            if (!response.ok) throw new Error(await response.text())
-            await response.json() as SkillMarketMutationResponse
+            await apiCreateSkill(payload)
             await fetchSkills()
             return { success: true }
         } catch (err) {
@@ -68,11 +58,7 @@ export function useSkillMarket(): UseSkillMarketResult {
 
     const fetchSkill = useCallback(async (skillId: string) => {
         try {
-            const response = await fetch(`${runtime.SKILL_MARKET_SERVICE_URL}/skills/${encodeURIComponent(skillId)}`, {
-                signal: AbortSignal.timeout(10000),
-            })
-            if (!response.ok) throw new Error(await response.text())
-            const skill = await response.json() as SkillMarketDetail
+            const skill = await fetchSkillDetail(skillId)
             return { success: true, skill }
         } catch (err) {
             return { success: false, error: getErrorMessage(err) }
@@ -81,13 +67,7 @@ export function useSkillMarket(): UseSkillMarketResult {
 
     const updateSkill = useCallback(async (skillId: string, payload: { name: string; description: string; instructions: string }) => {
         try {
-            const response = await fetch(`${runtime.SKILL_MARKET_SERVICE_URL}/skills/${encodeURIComponent(skillId)}`, {
-                method: 'PUT',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(payload),
-            })
-            if (!response.ok) throw new Error(await response.text())
-            await response.json() as SkillMarketMutationResponse
+            await apiUpdateSkill(skillId, payload)
             await fetchSkills()
             return { success: true }
         } catch (err) {
@@ -97,28 +77,7 @@ export function useSkillMarket(): UseSkillMarketResult {
 
     const importSkill = useCallback(async (file: File, id?: string) => {
         try {
-            const formData = new FormData()
-            formData.append('file', file)
-            if (id?.trim()) formData.append('id', id.trim())
-            const response = await fetch(`${runtime.SKILL_MARKET_SERVICE_URL}/skills:import`, {
-                method: 'POST',
-                body: formData,
-            })
-            if (!response.ok) {
-                const text = await response.text()
-                let message = text
-                try {
-                    const body = JSON.parse(text) as ApiErrorBody
-                    message = body.message || body.error || text
-                    if (body.code === 'SKILL_ALREADY_EXISTS') {
-                        message = 'SKILL_ALREADY_EXISTS'
-                    }
-                } catch {
-                    // Keep raw response text.
-                }
-                throw new Error(message)
-            }
-            await response.json() as SkillMarketMutationResponse
+            await apiImportSkill(file, id)
             await fetchSkills()
             return { success: true }
         } catch (err) {
@@ -128,10 +87,7 @@ export function useSkillMarket(): UseSkillMarketResult {
 
     const deleteSkill = useCallback(async (skillId: string) => {
         try {
-            const response = await fetch(`${runtime.SKILL_MARKET_SERVICE_URL}/skills/${encodeURIComponent(skillId)}`, {
-                method: 'DELETE',
-            })
-            if (!response.ok) throw new Error(await response.text())
+            await apiDeleteSkill(skillId)
             await fetchSkills()
             return { success: true }
         } catch (err) {
@@ -140,17 +96,7 @@ export function useSkillMarket(): UseSkillMarketResult {
     }, [fetchSkills])
 
     const installSkill = useCallback(async (agentId: string, skillId: string) => {
-        try {
-            const response = await fetch(`${runtime.GATEWAY_URL}/agents/${encodeURIComponent(agentId)}/skills/install`, {
-                method: 'POST',
-                headers: gatewayHeaders(userId),
-                body: JSON.stringify({ skillId }),
-            })
-            if (!response.ok) throw new Error(await response.text())
-            return { success: true }
-        } catch (err) {
-            return { success: false, error: getErrorMessage(err) }
-        }
+        return installSkillToAgent(agentId, skillId, userId!)
     }, [userId])
 
     return {
