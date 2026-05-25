@@ -215,7 +215,7 @@ public class BusinessTypeService {
             Files.writeString(file, json, StandardCharsets.UTF_8);
         } catch (IOException e) {
             log.error("Failed to write business-type file for id={}", id, e);
-            throw new RuntimeException("Failed to save business type", e);
+            throw new IllegalStateException("Failed to save business type", e);
         }
     }
 }

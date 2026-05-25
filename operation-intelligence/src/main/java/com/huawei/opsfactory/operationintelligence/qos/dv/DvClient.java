@@ -160,7 +160,7 @@ public class DvClient {
 
             return parseChildren(response);
         } catch (Exception e) {
-            throw new RuntimeException("Failed to fetch MOs from " + env.getServerUrl() + ": " + e.getMessage(), e);
+            throw new IllegalStateException("Failed to fetch MOs from " + env.getServerUrl() + ": " + e.getMessage(), e);
         }
     }
 
@@ -222,7 +222,7 @@ public class DvClient {
 
             return parsePerformanceResult(response);
         } catch (Exception e) {
-            throw new RuntimeException("Failed to fetch performance data from " + env.getServerUrl() + " moType="
+            throw new IllegalStateException("Failed to fetch performance data from " + env.getServerUrl() + " moType="
                 + moType + ": " + e.getMessage(), e);
         }
     }
@@ -267,7 +267,7 @@ public class DvClient {
 
             return parseAlarms(response);
         } catch (Exception e) {
-            throw new RuntimeException("Failed to fetch alarms from " + env.getServerUrl() + ": " + e.getMessage(), e);
+            throw new IllegalStateException("Failed to fetch alarms from " + env.getServerUrl() + ": " + e.getMessage(), e);
         }
     }
 
@@ -298,12 +298,12 @@ public class DvClient {
                     sleepBeforeRetry(delayMs);
                 } catch (InterruptedException ie) {
                     Thread.currentThread().interrupt();
-                    throw new RuntimeException(operationName + " interrupted during retry", ie);
+                    throw new IllegalStateException(operationName + " interrupted during retry", ie);
                 }
             }
         }
         log.error("{} failed after {} retries: {}", operationName, MAX_RETRIES, lastException.getMessage());
-        throw new RuntimeException(operationName + " failed after " + MAX_RETRIES + " retries", lastException);
+        throw new IllegalStateException(operationName + " failed after " + MAX_RETRIES + " retries", lastException);
     }
 
     private WebClient getOrCreateWebClient(DvEnvironmentInfo env) {
@@ -382,27 +382,47 @@ public class DvClient {
             JsonNode datas = resultNode.has("datas") ? resultNode.get("datas") : resultNode;
             if (datas.isArray()) {
                 for (JsonNode item : datas) {
-                    PerformanceDataResult r = new PerformanceDataResult();
-                    r.setDn(textVal(item, "dn"));
-                    r.setMoType(textVal(item, "neName"));
-                    r.setNeName(textVal(item, "neName"));
-                    r.setPeriod(item.has("period") ? item.get("period").asInt() : 0);
-                    if (item.has("values") && item.get("values").isObject()) {
-                        Map<String, String> vals = new LinkedHashMap<>();
-                        Iterator<Map.Entry<String, JsonNode>> fields = item.get("values").fields();
-                        while (fields.hasNext()) {
-                            Map.Entry<String, JsonNode> entry = fields.next();
-                            vals.put(entry.getKey(), entry.getValue().asText());
-                        }
-                        r.setValues(vals);
-                    }
-                    results.add(r);
+                    results.add(parsePerformanceDataItem(item));
                 }
             }
         } catch (Exception e) {
             log.warn("Failed to parse performance result: {}", e.getMessage());
         }
         return results;
+    }
+
+    /**
+     * Parses a single performance data JSON item into a PerformanceDataResult.
+     *
+     * @param item the JSON node representing one performance data entry
+     * @return the parsed PerformanceDataResult
+     */
+    private PerformanceDataResult parsePerformanceDataItem(JsonNode item) {
+        PerformanceDataResult r = new PerformanceDataResult();
+        r.setDn(textVal(item, "dn"));
+        r.setMoType(textVal(item, "neName"));
+        r.setNeName(textVal(item, "neName"));
+        r.setPeriod(item.has("period") ? item.get("period").asInt() : 0);
+        if (item.has("values") && item.get("values").isObject()) {
+            r.setValues(parseValuesMap(item.get("values")));
+        }
+        return r;
+    }
+
+    /**
+     * Converts a JSON object node into a map of string key-value pairs.
+     *
+     * @param valuesNode the JSON object node containing value entries
+     * @return a map of field names to their text values
+     */
+    private Map<String, String> parseValuesMap(JsonNode valuesNode) {
+        Map<String, String> vals = new LinkedHashMap<>();
+        Iterator<Map.Entry<String, JsonNode>> fields = valuesNode.fields();
+        while (fields.hasNext()) {
+            Map.Entry<String, JsonNode> entry = fields.next();
+            vals.put(entry.getKey(), entry.getValue().asText());
+        }
+        return vals;
     }
 
     List<AlarmInfo> parseAlarms(String response) {
@@ -442,17 +462,28 @@ public class DvClient {
             JsonNode resultNode = root.has("result") ? root.get("result") : root;
             if (resultNode.isArray()) {
                 for (JsonNode item : resultNode) {
-                    if (item.has("children") && item.get("children").isArray()) {
-                        for (JsonNode child : item.get("children")) {
-                            children.add(child.asText());
-                        }
-                    }
+                    collectChildTexts(item, children);
                 }
             }
         } catch (Exception e) {
             log.warn("Failed to parse MO children response: {}", e.getMessage());
         }
         return children;
+    }
+
+    /**
+     * Extracts text values from the "children" array of a JSON node.
+     *
+     * @param item the JSON node that may contain a "children" array
+     * @param children the list to append child text values to
+     */
+    private void collectChildTexts(JsonNode item, List<String> children) {
+        if (!item.has("children") || !item.get("children").isArray()) {
+            return;
+        }
+        for (JsonNode child : item.get("children")) {
+            children.add(child.asText());
+        }
     }
 
     // --- Call Chain: TraceLog Support ---
@@ -544,7 +575,7 @@ public class DvClient {
 
             return parseTraceLogResponse(response);
         } catch (Exception e) {
-            throw new RuntimeException("Failed to fetch tracelog from " + env.getServerUrl() + ": " + e.getMessage(), e);
+            throw new IllegalStateException("Failed to fetch tracelog from " + env.getServerUrl() + ": " + e.getMessage(), e);
         }
     }
 
@@ -592,7 +623,7 @@ public class DvClient {
 
             return parseTraceLogResponse(response);
         } catch (Exception e) {
-            throw new RuntimeException("Failed to fetch tracelog by traceId from " + env.getServerUrl() + ": " + e.getMessage(), e);
+            throw new IllegalStateException("Failed to fetch tracelog by traceId from " + env.getServerUrl() + ": " + e.getMessage(), e);
         }
     }
 

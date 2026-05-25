@@ -229,7 +229,7 @@ public class ClusterTypeService {
             Files.writeString(file, json, StandardCharsets.UTF_8);
         } catch (IOException e) {
             log.error("Failed to write cluster-type file for id={}", id, e);
-            throw new RuntimeException("Failed to save cluster type", e);
+            throw new IllegalStateException("Failed to save cluster type", e);
         }
     }
 }

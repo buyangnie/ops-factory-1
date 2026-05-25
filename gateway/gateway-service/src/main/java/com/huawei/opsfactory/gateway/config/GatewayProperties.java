@@ -1358,18 +1358,4 @@ public class GatewayProperties {
         return "GatewayProperties{" + "secretKey='***'" + ", corsOrigin='" + corsOrigin + '\'' + ", gooseTls="
             + gooseTls + ", gooseScheme='" + gooseScheme() + '\'' + ", goosedBin='" + goosedBin + '\'' + '}';
     }
-
-    private void normalizeGoosedBin() {
-        if (goosedBin == null || goosedBin.isBlank()) {
-            return;
-        }
-        Path rawPath = Path.of(goosedBin);
-        if (rawPath.isAbsolute()) {
-            return;
-        }
-        Path candidate = getGatewayRootPath().resolve(goosedBin).normalize();
-        if (Files.exists(candidate)) {
-            goosedBin = candidate.toString();
-        }
-    }
 }

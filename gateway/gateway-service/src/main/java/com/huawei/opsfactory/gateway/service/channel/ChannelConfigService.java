@@ -639,10 +639,6 @@ public class ChannelConfigService {
         return loginStatus.trim().toLowerCase(Locale.ROOT);
     }
 
-    private void appendEvent(String channelId, String level, String type, String summary) {
-        appendEvent(channelId, "admin", level, type, summary);
-    }
-
     private void appendEvent(String channelId, String ownerUserId, String level, String type, String summary) {
         ChannelInstance channel = findChannel(channelId);
         if (channel == null) {
@@ -677,22 +673,34 @@ public class ChannelConfigService {
                 if (!Files.isDirectory(typeDir)) {
                     continue;
                 }
-                try (DirectoryStream<Path> instanceDirs = Files.newDirectoryStream(typeDir)) {
-                    for (Path instanceDir : instanceDirs) {
-                        if (!Files.isDirectory(instanceDir)) {
-                            continue;
-                        }
-                        ChannelInstance channel = readChannelConfig(instanceDir);
-                        if (channel != null) {
-                            channels.add(channel);
-                        }
-                    }
-                }
+                readInstancesFromTypeDir(typeDir, channels);
             }
         } catch (IOException e) {
             log.warn("Failed to read channel directories {}: {}", channelsDir, e.getMessage());
         }
         return channels;
+    }
+
+    /**
+     * Reads all channel instance configurations from subdirectories of a type directory.
+     *
+     * @param typeDir the parent type directory containing instance subdirectories
+     * @param channels the list to append found channel instances to
+     */
+    private void readInstancesFromTypeDir(Path typeDir, List<ChannelInstance> channels) {
+        try (DirectoryStream<Path> instanceDirs = Files.newDirectoryStream(typeDir)) {
+            for (Path instanceDir : instanceDirs) {
+                if (!Files.isDirectory(instanceDir)) {
+                    continue;
+                }
+                ChannelInstance channel = readChannelConfig(instanceDir);
+                if (channel != null) {
+                    channels.add(channel);
+                }
+            }
+        } catch (IOException e) {
+            log.warn("Failed to read channel instances from {}: {}", typeDir, e.getMessage());
+        }
     }
 
     private List<ChannelBinding> readBindings(String ownerUserId) {
@@ -706,13 +714,6 @@ public class ChannelConfigService {
         Map<String, Object> wrapper = readJson(runtimeStorageService.bindingsFile(channel));
         return MAPPER.convertValue(wrapper.getOrDefault("bindings", List.of()),
             new TypeReference<List<ChannelBinding>>() {});
-    }
-
-    private List<ChannelEvent> readEvents(String ownerUserId) {
-        return readInstances().stream()
-            .map(channel -> withRuntimeUser(channel, ownerUserId))
-            .flatMap(channel -> readEvents(channel).stream())
-            .toList();
     }
 
     private List<ChannelEvent> readEvents(ChannelInstance channel) {
@@ -937,13 +938,4 @@ public class ChannelConfigService {
         }
     }
 
-    private void writeJson(Path file, Object payload) {
-        try {
-            Files.createDirectories(file.getParent());
-            Files.writeString(file, MAPPER.writerWithDefaultPrettyPrinter().writeValueAsString(payload),
-                StandardCharsets.UTF_8);
-        } catch (IOException e) {
-            throw new IllegalStateException("Failed to write channels file: " + file, e);
-        }
-    }
 }

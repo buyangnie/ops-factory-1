@@ -87,7 +87,7 @@ public class DvSslContextFactory {
             return SslContextBuilder.forClient().sslContextProvider(null).trustManager(tmf).keyManager(kmf).build();
         } catch (Exception e) {
             if (strictSsl) {
-                throw new RuntimeException("Failed to create SSL context with certificate (strict-ssl enabled)", e);
+                throw new IllegalStateException("Failed to create SSL context with certificate (strict-ssl enabled)", e);
             }
             log.error(
                 "INSECURE SSL: SSL context creation failed, falling back to insecure trust manager. "
@@ -106,7 +106,7 @@ public class DvSslContextFactory {
         try {
             return SslContextBuilder.forClient().trustManager(InsecureTrustManagerFactory.INSTANCE).build();
         } catch (Exception e) {
-            throw new RuntimeException("Failed to create insecure SSL context", e);
+            throw new IllegalStateException("Failed to create insecure SSL context", e);
         }
     }
 }

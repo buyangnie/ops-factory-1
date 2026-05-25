@@ -46,12 +46,15 @@ class JsonFileStoreTest {
 
     @AfterEach
     void tearDown() throws IOException {
-        Files.walk(tempDir).sorted((a, b) -> -a.compareTo(b)).forEach(p -> {
-            try {
-                Files.deleteIfExists(p);
-            } catch (IOException ignored) {
-            }
-        });
+        try (var walk = Files.walk(tempDir)) {
+            walk.sorted((a, b) -> -a.compareTo(b)).forEach(p -> {
+                try {
+                    Files.deleteIfExists(p);
+                } catch (IOException ignored) {
+                    // Expected when temp dir is already deleted or file is in use
+                }
+            });
+        }
     }
 
     @Test

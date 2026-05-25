@@ -30,9 +30,8 @@ import org.springframework.web.server.ServerWebExchange;
 
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Map;
 import java.util.Set;
 
 /**
@@ -87,65 +86,108 @@ public class HostController {
 
         return Mono.fromCallable(() -> {
             // Resolve disabled context once when enabledOnly is requested
-            final Set<String> disabledGroupIds;
-            final Set<String> disabledClusterIds;
-            if (enabledOnly) {
-                List<Map<String, Object>> allGroups = hostGroupService.listGroups();
-                disabledGroupIds = hostGroupService.getDisabledGroupIds(allGroups);
-
-                if (groupId != null && !groupId.isEmpty() && disabledGroupIds.contains(groupId)) {
-                    Map<String, Object> result = new LinkedHashMap<>();
-                    result.put("hosts", List.of());
-                    return result;
-                }
-                if (clusterId != null && !clusterId.isEmpty()) {
-                    try {
-                        Map<String, Object> cluster = clusterService.getCluster(clusterId);
-                        if (Boolean.FALSE.equals(cluster.get("enabled"))
-                            || disabledGroupIds.contains(cluster.get("groupId"))) {
-                            Map<String, Object> result = new LinkedHashMap<>();
-                            result.put("hosts", List.of());
-                            return result;
-                        }
-                    } catch (IllegalArgumentException e) {
-                        // Cluster not found, let normal flow handle it
-                    }
-                }
-                // Build disabledClusterIds for the "list all hosts" fallback path
-                List<Map<String, Object>> allClusters = clusterService.listClusters(null, null);
-                disabledClusterIds = new java.util.HashSet<>();
-                for (Map<String, Object> c : allClusters) {
-                    if (Boolean.FALSE.equals(c.get("enabled")) || disabledGroupIds.contains(c.get("groupId"))) {
-                        disabledClusterIds.add((String) c.get("id"));
-                    }
-                }
-            } else {
-                disabledGroupIds = Set.of();
-                disabledClusterIds = Set.of();
+            DisabledSets disabledSets = buildDisabledSets(enabledOnly, groupId, clusterId);
+            if (disabledSets == null) {
+                Map<String, Object> result = new LinkedHashMap<>();
+                result.put("hosts", List.of());
+                return result;
             }
 
-            List<Map<String, Object>> hosts;
-            if (businessServiceId != null && !businessServiceId.isEmpty()) {
-                hosts = businessServiceService.getHostsForBusinessService(businessServiceId);
-            } else if (clusterId != null && !clusterId.isEmpty()) {
-                hosts = hostService.listHostsByCluster(clusterId);
-            } else if (groupId != null && !groupId.isEmpty()) {
-                hosts = hostService.listHostsByGroup(groupId, clusterService);
-            } else {
-                List<String> tagList =
-                    (tags != null && !tags.isBlank()) ? Arrays.asList(tags.split(",")) : Collections.emptyList();
-                hosts = hostService.listHosts(tagList.toArray(new String[0]));
-            }
+            List<Map<String, Object>> hosts =
+                resolveHosts(businessServiceId, clusterId, groupId, tags);
 
             // Filter out hosts belonging to disabled clusters when enabledOnly=true
-            if (enabledOnly && !disabledClusterIds.isEmpty()) {
-                hosts.removeIf(h -> disabledClusterIds.contains(h.get("clusterId")));
+            if (enabledOnly && !disabledSets.clusterIds.isEmpty()) {
+                hosts.removeIf(h -> disabledSets.clusterIds.contains(h.get("clusterId")));
             }
 
             Map<String, Object> result = new LinkedHashMap<>();
             result.put("hosts", hosts);
             return result;
         }).subscribeOn(Schedulers.boundedElastic());
+    }
+
+    /**
+     * Builds the disabled group and cluster ID sets when enabledOnly is true.
+     * Returns {@code null} to signal that the caller should return an empty-hosts
+     * result immediately (the requested group or cluster is disabled).
+     *
+     * @param enabledOnly whether only enabled entities should be included
+     * @param groupId optional group identifier filter
+     * @param clusterId optional cluster identifier filter
+     * @return disabled sets, or {@code null} if an early empty result is required
+     */
+    private DisabledSets buildDisabledSets(boolean enabledOnly, String groupId, String clusterId) {
+        if (!enabledOnly) {
+            return new DisabledSets(Set.of(), Set.of());
+        }
+
+        List<Map<String, Object>> allGroups = hostGroupService.listGroups();
+        Set<String> disabledGroupIds = hostGroupService.getDisabledGroupIds(allGroups);
+
+        if (groupId != null && !groupId.isEmpty() && disabledGroupIds.contains(groupId)) {
+            return null;
+        }
+        if (clusterId != null && !clusterId.isEmpty()) {
+            try {
+                Map<String, Object> cluster = clusterService.getCluster(clusterId);
+                if (Boolean.FALSE.equals(cluster.get("enabled"))
+                    || disabledGroupIds.contains(cluster.get("groupId"))) {
+                    return null;
+                }
+            } catch (IllegalArgumentException e) {
+                // Cluster not found, let normal flow handle it
+            }
+        }
+
+        // Build disabledClusterIds for the "list all hosts" fallback path
+        List<Map<String, Object>> allClusters = clusterService.listClusters(null, null);
+        Set<String> disabledClusterIds = new HashSet<>();
+        for (Map<String, Object> c : allClusters) {
+            if (Boolean.FALSE.equals(c.get("enabled")) || disabledGroupIds.contains(c.get("groupId"))) {
+                disabledClusterIds.add((String) c.get("id"));
+            }
+        }
+        return new DisabledSets(disabledGroupIds, disabledClusterIds);
+    }
+
+    /**
+     * Resolves the host list based on the provided filter parameters.
+     * Priority: businessServiceId &gt; clusterId &gt; groupId &gt; tags.
+     *
+     * @param businessServiceId optional business service identifier
+     * @param clusterId optional cluster identifier
+     * @param groupId optional group identifier
+     * @param tags optional comma-separated tags
+     * @return the resolved host list
+     */
+    private List<Map<String, Object>> resolveHosts(String businessServiceId, String clusterId,
+        String groupId, String tags) {
+        if (businessServiceId != null && !businessServiceId.isEmpty()) {
+            return businessServiceService.getHostsForBusinessService(businessServiceId);
+        }
+        if (clusterId != null && !clusterId.isEmpty()) {
+            return hostService.listHostsByCluster(clusterId);
+        }
+        if (groupId != null && !groupId.isEmpty()) {
+            return hostService.listHostsByGroup(groupId, clusterService);
+        }
+        List<String> tagList =
+            (tags != null && !tags.isBlank()) ? Arrays.asList(tags.split(",")) : Collections.emptyList();
+        return hostService.listHosts(tagList.toArray(new String[0]));
+    }
+
+    /**
+     * Simple holder for the disabled group and cluster ID sets used during host listing.
+     */
+    private static final class DisabledSets {
+        final Set<String> groupIds;
+        final Set<String> clusterIds;
+
+        DisabledSets(Set<String> groupIds, Set<String> clusterIds) {
+            this.groupIds = Set.copyOf(groupIds);
+            this.clusterIds = Set.copyOf(clusterIds);
+        }
     }
 
     /**

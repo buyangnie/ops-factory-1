@@ -343,7 +343,7 @@ public class HostGroupServiceTest {
                 .writeValueAsString(group);
             Files.writeString(file, json, StandardCharsets.UTF_8);
         } catch (IOException e) {
-            throw new RuntimeException(e);
+            throw new IllegalStateException(e);
         }
     }
 }

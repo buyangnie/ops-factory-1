@@ -124,18 +124,18 @@ public class DvAuthService {
                 .block(Duration.ofSeconds(30));
 
             if (response == null || response.isBlank()) {
-                throw new RuntimeException("Empty response from SSO login at " + env.getServerUrl());
+                throw new IllegalStateException("Empty response from SSO login at " + env.getServerUrl());
             }
 
             JsonNode json = MAPPER.readTree(response);
             String token = json.has("accessSession") ? json.get("accessSession").asText() : null;
             if (token == null || token.isBlank()) {
-                throw new RuntimeException("No token in login response from " + env.getServerUrl());
+                throw new IllegalStateException("No token in login response from " + env.getServerUrl());
             }
 
             String roaRand = json.has("roaRand") ? json.get("roaRand").asText() : null;
             if (roaRand == null || roaRand.isBlank()) {
-                throw new RuntimeException("No roaRand in login response from " + env.getServerUrl());
+                throw new IllegalStateException("No roaRand in login response from " + env.getServerUrl());
             }
 
             long ttlMs = TOKEN_TTL_MS;
@@ -150,7 +150,7 @@ public class DvAuthService {
             return new TokenInfo(token, roaRand, System.currentTimeMillis(), ttlMs);
         } catch (Exception e) {
             log.error("Failed to get SSO token from {}: {}", env.getServerUrl(), e.getMessage());
-            throw new RuntimeException("DV SSO login failed", e);
+            throw new IllegalStateException("DV SSO login failed", e);
         }
     }
 

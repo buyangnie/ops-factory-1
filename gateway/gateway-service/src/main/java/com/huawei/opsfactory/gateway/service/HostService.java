@@ -58,6 +58,8 @@ public class HostService {
 
     private static final int GCM_TAG_LENGTH = 128;
 
+    private static final java.security.SecureRandom SECURE_RANDOM = new java.security.SecureRandom();
+
     private final GatewayProperties properties;
 
     private Path gatewayRoot;
@@ -296,34 +298,42 @@ public class HostService {
                     continue;
                 }
                 Map<String, Object> host = readHostFile(file);
-                if (host != null) {
-                    // Mask credential for listing
-                    host.put("credential", "***");
-
-                    // Filter by tags if provided
-                    if (tags != null && tags.length > 0) {
-                        Object hostTagsObj = host.get("tags");
-                        if (!(hostTagsObj instanceof List<?> hostTags)) {
-                            continue;
-                        }
-                        boolean matches = false;
-                        for (String tag : tags) {
-                            if (hostTags.stream().anyMatch(ht -> String.valueOf(ht).equalsIgnoreCase(tag))) {
-                                matches = true;
-                                break;
-                            }
-                        }
-                        if (!matches) {
-                            continue;
-                        }
-                    }
-                    hosts.add(host);
+                if (host == null) {
+                    continue;
                 }
+                host.put("credential", "***");
+                if (!matchesTags(host, tags)) {
+                    continue;
+                }
+                hosts.add(host);
             }
         } catch (IOException e) {
             log.error("Failed to list hosts from {}", hostsDir, e);
         }
         return hosts;
+    }
+
+    /**
+     * Checks whether a host matches the given tag filter.
+     *
+     * @param host host data map to check
+     * @param tags tag filter array; if null or empty, all hosts match
+     * @return true if the host has at least one matching tag
+     */
+    private boolean matchesTags(Map<String, Object> host, String[] tags) {
+        if (tags == null || tags.length == 0) {
+            return true;
+        }
+        Object hostTagsObj = host.get("tags");
+        if (!(hostTagsObj instanceof List<?> hostTags)) {
+            return false;
+        }
+        for (String tag : tags) {
+            if (hostTags.stream().anyMatch(ht -> String.valueOf(ht).equalsIgnoreCase(tag))) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /**
@@ -413,7 +423,7 @@ public class HostService {
             host.put("credential", encrypt(rawCredential));
         } catch (GeneralSecurityException e) {
             log.error("Failed to encrypt credential for new host {}", id, e);
-            throw new RuntimeException("Failed to encrypt credential", e);
+            throw new IllegalStateException("Failed to encrypt credential", e);
         }
 
         syncClusterTypeToTags(host);
@@ -440,6 +450,13 @@ public class HostService {
      * @param body request body containing updated host fields
      * @return the updated host map with credential masked
      */
+    private static final java.util.Set<String> MUTABLE_FIELDS = java.util.Set.of(
+        "name", "hostname", "ip", "port", "os", "location",
+        "username", "authType", "business", "clusterId",
+        "purpose", "tags", "description", "customAttributes",
+        "businessIp", "role"
+    );
+
     public Map<String, Object> updateHost(String id, Map<String, Object> body) {
         Path file = hostsDir.resolve(id + ".json");
         Map<String, Object> host = readHostFile(file);
@@ -458,64 +475,22 @@ public class HostService {
         }
 
         // Update mutable fields
-        if (body.containsKey("name")) {
-            host.put("name", body.get("name"));
+        for (String field : MUTABLE_FIELDS) {
+            if (body.containsKey(field)) {
+                host.put(field, body.get(field));
+            }
         }
-        if (body.containsKey("hostname")) {
-            host.put("hostname", body.get("hostname"));
-        }
-        if (body.containsKey("ip")) {
-            host.put("ip", body.get("ip"));
-        }
-        if (body.containsKey("port")) {
-            host.put("port", body.get("port"));
-        }
-        if (body.containsKey("os")) {
-            host.put("os", body.get("os"));
-        }
-        if (body.containsKey("location")) {
-            host.put("location", body.get("location"));
-        }
-        if (body.containsKey("username")) {
-            host.put("username", body.get("username"));
-        }
-        if (body.containsKey("authType")) {
-            host.put("authType", body.get("authType"));
-        }
-        if (body.containsKey("business")) {
-            host.put("business", body.get("business"));
-        }
-        if (body.containsKey("clusterId")) {
-            host.put("clusterId", body.get("clusterId"));
-        }
-        if (body.containsKey("purpose")) {
-            host.put("purpose", body.get("purpose"));
-        }
-        if (body.containsKey("tags")) {
-            host.put("tags", body.get("tags"));
-        }
-        if (body.containsKey("description")) {
-            host.put("description", body.get("description"));
-        }
-        if (body.containsKey("customAttributes")) {
-            host.put("customAttributes", body.get("customAttributes"));
-        }
-        if (body.containsKey("businessIp")) {
-            host.put("businessIp", body.get("businessIp"));
-        }
-        if (body.containsKey("role")) {
-            host.put("role", body.get("role"));
-        }
+
+        // Credential requires special handling (encryption + sentinel skip)
         if (body.containsKey("credential")) {
             Object credentialObj = body.get("credential");
             String rawCredential = credentialObj != null ? credentialObj.toString() : "";
-            // Skip update when the frontend sends back the masked sentinel value
             if (!"***".equals(rawCredential)) {
                 try {
                     host.put("credential", encrypt(rawCredential));
                 } catch (GeneralSecurityException e) {
                     log.error("Failed to encrypt credential for host {}", id, e);
-                    throw new RuntimeException("Failed to encrypt credential", e);
+                    throw new IllegalStateException("Failed to encrypt credential", e);
                 }
             }
         }
@@ -708,9 +683,10 @@ public class HostService {
         long start = System.currentTimeMillis();
         log.info("SSH connection test started hostId={} ip={} port={} authType={}", id, hostname, port, authType);
 
+        Session session = null;
         try {
             JSch jsch = new JSch();
-            Session session = jsch.getSession(username, hostname, port);
+            session = jsch.getSession(username, hostname, port);
 
             if ("key".equals(authType)) {
                 jsch.addIdentity("test-connection", credential.getBytes(StandardCharsets.UTF_8), null, null);
@@ -718,12 +694,13 @@ public class HostService {
                 session.setPassword(credential);
             }
 
+            // WARNING: Strict host key checking is disabled for test-connection only.
+            // This is acceptable because the test is initiated by an authenticated admin
+            // and the result is not used for production data transfer.
             session.setConfig("StrictHostKeyChecking", "no");
             session.connect(5000);
 
             long latency = System.currentTimeMillis() - start;
-            session.disconnect();
-
             result.put("success", true);
             result.put("message", "Connection successful");
             result.put("latency", latency + "ms");
@@ -735,6 +712,10 @@ public class HostService {
             result.put("success", false);
             result.put("message", "Connection failed: " + e.getMessage());
             result.put("latency", latency + "ms");
+        } finally {
+            if (session != null && session.isConnected()) {
+                session.disconnect();
+            }
         }
 
         return result;
@@ -763,7 +744,7 @@ public class HostService {
             Files.writeString(file, json, StandardCharsets.UTF_8);
         } catch (IOException e) {
             log.error("Failed to write host file for id={}", id, e);
-            throw new RuntimeException("Failed to save host", e);
+            throw new IllegalStateException("Failed to save host", e);
         }
     }
 
@@ -778,7 +759,7 @@ public class HostService {
      */
     private String encrypt(String plaintext) throws GeneralSecurityException {
         byte[] iv = new byte[GCM_IV_LENGTH];
-        new SecureRandom().nextBytes(iv);
+        SECURE_RANDOM.nextBytes(iv);
 
         Cipher cipher = Cipher.getInstance(AES_ALGORITHM);
         GCMParameterSpec gcmSpec = new GCMParameterSpec(GCM_TAG_LENGTH, iv);

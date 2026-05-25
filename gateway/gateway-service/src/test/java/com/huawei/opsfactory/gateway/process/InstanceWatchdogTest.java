@@ -249,7 +249,7 @@ public class InstanceWatchdogTest {
             field.setAccessible(true);
             field.setLong(instance, timestamp);
         } catch (ReflectiveOperationException e) {
-            throw new RuntimeException(e);
+            throw new IllegalStateException(e);
         }
     }
 }

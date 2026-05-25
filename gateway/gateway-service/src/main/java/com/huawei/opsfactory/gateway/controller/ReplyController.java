@@ -69,6 +69,32 @@ public class ReplyController {
 
     private static final ObjectMapper MAPPER = new ObjectMapper();
 
+    private static final Map<String, String> SESSION_ERROR_MESSAGE_KEYS;
+
+    static {
+        Map<String, String> map = new LinkedHashMap<>();
+        map.put("gateway_submit_timeout", "chat.sessionErrors.gatewaySubmitTimeout");
+        map.put("gateway_submit_failed", "chat.sessionErrors.gatewaySubmitFailed");
+        map.put("gateway_events_failed", "chat.sessionErrors.gatewayEventsFailed");
+        map.put("gateway_cancel_failed", "chat.sessionErrors.gatewayCancelFailed");
+        map.put("gateway_unauthorized", "chat.sessionErrors.gatewayUnauthorized");
+        map.put("gateway_agent_not_found", "chat.sessionErrors.gatewayAgentNotFound");
+        map.put("gateway_agent_unavailable", "chat.sessionErrors.gatewayAgentUnavailable");
+        map.put("gateway_goosed_unavailable", "chat.sessionErrors.gatewayGoosedUnavailable");
+        map.put("gateway_max_duration_reached", "chat.sessionErrors.gatewayMaxDurationReached");
+        map.put("gateway_rate_limited", "chat.sessionErrors.gatewayRateLimited");
+        map.put("goosed_active_request_conflict", "chat.sessionErrors.goosedActiveRequestConflict");
+        map.put("goosed_request_rejected", "chat.sessionErrors.goosedRequestRejected");
+        map.put("goosed_error", "chat.sessionErrors.goosedError");
+        map.put("provider_timeout", "chat.sessionErrors.providerTimeout");
+        map.put("provider_rate_limited", "chat.sessionErrors.providerRateLimited");
+        map.put("provider_auth_or_quota_failed", "chat.sessionErrors.providerAuthOrQuotaFailed");
+        map.put("tool_execution_failed", "chat.sessionErrors.toolExecutionFailed");
+        map.put("mcp_unavailable", "chat.sessionErrors.mcpUnavailable");
+        map.put("context_too_large", "chat.sessionErrors.contextTooLarge");
+        SESSION_ERROR_MESSAGE_KEYS = Collections.unmodifiableMap(map);
+    }
+
     private final InstanceManager instanceManager;
 
     private final GoosedProxy goosedProxy;
@@ -513,48 +539,7 @@ public class ReplyController {
     }
 
     private String sessionErrorMessageKey(String code) {
-        return switch (code) {
-            case "gateway_submit_timeout":
-                yield "chat.sessionErrors.gatewaySubmitTimeout";
-            case "gateway_submit_failed":
-                yield "chat.sessionErrors.gatewaySubmitFailed";
-            case "gateway_events_failed":
-                yield "chat.sessionErrors.gatewayEventsFailed";
-            case "gateway_cancel_failed":
-                yield "chat.sessionErrors.gatewayCancelFailed";
-            case "gateway_unauthorized":
-                yield "chat.sessionErrors.gatewayUnauthorized";
-            case "gateway_agent_not_found":
-                yield "chat.sessionErrors.gatewayAgentNotFound";
-            case "gateway_agent_unavailable":
-                yield "chat.sessionErrors.gatewayAgentUnavailable";
-            case "gateway_goosed_unavailable":
-                yield "chat.sessionErrors.gatewayGoosedUnavailable";
-            case "gateway_max_duration_reached":
-                yield "chat.sessionErrors.gatewayMaxDurationReached";
-            case "gateway_rate_limited":
-                yield "chat.sessionErrors.gatewayRateLimited";
-            case "goosed_active_request_conflict":
-                yield "chat.sessionErrors.goosedActiveRequestConflict";
-            case "goosed_request_rejected":
-                yield "chat.sessionErrors.goosedRequestRejected";
-            case "goosed_error":
-                yield "chat.sessionErrors.goosedError";
-            case "provider_timeout":
-                yield "chat.sessionErrors.providerTimeout";
-            case "provider_rate_limited":
-                yield "chat.sessionErrors.providerRateLimited";
-            case "provider_auth_or_quota_failed":
-                yield "chat.sessionErrors.providerAuthOrQuotaFailed";
-            case "tool_execution_failed":
-                yield "chat.sessionErrors.toolExecutionFailed";
-            case "mcp_unavailable":
-                yield "chat.sessionErrors.mcpUnavailable";
-            case "context_too_large":
-                yield "chat.sessionErrors.contextTooLarge";
-            default:
-                yield "chat.sessionErrors.unknown";
-        };
+        return SESSION_ERROR_MESSAGE_KEYS.getOrDefault(code, "chat.sessionErrors.unknown");
     }
 
     private String normalizeReplyUserMessageCreated(String body) {
@@ -686,7 +671,6 @@ public class ReplyController {
             int total = conv.size();
             int limit = Math.min(total, 30);
             List<String> head = new ArrayList<>(limit);
-
             int createdCount = 0;
             int inversionCount = 0;
             String prevRole = null;
@@ -694,33 +678,21 @@ public class ReplyController {
             for (int i = 0; i < total; i++) {
                 JsonNode m = conv.get(i);
                 String role = m.hasNonNull("role") ? m.get("role").asText() : "";
+
+                if (prevRole != null && "assistant".equals(prevRole) && "user".equals(role)) {
+                    inversionCount++;
+                }
                 if ("user".equals(role) || "assistant".equals(role)) {
                     prevRole = prevRole == null ? role : prevRole;
                 }
-                if (prevRole != null && "assistant".equals(prevRole) && "user".equals(role)) {
-                    inversionCount += 1;
-                }
                 prevRole = role;
 
-                JsonNode created = m.get("created");
-                if (created != null && created.isNumber()) {
-                    createdCount += 1;
-                } else if (created != null && created.isTextual() && !created.asText().trim().isEmpty()) {
-                    createdCount += 1;
-                } else if (m.hasNonNull("created_at") || m.hasNonNull("createdAt")) {
-                    createdCount += 1;
+                if (hasCreatedTimestamp(m)) {
+                    createdCount++;
                 }
 
                 if (i < limit) {
-                    String id = m.hasNonNull("id") ? m.get("id").asText() : "";
-                    String createdRaw = created != null && !created.isNull() ? created.asText() : "";
-                    if (createdRaw.isEmpty() && m.hasNonNull("created_at")) {
-                        createdRaw = m.get("created_at").asText();
-                    }
-                    if (createdRaw.isEmpty() && m.hasNonNull("createdAt")) {
-                        createdRaw = m.get("createdAt").asText();
-                    }
-                    head.add(i + ":" + role + ":" + id + ":" + createdRaw);
+                    head.add(buildDigestEntry(i, m, role));
                 }
             }
 
@@ -732,6 +704,43 @@ public class ReplyController {
             log.debug("[CHAT-ORDER] resume agentId={} userId={} sessionId={} parseFailed err={}", agentId, userId,
                 sessionId, e.getMessage());
         }
+    }
+
+    private static boolean hasCreatedTimestamp(JsonNode message) {
+        JsonNode created = message.get("created");
+        if (created != null && created.isNumber()) {
+            return true;
+        }
+        if (created != null && created.isTextual() && !created.asText().trim().isEmpty()) {
+            return true;
+        }
+        if (message.hasNonNull("created_at") || message.hasNonNull("createdAt")) {
+            return true;
+        }
+        return false;
+    }
+
+    private static String buildDigestEntry(int index, JsonNode message, String role) {
+        String id = message.hasNonNull("id") ? message.get("id").asText() : "";
+        String createdRaw = resolveCreatedRaw(message);
+        return index + ":" + role + ":" + id + ":" + createdRaw;
+    }
+
+    private static String resolveCreatedRaw(JsonNode message) {
+        JsonNode created = message.get("created");
+        if (created != null && !created.isNull()) {
+            String text = created.asText();
+            if (!text.isEmpty()) {
+                return text;
+            }
+        }
+        if (message.hasNonNull("created_at")) {
+            return message.get("created_at").asText();
+        }
+        if (message.hasNonNull("createdAt")) {
+            return message.get("createdAt").asText();
+        }
+        return "";
     }
 
     /**

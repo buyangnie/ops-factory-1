@@ -19,8 +19,11 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.yaml.snakeyaml.DumperOptions;
+import org.yaml.snakeyaml.LoaderOptions;
 import org.yaml.snakeyaml.Yaml;
+import org.yaml.snakeyaml.constructor.SafeConstructor;
 import org.yaml.snakeyaml.error.YAMLException;
+import org.yaml.snakeyaml.representer.Representer;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -586,38 +589,48 @@ public class AgentConfigService {
         try (DirectoryStream<Path> stream = Files.newDirectoryStream(skillsDir)) {
             for (Path entry : stream) {
                 if (Files.isDirectory(entry)) {
-                    String dirName = entry.getFileName().toString();
-                    Map<String, String> skill = new HashMap<>();
-                    skill.put("id", dirName);
-                    skill.put("name", dirName);
-                    skill.put("description", "");
-                    skill.put("path", "skills/" + dirName);
-
-                    // Parse SKILL.md YAML frontmatter for name/description
-                    Path skillMd = entry.resolve("SKILL.md");
-                    if (Files.exists(skillMd)) {
-                        try {
-                            Map<String, String> frontmatter = parseMarkdownFrontmatter(skillMd);
-                            if (frontmatter.containsKey("name")) {
-                                skill.put("name", frontmatter.get("name"));
-                            }
-                            if (frontmatter.containsKey("description")) {
-                                skill.put("description", frontmatter.get("description"));
-                            }
-                            putFrontmatterAlias(skill, frontmatter, "pinned", "pinned");
-                            putFrontmatterAlias(skill, frontmatter, "displayOrder", "displayOrder", "display-order",
-                                "x-display-order");
-                        } catch (IOException e) {
-                            log.warn("Failed to parse SKILL.md for skill {}/{}", agentId, dirName, e);
-                        }
-                    }
-                    skills.add(skill);
+                    skills.add(buildSkillEntry(agentId, entry));
                 }
             }
         } catch (IOException e) {
             log.error("Failed to list skills for {}", agentId, e);
         }
         return skills;
+    }
+
+    /**
+     * Builds a skill metadata map from a skill directory, parsing SKILL.md frontmatter if present.
+     *
+     * @param agentId agent instance identifier (for logging)
+     * @param skillDir path to the skill directory
+     * @return skill metadata map containing id, name, description, and path
+     */
+    private Map<String, String> buildSkillEntry(String agentId, Path skillDir) {
+        String dirName = skillDir.getFileName().toString();
+        Map<String, String> skill = new HashMap<>();
+        skill.put("id", dirName);
+        skill.put("name", dirName);
+        skill.put("description", "");
+        skill.put("path", "skills/" + dirName);
+
+        Path skillMd = skillDir.resolve("SKILL.md");
+        if (!Files.exists(skillMd)) {
+            return skill;
+        }
+        try {
+            Map<String, String> frontmatter = parseMarkdownFrontmatter(skillMd);
+            if (frontmatter.containsKey("name")) {
+                skill.put("name", frontmatter.get("name"));
+            }
+            if (frontmatter.containsKey("description")) {
+                skill.put("description", frontmatter.get("description"));
+            }
+            putFrontmatterAlias(skill, frontmatter, "pinned", "pinned");
+            putFrontmatterAlias(skill, frontmatter, "displayOrder", "displayOrder", "display-order", "x-display-order");
+        } catch (IOException e) {
+            log.warn("Failed to parse SKILL.md for skill {}/{}", agentId, dirName, e);
+        }
+        return skill;
     }
 
     private void putFrontmatterAlias(Map<String, String> target, Map<String, String> frontmatter, String targetKey,
@@ -649,7 +662,8 @@ public class AgentConfigService {
             return result;
         }
         String yamlBlock = content.substring(3, endIndex).trim();
-        org.yaml.snakeyaml.Yaml yaml = new org.yaml.snakeyaml.Yaml();
+        org.yaml.snakeyaml.Yaml yaml = new org.yaml.snakeyaml.Yaml(
+            new org.yaml.snakeyaml.constructor.SafeConstructor(new org.yaml.snakeyaml.LoaderOptions()));
         Object parsed;
         try {
             parsed = yaml.load(yamlBlock);
@@ -825,7 +839,7 @@ public class AgentConfigService {
             if (content == null || content.isBlank()) {
                 return null;
             }
-            Yaml yaml = new Yaml();
+            Yaml yaml = new Yaml(new SafeConstructor(new LoaderOptions()));
             Object parsed = yaml.load(content);
             if (parsed instanceof Map<?, ?> rawMap) {
                 @SuppressWarnings("unchecked")
@@ -1054,7 +1068,7 @@ public class AgentConfigService {
         DumperOptions options = new DumperOptions();
         options.setDefaultFlowStyle(DumperOptions.FlowStyle.BLOCK);
         options.setPrettyFlow(true);
-        return new Yaml(options);
+        return new Yaml(new SafeConstructor(new LoaderOptions()), new Representer(options));
     }
 
     /**
@@ -1170,7 +1184,8 @@ public class AgentConfigService {
         }
 
         data.put("agents", agents);
-        org.yaml.snakeyaml.Yaml yaml = new org.yaml.snakeyaml.Yaml();
+        org.yaml.snakeyaml.Yaml yaml = new org.yaml.snakeyaml.Yaml(
+            new org.yaml.snakeyaml.constructor.SafeConstructor(new org.yaml.snakeyaml.LoaderOptions()));
         Files.writeString(configYaml, yaml.dump(data));
     }
 

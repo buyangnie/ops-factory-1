@@ -564,7 +564,7 @@ public class InstanceManagerExtendedTest {
                 (java.util.concurrent.ConcurrentHashMap<String, ManagedInstance>) field.get(instanceManager);
             instances.put(instance.getKey(), instance);
         } catch (ReflectiveOperationException e) {
-            throw new RuntimeException(e);
+            throw new IllegalStateException(e);
         }
     }
 }

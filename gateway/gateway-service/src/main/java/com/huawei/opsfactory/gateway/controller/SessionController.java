@@ -171,7 +171,7 @@ public class SessionController {
             Object id = map.get("id");
             return id != null ? id.toString() : null;
         } catch (JsonProcessingException e) {
-            throw new RuntimeException("Failed to parse session ID from start response", e);
+            throw new IllegalStateException("Failed to parse session ID from start response", e);
         }
     }
 
@@ -255,24 +255,8 @@ public class SessionController {
         String search, String agentId, String type) {
         List<Map<String, Object>> filtered = new ArrayList<>();
         for (Map<String, Object> m : sortedSessions) {
-            if (agentId != null && !agentId.isBlank() && !agentId.equals(m.get("agentId"))) {
+            if (!matchesFilters(m, agentId, type, search)) {
                 continue;
-            }
-            if (type != null && !type.isBlank()) {
-                String sessionType = m.getOrDefault("session_type", "user") instanceof String s ? s : "user";
-                String scheduleId = m.get("schedule_id") instanceof String s && !s.isBlank() ? s : null;
-                if ("user".equals(type) && (!"user".equals(sessionType) || scheduleId != null)) {
-                    continue;
-                }
-                if ("scheduled".equals(type) && (scheduleId == null && !"scheduled".equals(sessionType))) {
-                    continue;
-                }
-            }
-            if (search != null && !search.isBlank()) {
-                String name = m.getOrDefault("name", "") instanceof String s ? s.toLowerCase(Locale.ROOT) : "";
-                if (!name.contains(search.toLowerCase(Locale.ROOT))) {
-                    continue;
-                }
             }
             filtered.add(m);
         }
@@ -288,8 +272,36 @@ public class SessionController {
         try {
             return MAPPER.writeValueAsString(response);
         } catch (JsonProcessingException e) {
-            throw new RuntimeException("Failed to serialize paginated response", e);
+            throw new IllegalStateException("Failed to serialize paginated response", e);
         }
+    }
+
+    private boolean matchesFilters(Map<String, Object> session, String agentId, String type, String search) {
+        if (agentId != null && !agentId.isBlank() && !agentId.equals(session.get("agentId"))) {
+            return false;
+        }
+        if (type != null && !type.isBlank() && !matchesType(session, type)) {
+            return false;
+        }
+        if (search != null && !search.isBlank()) {
+            String name = session.getOrDefault("name", "") instanceof String s ? s.toLowerCase(Locale.ROOT) : "";
+            if (!name.contains(search.toLowerCase(Locale.ROOT))) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    private boolean matchesType(Map<String, Object> session, String type) {
+        String sessionType = session.getOrDefault("session_type", "user") instanceof String s ? s : "user";
+        String scheduleId = session.get("schedule_id") instanceof String s && !s.isBlank() ? s : null;
+        if ("user".equals(type)) {
+            return "user".equals(sessionType) && scheduleId == null;
+        }
+        if ("scheduled".equals(type)) {
+            return scheduleId != null || "scheduled".equals(sessionType);
+        }
+        return true;
     }
 
     /**
