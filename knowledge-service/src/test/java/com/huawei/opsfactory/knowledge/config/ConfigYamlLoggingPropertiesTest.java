@@ -1,3 +1,7 @@
+/*
+ * Copyright (c) Huawei Technologies Co., Ltd. 2026-2026. All rights reserved.
+ */
+
 package com.huawei.opsfactory.knowledge.config;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -21,7 +25,12 @@ import org.springframework.core.env.Environment;
 import org.springframework.test.annotation.DirtiesContext;
 
 @SpringBootTest(properties = {
-    "knowledge.runtime.base-dir=target/test-runtime-config-yaml"
+    "knowledge.runtime.base-dir=target/test-runtime-config-yaml",
+    "knowledge.logging.include-query-text=false",
+    "logging.level.root=INFO",
+    "logging.level.com.huawei.opsfactory.knowledge=INFO",
+    "logging.level.com.huawei.opsfactory.knowledge.service.EmbeddingService=WARN",
+    "logging.level.com.huawei.opsfactory.knowledge.service.SearchService=INFO"
 })
 @AutoConfigureMockMvc
 @DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_CLASS)
