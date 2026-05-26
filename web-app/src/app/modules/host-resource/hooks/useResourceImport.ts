@@ -173,7 +173,6 @@ export function useResourceImport(deps: ImportDeps) {
         // Build lookup maps from current data
         const groupNameToId = new Map(deps.groups.map(g => [g.name, g.id]))
         const groupCodeToId = new Map(deps.groups.map(g => [g.code ?? '', g.id]))
-        const clusterGroupedKeyToId = new Map(deps.clusters.map(c => [`${c.groupId ?? ''}:${c.name}`, c.id]))
         const clusterNameToId = new Map(deps.clusters.map(c => [c.name, c.id]))
         const clusterTypeNameSet = new Set(deps.clusterTypes.map(ct => ct.name))
         const clusterTypeCodeToName = new Map(deps.clusterTypes.map(ct => [ct.code, ct.name]))
@@ -250,14 +249,13 @@ export function useResourceImport(deps: ImportDeps) {
                     }
 
                     case 'Clusters': {
-                        const groupId = row.group
-                            ? (groupNameToId.get(row.group) || groupCodeToId.get(row.group))
-                            : undefined
-                        const clusterKey = `${groupId ?? ''}:${row.name}`
-                        if (clusterGroupedKeyToId.has(clusterKey)) {
+                        if (clusterNameToId.has(row.name)) {
                             errors.push({ row: i + 1, code: 'import.duplicate', params: { type: 'Cluster', name: row.name } })
                             continue
                         }
+                        const groupId = row.group
+                            ? (groupNameToId.get(row.group) || groupCodeToId.get(row.group))
+                            : undefined
                         let typeName = row.type || ''
                         if (typeName && !clusterTypeNameSet.has(typeName)) {
                             typeName = clusterTypeCodeToName.get(typeName) || typeName
@@ -273,7 +271,6 @@ export function useResourceImport(deps: ImportDeps) {
                             groupId,
                             description: row.description || '',
                         })
-                        clusterGroupedKeyToId.set(clusterKey, created.id)
                         clusterNameToId.set(row.name, created.id)
                         success++
                         break
