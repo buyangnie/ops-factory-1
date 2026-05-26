@@ -4,6 +4,10 @@
 server:
   port: 8096                            # env override: OI_PORT
 
+spring:
+  codec:
+    max-in-memory-size: 10MB             # allow large knowledge graph JSON imports
+
 operation-intelligence:
   secret-key: ""                        # env override: OI_SECRET_KEY [REQUIRED]
   cors-origin: "*"                      # env override: OI_CORS_ORIGIN

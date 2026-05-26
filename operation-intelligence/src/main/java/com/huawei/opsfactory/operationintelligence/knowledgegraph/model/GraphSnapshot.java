@@ -18,6 +18,8 @@ import java.util.Map;
 public class GraphSnapshot {
     private String formatVersion = "1.0";
 
+    private String ontologyId;
+
     private String envCode;
 
     private String schemaVersion;
@@ -44,6 +46,14 @@ public class GraphSnapshot {
 
     public void setFormatVersion(String formatVersion) {
         this.formatVersion = formatVersion;
+    }
+
+    public String getOntologyId() {
+        return ontologyId;
+    }
+
+    public void setOntologyId(String ontologyId) {
+        this.ontologyId = ontologyId;
     }
 
     public String getEnvCode() {

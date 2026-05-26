@@ -64,6 +64,8 @@ public class GatewayProperties {
 
     private Knowledge knowledge = new Knowledge();
 
+    private OperationIntelligence operationIntelligence = new OperationIntelligence();
+
     // ---- Getters / Setters ----
 
     /**
@@ -415,6 +417,24 @@ public class GatewayProperties {
      */
     public void setKnowledge(Knowledge knowledge) {
         this.knowledge = knowledge;
+    }
+
+    /**
+     * Returns the operation intelligence proxy configuration.
+     *
+     * @return the operation intelligence proxy configuration
+     */
+    public OperationIntelligence getOperationIntelligence() {
+        return operationIntelligence;
+    }
+
+    /**
+     * Sets the operation intelligence proxy configuration.
+     *
+     * @param operationIntelligence the operation intelligence proxy configuration
+     */
+    public void setOperationIntelligence(OperationIntelligence operationIntelligence) {
+        this.operationIntelligence = operationIntelligence;
     }
 
     /**
@@ -1350,6 +1370,88 @@ public class GatewayProperties {
          */
         public void setArtifactsRoot(String artifactsRoot) {
             this.artifactsRoot = artifactsRoot;
+        }
+    }
+
+    public static class OperationIntelligence {
+        private String baseUrl = "http://127.0.0.1:8096";
+
+        private String secretKey = "test";
+
+        private int requestTimeoutMs = 30000;
+
+        private int maxResponseSizeMb = 10;
+
+        /**
+         * Gets the base url.
+         *
+         * @return the base url
+         */
+        public String getBaseUrl() {
+            return baseUrl;
+        }
+
+        /**
+         * Sets the base url.
+         *
+         * @param baseUrl the base url
+         */
+        public void setBaseUrl(String baseUrl) {
+            this.baseUrl = baseUrl;
+        }
+
+        /**
+         * Gets the secret key.
+         *
+         * @return the secret key
+         */
+        public String getSecretKey() {
+            return secretKey;
+        }
+
+        /**
+         * Sets the secret key.
+         *
+         * @param secretKey the secret key
+         */
+        public void setSecretKey(String secretKey) {
+            this.secretKey = secretKey;
+        }
+
+        /**
+         * Gets the request timeout ms.
+         *
+         * @return the request timeout ms
+         */
+        public int getRequestTimeoutMs() {
+            return requestTimeoutMs;
+        }
+
+        /**
+         * Sets the request timeout ms.
+         *
+         * @param requestTimeoutMs the requestTimeoutMs
+         */
+        public void setRequestTimeoutMs(int requestTimeoutMs) {
+            this.requestTimeoutMs = requestTimeoutMs;
+        }
+
+        /**
+         * Gets the max response size mb.
+         *
+         * @return the max response size mb
+         */
+        public int getMaxResponseSizeMb() {
+            return maxResponseSizeMb;
+        }
+
+        /**
+         * Sets the max response size mb.
+         *
+         * @param maxResponseSizeMb the max response size mb
+         */
+        public void setMaxResponseSizeMb(int maxResponseSizeMb) {
+            this.maxResponseSizeMb = maxResponseSizeMb;
         }
     }
 

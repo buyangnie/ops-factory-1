@@ -23,6 +23,8 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Optional;
+import java.util.UUID;
+import java.util.regex.Pattern;
 import java.util.stream.Stream;
 
 /**
@@ -37,7 +39,9 @@ public class GraphSnapshotStore {
 
     private static final ObjectMapper MAPPER = new ObjectMapper().enable(SerializationFeature.INDENT_OUTPUT);
 
-    private static final DateTimeFormatter FILE_TS_FORMAT = DateTimeFormatter.ofPattern("yyyyMMddHHmmss");
+    private static final DateTimeFormatter FILE_TS_FORMAT = DateTimeFormatter.ofPattern("yyyyMMddHHmmssSSS");
+
+    private static final Pattern SAFE_PATH_SEGMENT = Pattern.compile("[A-Za-z0-9_.-]+");
 
     private final OperationIntelligenceProperties properties;
 
@@ -52,7 +56,7 @@ public class GraphSnapshotStore {
      */
     public Path resolveRoot() {
         String dataDir = properties.getKnowledgeGraph().getDataDir();
-        return properties.resolveDataRoot().resolve(dataDir).normalize();
+        return properties.resolveDataRoot().resolve(dataDir).toAbsolutePath().normalize();
     }
 
     /**
@@ -62,9 +66,10 @@ public class GraphSnapshotStore {
      */
     public void save(GraphSnapshot snapshot) {
         try {
-            Path envDir = envDir(snapshot.getEnvCode());
+            Path envDir = envDir(snapshot.getOntologyId(), snapshot.getEnvCode());
             Files.createDirectories(envDir);
-            String fileName = "snapshot_" + OffsetDateTime.now().format(FILE_TS_FORMAT) + ".json";
+            String fileName = "snapshot_" + OffsetDateTime.now().format(FILE_TS_FORMAT) + "_"
+                + UUID.randomUUID() + ".json";
             Path tmp = envDir.resolve(fileName + ".tmp");
             Path target = envDir.resolve(fileName);
             MAPPER.writeValue(tmp.toFile(), snapshot);
@@ -81,8 +86,8 @@ public class GraphSnapshotStore {
      * @param envCode the envCode
      * @return the result
      */
-    public Optional<GraphSnapshot> loadLatest(String envCode) {
-        List<Path> files = listSnapshots(envCode);
+    public Optional<GraphSnapshot> loadLatest(String ontologyId, String envCode) {
+        List<Path> files = listSnapshots(ontologyId, envCode);
         for (int index = files.size() - 1; index >= 0; index--) {
             Path file = files.get(index);
             try {
@@ -105,13 +110,74 @@ public class GraphSnapshotStore {
         if (!Files.isDirectory(root)) {
             return snapshots;
         }
-        try (Stream<Path> dirs = Files.list(root)) {
-            dirs.filter(Files::isDirectory)
-                .forEach(dir -> loadLatest(dir.getFileName().toString()).ifPresent(snapshots::add));
+        try (Stream<Path> ontologyDirs = Files.list(root)) {
+            ontologyDirs.filter(Files::isDirectory)
+                .forEach(ontologyDir -> loadLatestEnvironments(ontologyDir).forEach(snapshots::add));
         } catch (IOException e) {
             log.warn("Failed to list graph snapshots: {}", e.getMessage());
         }
         return snapshots;
+    }
+
+    /**
+     * Counts persisted environment snapshot directories under one ontology.
+     *
+     * @param ontologyId the ontologyId
+     * @return snapshot environment count
+     */
+    public int countOntologySnapshots(String ontologyId) {
+        Path ontologyDir = ontologyDir(ontologyId);
+        if (!Files.isDirectory(ontologyDir)) {
+            return 0;
+        }
+        try (Stream<Path> envDirs = Files.list(ontologyDir)) {
+            return (int) envDirs.filter(Files::isDirectory)
+                .filter(envDir -> !listSnapshots(envDir).isEmpty())
+                .count();
+        } catch (IOException e) {
+            throw new IllegalStateException("Failed to count graph snapshots", e);
+        }
+    }
+
+    /**
+     * Lists persisted environment codes under one ontology.
+     *
+     * @param ontologyId the ontologyId
+     * @return environment codes
+     */
+    public List<String> listEnvironmentCodes(String ontologyId) {
+        Path ontologyDir = ontologyDir(ontologyId);
+        if (!Files.isDirectory(ontologyDir)) {
+            return List.of();
+        }
+        try (Stream<Path> envDirs = Files.list(ontologyDir)) {
+            return envDirs.filter(Files::isDirectory)
+                .filter(envDir -> !listSnapshots(envDir).isEmpty())
+                .map(envDir -> envDir.getFileName().toString())
+                .sorted()
+                .toList();
+        } catch (IOException e) {
+            throw new IllegalStateException("Failed to list graph snapshot environments", e);
+        }
+    }
+
+    /**
+     * Deletes all persisted snapshots under one ontology.
+     *
+     * @param ontologyId the ontologyId
+     */
+    public void deleteOntology(String ontologyId) {
+        deleteRecursively(ontologyDir(ontologyId));
+    }
+
+    /**
+     * Deletes one persisted environment snapshot directory.
+     *
+     * @param ontologyId the ontologyId
+     * @param envCode the envCode
+     */
+    public void deleteSnapshot(String ontologyId, String envCode) {
+        deleteRecursively(envDir(ontologyId, envCode));
     }
 
     private void cleanup(Path envDir) throws IOException {
@@ -123,8 +189,20 @@ public class GraphSnapshotStore {
         }
     }
 
-    private List<Path> listSnapshots(String envCode) {
-        return listSnapshots(envDir(envCode));
+    private List<GraphSnapshot> loadLatestEnvironments(Path ontologyDir) {
+        List<GraphSnapshot> snapshots = new ArrayList<>();
+        String ontologyId = ontologyDir.getFileName().toString();
+        try (Stream<Path> envDirs = Files.list(ontologyDir)) {
+            envDirs.filter(Files::isDirectory)
+                .forEach(envDir -> loadLatest(ontologyId, envDir.getFileName().toString()).ifPresent(snapshots::add));
+        } catch (IOException e) {
+            log.warn("Failed to list graph snapshot environments under {}: {}", ontologyDir, e.getMessage());
+        }
+        return snapshots;
+    }
+
+    private List<Path> listSnapshots(String ontologyId, String envCode) {
+        return listSnapshots(envDir(ontologyId, envCode));
     }
 
     private List<Path> listSnapshots(Path envDir) {
@@ -142,7 +220,47 @@ public class GraphSnapshotStore {
         }
     }
 
-    private Path envDir(String envCode) {
-        return resolveRoot().resolve(envCode).normalize();
+    private Path envDir(String ontologyId, String envCode) {
+        Path root = resolveRoot();
+        Path resolved = root.resolve(safePathSegment(ontologyId, "ontologyId"))
+            .resolve(safePathSegment(envCode, "envCode"))
+            .normalize();
+        if (!resolved.startsWith(root)) {
+            throw new IllegalArgumentException("Graph snapshot path is outside data root");
+        }
+        return resolved;
+    }
+
+    private Path ontologyDir(String ontologyId) {
+        Path root = resolveRoot();
+        Path resolved = root.resolve(safePathSegment(ontologyId, "ontologyId")).normalize();
+        if (!resolved.startsWith(root)) {
+            throw new IllegalArgumentException("Graph ontology snapshot path is outside data root");
+        }
+        return resolved;
+    }
+
+    private String safePathSegment(String value, String fieldName) {
+        if (value == null || !SAFE_PATH_SEGMENT.matcher(value).matches()) {
+            throw new IllegalArgumentException(fieldName + " contains unsupported path characters");
+        }
+        return value;
+    }
+
+    private void deleteRecursively(Path root) {
+        if (!Files.exists(root)) {
+            return;
+        }
+        try (Stream<Path> paths = Files.walk(root)) {
+            paths.sorted(Comparator.reverseOrder()).forEach(path -> {
+                try {
+                    Files.deleteIfExists(path);
+                } catch (IOException e) {
+                    throw new IllegalStateException("Failed to delete " + path, e);
+                }
+            });
+        } catch (IOException e) {
+            throw new IllegalStateException("Failed to delete graph snapshots", e);
+        }
     }
 }

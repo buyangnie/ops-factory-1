@@ -14,6 +14,7 @@ const validIcons = new Set<IconKey>([
     'agents',
     'skillMarket',
     'knowledge',
+    'knowledgeGraph',
     'scheduler',
     'monitoring',
     'hostResource',

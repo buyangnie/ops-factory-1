@@ -1,6 +1,21 @@
 import { trackedFetch } from '../app/platform/logging/requestClient'
 import { configureWebappLogging, type WebappLoggingRuntimeConfig } from '../app/platform/logging/settings'
 
+export interface KnowledgeGraphCollapsedRelationRule {
+    relationType: string
+    targetEntityTypes: string[]
+    threshold: number
+}
+
+export interface KnowledgeGraphResourceTreeHierarchyRule {
+    ontologyId?: string
+    relationType: string
+    mode?: 'hierarchy'
+    parentEntityTypes?: string[]
+    childEntityTypes?: string[]
+    threshold?: number
+}
+
 interface RuntimeConfig {
     gatewayUrl?: string
     gatewaySecretKey?: string
@@ -11,6 +26,10 @@ interface RuntimeConfig {
     skillMarketServiceUrl?: string
     operationIntelligenceServiceUrl?: string
     operationIntelligenceSecretKey?: string
+    operationIntelligenceKnowledgeGraph?: {
+        collapsedRelationRules?: KnowledgeGraphCollapsedRelationRule[]
+        resourceTreeHierarchyRules?: KnowledgeGraphResourceTreeHierarchyRule[]
+    }
     logging?: {
         level?: WebappLoggingRuntimeConfig['level']
         consoleEnabled?: boolean
@@ -125,22 +144,39 @@ function resolveSkillMarketServiceUrl(raw: string | undefined): string {
 function resolveOperationIntelligenceServiceUrl(raw: string | undefined): string {
     const pageHost = window.location.hostname || '127.0.0.1'
     const pageProtocol = window.location.protocol || 'http:'
-    const fallbackOrigin = `${pageProtocol}//${pageHost}:8096`
+    const fallbackOrigin = `${pageProtocol}//${pageHost}:3000`
 
-    if (!raw) return `${OPERATION_INTELLIGENCE_PATH_PREFIX}`
+    if (!raw) return `${GATEWAY_PATH_PREFIX}${OPERATION_INTELLIGENCE_PATH_PREFIX}`
 
     try {
         const url = new URL(raw)
         if (isLoopbackHost(url.hostname) && url.hostname !== pageHost) {
             url.hostname = pageHost
         }
-        return `${url.origin}${OPERATION_INTELLIGENCE_PATH_PREFIX}`
+        if (url.port === '8096') {
+            return `${fallbackOrigin}${GATEWAY_PATH_PREFIX}${OPERATION_INTELLIGENCE_PATH_PREFIX}`
+        }
+        return `${url.origin}${GATEWAY_PATH_PREFIX}${OPERATION_INTELLIGENCE_PATH_PREFIX}`
     } catch {
-        return `${fallbackOrigin}${OPERATION_INTELLIGENCE_PATH_PREFIX}`
+        return `${fallbackOrigin}${GATEWAY_PATH_PREFIX}${OPERATION_INTELLIGENCE_PATH_PREFIX}`
     }
 }
 
 const DEFAULT_SECRET_KEY = 'test'
+const DEFAULT_KNOWLEDGE_GRAPH_COLLAPSED_RELATION_RULES: KnowledgeGraphCollapsedRelationRule[] = [
+    {
+        relationType: 'contains',
+        targetEntityTypes: ['Host'],
+        threshold: 1,
+    },
+]
+const DEFAULT_KNOWLEDGE_GRAPH_RESOURCE_TREE_HIERARCHY_RULES: KnowledgeGraphResourceTreeHierarchyRule[] = [
+    {
+        relationType: 'contains',
+        mode: 'hierarchy',
+        threshold: 1,
+    },
+]
 
 export const runtime = {
     GATEWAY_URL: resolveGatewayUrl(undefined),
@@ -152,6 +188,10 @@ export const runtime = {
     SKILL_MARKET_SERVICE_URL: resolveSkillMarketServiceUrl(undefined),
     OPERATION_INTELLIGENCE_SERVICE_URL: resolveOperationIntelligenceServiceUrl(undefined),
     OPERATION_INTELLIGENCE_SECRET_KEY: DEFAULT_SECRET_KEY,
+    OPERATION_INTELLIGENCE_KNOWLEDGE_GRAPH_COLLAPSED_RELATION_RULES:
+        DEFAULT_KNOWLEDGE_GRAPH_COLLAPSED_RELATION_RULES,
+    OPERATION_INTELLIGENCE_KNOWLEDGE_GRAPH_RESOURCE_TREE_HIERARCHY_RULES:
+        DEFAULT_KNOWLEDGE_GRAPH_RESOURCE_TREE_HIERARCHY_RULES,
 }
 
 function setRuntimeConfig(config: RuntimeConfig): void {
@@ -160,11 +200,52 @@ function setRuntimeConfig(config: RuntimeConfig): void {
     runtime.CONTROL_CENTER_URL = resolveControlCenterUrl(config.controlCenterUrl)
     runtime.CONTROL_CENTER_SECRET_KEY = config.controlCenterSecretKey || DEFAULT_SECRET_KEY
     runtime.KNOWLEDGE_SERVICE_URL = resolveKnowledgeServiceUrl(config.knowledgeServiceUrl)
-    runtime.BUSINESS_INTELLIGENCE_SERVICE_URL = resolveBusinessIntelligenceServiceUrl(config.businessIntelligenceServiceUrl)
+    runtime.BUSINESS_INTELLIGENCE_SERVICE_URL = resolveBusinessIntelligenceServiceUrl(
+        config.businessIntelligenceServiceUrl,
+    )
     runtime.SKILL_MARKET_SERVICE_URL = resolveSkillMarketServiceUrl(config.skillMarketServiceUrl)
-    runtime.OPERATION_INTELLIGENCE_SERVICE_URL = resolveOperationIntelligenceServiceUrl(config.operationIntelligenceServiceUrl)
+    runtime.OPERATION_INTELLIGENCE_SERVICE_URL = resolveOperationIntelligenceServiceUrl(
+        config.operationIntelligenceServiceUrl,
+    )
     runtime.OPERATION_INTELLIGENCE_SECRET_KEY = config.operationIntelligenceSecretKey || DEFAULT_SECRET_KEY
+    runtime.OPERATION_INTELLIGENCE_KNOWLEDGE_GRAPH_COLLAPSED_RELATION_RULES =
+        normalizeCollapsedRelationRules(config.operationIntelligenceKnowledgeGraph?.collapsedRelationRules)
+    runtime.OPERATION_INTELLIGENCE_KNOWLEDGE_GRAPH_RESOURCE_TREE_HIERARCHY_RULES =
+        normalizeResourceTreeHierarchyRules(config.operationIntelligenceKnowledgeGraph?.resourceTreeHierarchyRules)
     configureWebappLogging(config.logging)
+}
+
+function normalizeCollapsedRelationRules(
+    rules: KnowledgeGraphCollapsedRelationRule[] | undefined,
+): KnowledgeGraphCollapsedRelationRule[] {
+    if (!rules?.length) {
+        return DEFAULT_KNOWLEDGE_GRAPH_COLLAPSED_RELATION_RULES
+    }
+    return rules
+        .filter(rule => rule.relationType && rule.targetEntityTypes?.length && Number.isFinite(rule.threshold))
+        .map(rule => ({
+            relationType: rule.relationType,
+            targetEntityTypes: rule.targetEntityTypes,
+            threshold: Math.max(0, Math.floor(rule.threshold)),
+        }))
+}
+
+function normalizeResourceTreeHierarchyRules(
+    rules: KnowledgeGraphResourceTreeHierarchyRule[] | undefined,
+): KnowledgeGraphResourceTreeHierarchyRule[] {
+    if (!rules?.length) {
+        return DEFAULT_KNOWLEDGE_GRAPH_RESOURCE_TREE_HIERARCHY_RULES
+    }
+    return rules
+        .filter(rule => rule.relationType)
+        .map(rule => ({
+            ontologyId: rule.ontologyId,
+            relationType: rule.relationType,
+            mode: rule.mode ?? 'hierarchy',
+            parentEntityTypes: rule.parentEntityTypes,
+            childEntityTypes: rule.childEntityTypes,
+            threshold: Math.max(1, Math.floor(rule.threshold ?? 1)),
+        }))
 }
 
 async function loadRuntimeConfig(): Promise<RuntimeConfig> {

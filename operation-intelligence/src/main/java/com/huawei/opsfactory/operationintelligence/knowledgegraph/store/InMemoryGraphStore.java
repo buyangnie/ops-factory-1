@@ -44,7 +44,7 @@ public class InMemoryGraphStore {
      */
     public void loadSnapshot(GraphSnapshot snapshot) {
         EnvGraph envGraph = EnvGraph.fromSnapshot(snapshot);
-        graphs.put(snapshot.getEnvCode(), envGraph);
+        graphs.put(graphKey(snapshot.getOntologyId(), snapshot.getEnvCode()), envGraph);
     }
 
     /**
@@ -54,7 +54,9 @@ public class InMemoryGraphStore {
      * @return merged snapshot
      */
     public GraphSnapshot upsert(GraphSnapshot incoming) {
-        EnvGraph envGraph = graphs.computeIfAbsent(incoming.getEnvCode(), envCode -> new EnvGraph(envCode));
+        String key = graphKey(incoming.getOntologyId(), incoming.getEnvCode());
+        EnvGraph envGraph = graphs.computeIfAbsent(key, item -> new EnvGraph(incoming.getOntologyId(),
+            incoming.getEnvCode()));
         envGraph.lock.writeLock().lock();
         try {
             envGraph.upsert(incoming);
@@ -65,13 +67,36 @@ public class InMemoryGraphStore {
     }
 
     /**
+     * Builds a merged snapshot without changing the loaded graph.
+     *
+     * @param incoming the incoming snapshot
+     * @return merged snapshot
+     */
+    public GraphSnapshot mergeSnapshot(GraphSnapshot incoming) {
+        EnvGraph existing = graphs.get(graphKey(incoming.getOntologyId(), incoming.getEnvCode()));
+        if (existing == null) {
+            EnvGraph envGraph = new EnvGraph(incoming.getOntologyId(), incoming.getEnvCode());
+            envGraph.upsert(incoming);
+            return envGraph.toSnapshot(incoming);
+        }
+        existing.lock.readLock().lock();
+        try {
+            EnvGraph envGraph = EnvGraph.fromSnapshot(existing.toSnapshot(null));
+            envGraph.upsert(incoming);
+            return envGraph.toSnapshot(incoming);
+        } finally {
+            existing.lock.readLock().unlock();
+        }
+    }
+
+    /**
      * Gets a snapshot for the environment.
      *
      * @param envCode the envCode
      * @return the result
      */
-    public Optional<GraphSnapshot> getSnapshot(String envCode) {
-        EnvGraph envGraph = graphs.get(envCode);
+    public Optional<GraphSnapshot> getSnapshot(String ontologyId, String envCode) {
+        EnvGraph envGraph = graphs.get(graphKey(ontologyId, envCode));
         if (envGraph == null) {
             return Optional.empty();
         }
@@ -84,14 +109,71 @@ public class InMemoryGraphStore {
     }
 
     /**
+     * Counts loaded environment graphs under one ontology.
+     *
+     * @param ontologyId the ontologyId
+     * @return graph count
+     */
+    public int countOntologySnapshots(String ontologyId) {
+        String keyPrefix = ontologyId + "::";
+        return (int) graphs.keySet()
+            .stream()
+            .filter(key -> key.startsWith(keyPrefix))
+            .count();
+    }
+
+    /**
+     * Lists loaded environment codes under one ontology.
+     *
+     * @param ontologyId the ontologyId
+     * @return environment codes
+     */
+    public List<String> listEnvironmentCodes(String ontologyId) {
+        String keyPrefix = ontologyId + "::";
+        return graphs.keySet()
+            .stream()
+            .filter(key -> key.startsWith(keyPrefix))
+            .map(key -> key.substring(keyPrefix.length()))
+            .sorted()
+            .toList();
+    }
+
+    /**
+     * Deletes all environment graphs under one ontology.
+     *
+     * @param ontologyId the ontologyId
+     * @return deleted graph count
+     */
+    public int deleteOntology(String ontologyId) {
+        String keyPrefix = ontologyId + "::";
+        List<String> keys = graphs.keySet()
+            .stream()
+            .filter(key -> key.startsWith(keyPrefix))
+            .toList();
+        keys.forEach(graphs::remove);
+        return keys.size();
+    }
+
+    /**
+     * Deletes one environment graph.
+     *
+     * @param ontologyId the ontologyId
+     * @param envCode the envCode
+     * @return true if graph existed
+     */
+    public boolean deleteSnapshot(String ontologyId, String envCode) {
+        return graphs.remove(graphKey(ontologyId, envCode)) != null;
+    }
+
+    /**
      * Gets an entity.
      *
      * @param envCode the envCode
      * @param entityId the entityId
      * @return the result
      */
-    public Optional<GraphEntity> getEntity(String envCode, String entityId) {
-        EnvGraph envGraph = graphs.get(envCode);
+    public Optional<GraphEntity> getEntity(String ontologyId, String envCode, String entityId) {
+        EnvGraph envGraph = graphs.get(graphKey(ontologyId, envCode));
         if (envGraph == null) {
             return Optional.empty();
         }
@@ -111,8 +193,8 @@ public class InMemoryGraphStore {
      * @param maxHops the maxHops
      * @return the result
      */
-    public Optional<GraphSnapshot> querySubgraph(String envCode, String entityId, int maxHops) {
-        EnvGraph envGraph = graphs.get(envCode);
+    public Optional<GraphSnapshot> querySubgraph(String ontologyId, String envCode, String entityId, int maxHops) {
+        EnvGraph envGraph = graphs.get(graphKey(ontologyId, envCode));
         if (envGraph == null) {
             return Optional.empty();
         }
@@ -129,6 +211,7 @@ public class InMemoryGraphStore {
                 }
             }
             GraphSnapshot result = new GraphSnapshot();
+            result.setOntologyId(ontologyId);
             result.setEnvCode(envCode);
             result.setSnapshotId(envGraph.snapshotId);
             result.setSchemaVersion(envGraph.schemaVersion);
@@ -139,6 +222,89 @@ public class InMemoryGraphStore {
                     result.getObservations().add(observation);
                 }
             }
+            return Optional.of(result);
+        } finally {
+            envGraph.lock.readLock().unlock();
+        }
+    }
+
+    /**
+     * Queries a directional subgraph.
+     *
+     * @param ontologyId the ontologyId
+     * @param envCode the envCode
+     * @param entityId the entityId
+     * @param upstreamHops the upstreamHops
+     * @param downstreamHops the downstreamHops
+     * @return the result
+     */
+    public Optional<GraphSnapshot> querySubgraph(String ontologyId, String envCode, String entityId, int upstreamHops,
+        int downstreamHops) {
+        EnvGraph envGraph = graphs.get(graphKey(ontologyId, envCode));
+        if (envGraph == null) {
+            return Optional.empty();
+        }
+        envGraph.lock.readLock().lock();
+        try {
+            if (!envGraph.entities.containsKey(entityId)) {
+                return Optional.empty();
+            }
+            SubgraphSelection selection = collectDirectionalSubgraph(envGraph, entityId, upstreamHops, downstreamHops);
+            GraphSnapshot result = new GraphSnapshot();
+            result.setOntologyId(ontologyId);
+            result.setEnvCode(envCode);
+            result.setSnapshotId(envGraph.snapshotId);
+            result.setSchemaVersion(envGraph.schemaVersion);
+            selection.entityIds().forEach(id -> result.getEntities().add(envGraph.entities.get(id)));
+            selection.relationIds().forEach(id -> result.getRelations().add(envGraph.relations.get(id)));
+            for (GraphObservation observation : envGraph.observations.values()) {
+                if (selection.entityIds().contains(observation.getEntityId())) {
+                    result.getObservations().add(observation);
+                }
+            }
+            return Optional.of(result);
+        } finally {
+            envGraph.lock.readLock().unlock();
+        }
+    }
+
+    /**
+     * Finds the shortest relation path between two entities.
+     *
+     * @param envCode the envCode
+     * @param fromEntityId the fromEntityId
+     * @param toEntityId the toEntityId
+     * @param maxHops the maxHops
+     * @return the result
+     */
+    public Optional<GraphSnapshot> findPath(String ontologyId, String envCode, String fromEntityId, String toEntityId,
+        int maxHops) {
+        EnvGraph envGraph = graphs.get(graphKey(ontologyId, envCode));
+        if (envGraph == null) {
+            return Optional.empty();
+        }
+        envGraph.lock.readLock().lock();
+        try {
+            if (!envGraph.entities.containsKey(fromEntityId) || !envGraph.entities.containsKey(toEntityId)) {
+                return Optional.empty();
+            }
+            PathSearchResult searchResult = searchPath(envGraph, fromEntityId, toEntityId, maxHops);
+            if (!searchResult.isFound()) {
+                return Optional.empty();
+            }
+            GraphSnapshot result = envGraph.toSnapshot(null);
+            result.setEntities(searchResult.entityIds()
+                .stream()
+                .map(envGraph.entities::get)
+                .toList());
+            result.setRelations(searchResult.relationIds()
+                .stream()
+                .map(envGraph.relations::get)
+                .toList());
+            result.setObservations(result.getObservations()
+                .stream()
+                .filter(observation -> searchResult.entityIds().contains(observation.getEntityId()))
+                .toList());
             return Optional.of(result);
         } finally {
             envGraph.lock.readLock().unlock();
@@ -173,8 +339,120 @@ public class InMemoryGraphStore {
         return visited;
     }
 
+    private SubgraphSelection collectDirectionalSubgraph(EnvGraph envGraph, String startId, int upstreamHops,
+        int downstreamHops) {
+        Set<String> selectedEntities = new LinkedHashSet<>();
+        Set<String> selectedRelations = new LinkedHashSet<>();
+        selectedEntities.add(startId);
+        collectDirectionalEntityIds(envGraph, startId, upstreamHops, false, selectedEntities, selectedRelations);
+        collectDirectionalEntityIds(envGraph, startId, downstreamHops, true, selectedEntities, selectedRelations);
+        return new SubgraphSelection(selectedEntities, selectedRelations);
+    }
+
+    private void collectDirectionalEntityIds(EnvGraph envGraph, String startId, int maxHops, boolean downstream,
+        Set<String> selectedEntities, Set<String> selectedRelations) {
+        Map<String, Integer> distance = new HashMap<>();
+        Queue<String> queue = new ArrayDeque<>();
+        distance.put(startId, 0);
+        queue.add(startId);
+        while (!queue.isEmpty()) {
+            String current = queue.poll();
+            int currentDistance = distance.get(current);
+            if (currentDistance >= maxHops) {
+                continue;
+            }
+            for (String relationId : envGraph.entityRelations.getOrDefault(current, Set.of())) {
+                GraphRelation relation = envGraph.relations.get(relationId);
+                if (relation == null || !isDirectionalMatch(relation, current, downstream)) {
+                    continue;
+                }
+                String next = downstream ? relation.getTo() : relation.getFrom();
+                selectedRelations.add(relationId);
+                selectedEntities.add(next);
+                if (!distance.containsKey(next)) {
+                    distance.put(next, currentDistance + 1);
+                    queue.add(next);
+                }
+            }
+        }
+    }
+
+    private boolean isDirectionalMatch(GraphRelation relation, String current, boolean downstream) {
+        if (downstream) {
+            return relation.getFrom().equals(current);
+        }
+        return relation.getTo().equals(current);
+    }
+
+    private String graphKey(String ontologyId, String envCode) {
+        return ontologyId + "::" + envCode;
+    }
+
+    private PathSearchResult searchPath(EnvGraph envGraph, String fromEntityId, String toEntityId, int maxHops) {
+        Map<String, Integer> distance = new HashMap<>();
+        Map<String, String> previousEntity = new HashMap<>();
+        Map<String, String> previousRelation = new HashMap<>();
+        Queue<String> queue = new ArrayDeque<>();
+        distance.put(fromEntityId, 0);
+        queue.add(fromEntityId);
+        while (!queue.isEmpty()) {
+            String current = queue.poll();
+            if (current.equals(toEntityId)) {
+                return buildPath(fromEntityId, toEntityId, previousEntity, previousRelation);
+            }
+            int currentDistance = distance.get(current);
+            if (currentDistance >= maxHops) {
+                continue;
+            }
+            for (String relationId : envGraph.entityRelations.getOrDefault(current, Set.of())) {
+                GraphRelation relation = envGraph.relations.get(relationId);
+                String next = relation.getFrom().equals(current) ? relation.getTo() : relation.getFrom();
+                if (distance.containsKey(next)) {
+                    continue;
+                }
+                distance.put(next, currentDistance + 1);
+                previousEntity.put(next, current);
+                previousRelation.put(next, relationId);
+                queue.add(next);
+            }
+        }
+        return PathSearchResult.notFound();
+    }
+
+    private PathSearchResult buildPath(String fromEntityId, String toEntityId, Map<String, String> previousEntity,
+        Map<String, String> previousRelation) {
+        List<String> entityIds = new ArrayList<>();
+        List<String> relationIds = new ArrayList<>();
+        String current = toEntityId;
+        entityIds.add(current);
+        while (!current.equals(fromEntityId)) {
+            String relationId = previousRelation.get(current);
+            String previous = previousEntity.get(current);
+            if (relationId == null || previous == null) {
+                return PathSearchResult.notFound();
+            }
+            relationIds.add(relationId);
+            entityIds.add(previous);
+            current = previous;
+        }
+        java.util.Collections.reverse(entityIds);
+        java.util.Collections.reverse(relationIds);
+        return new PathSearchResult(true, entityIds, relationIds);
+    }
+
+    private record PathSearchResult(boolean isFound, List<String> entityIds, List<String> relationIds) {
+        static PathSearchResult notFound() {
+            return new PathSearchResult(false, List.of(), List.of());
+        }
+    }
+
+    private record SubgraphSelection(Set<String> entityIds, Set<String> relationIds) {
+    }
+
     private static class EnvGraph {
         private final ReadWriteLock lock = new ReentrantReadWriteLock();
+
+        private final String ontologyId;
 
         private final String envCode;
 
@@ -184,6 +462,10 @@ public class InMemoryGraphStore {
 
         private String generatedAt;
 
+        private String sourceSystem;
+
+        private Map<String, Object> metadata = new LinkedHashMap<>();
+
         private final Map<String, GraphEntity> entities = new LinkedHashMap<>();
 
         private final Map<String, GraphRelation> relations = new LinkedHashMap<>();
@@ -192,12 +474,13 @@ public class InMemoryGraphStore {
 
         private final Map<String, Set<String>> entityRelations = new LinkedHashMap<>();
 
-        EnvGraph(String envCode) {
+        EnvGraph(String ontologyId, String envCode) {
+            this.ontologyId = ontologyId;
             this.envCode = envCode;
         }
 
         static EnvGraph fromSnapshot(GraphSnapshot snapshot) {
-            EnvGraph envGraph = new EnvGraph(snapshot.getEnvCode());
+            EnvGraph envGraph = new EnvGraph(snapshot.getOntologyId(), snapshot.getEnvCode());
             envGraph.upsert(snapshot);
             return envGraph;
         }
@@ -206,6 +489,8 @@ public class InMemoryGraphStore {
             schemaVersion = firstNonBlank(snapshot.getSchemaVersion(), schemaVersion);
             snapshotId = firstNonBlank(snapshot.getSnapshotId(), snapshotId);
             generatedAt = firstNonBlank(snapshot.getGeneratedAt(), generatedAt);
+            sourceSystem = firstNonBlank(snapshot.getSourceSystem(), sourceSystem);
+            metadata = new LinkedHashMap<>(snapshot.getMetadata());
             for (GraphEntity entity : snapshot.getEntities()) {
                 entities.put(entity.getId(), entity);
             }
@@ -223,6 +508,7 @@ public class InMemoryGraphStore {
 
         GraphSnapshot toSnapshot(GraphSnapshot request) {
             GraphSnapshot snapshot = new GraphSnapshot();
+            snapshot.setOntologyId(ontologyId);
             snapshot.setEnvCode(envCode);
             snapshot.setSchemaVersion(request == null
                 ? schemaVersion
@@ -231,11 +517,10 @@ public class InMemoryGraphStore {
             snapshot.setGeneratedAt(request == null
                 ? generatedAt
                 : firstNonBlank(request.getGeneratedAt(), generatedAt));
-            snapshot.setSourceSystem(request == null ? null : request.getSourceSystem());
+            snapshot.setSourceSystem(request == null ? sourceSystem : firstNonBlank(request.getSourceSystem(),
+                sourceSystem));
             snapshot.setImportMode("UPSERT");
-            if (request != null) {
-                snapshot.setMetadata(request.getMetadata());
-            }
+            snapshot.setMetadata(request == null ? metadata : request.getMetadata());
             snapshot.setEntities(new ArrayList<>(entities.values()));
             snapshot.setRelations(new ArrayList<>(relations.values()));
             snapshot.setObservations(new ArrayList<>(observations.values()));

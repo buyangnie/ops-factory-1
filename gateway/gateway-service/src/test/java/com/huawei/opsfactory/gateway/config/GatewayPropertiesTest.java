@@ -96,6 +96,17 @@ public class GatewayPropertiesTest {
     }
 
     /**
+     * Tests operation intelligence defaults.
+     */
+    @Test
+    public void testOperationIntelligenceDefaults() {
+        GatewayProperties.OperationIntelligence operationIntelligence = new GatewayProperties.OperationIntelligence();
+        assertEquals("http://127.0.0.1:8096", operationIntelligence.getBaseUrl());
+        assertEquals("test", operationIntelligence.getSecretKey());
+        assertEquals(30000, operationIntelligence.getRequestTimeoutMs());
+    }
+
+    /**
      * Tests office preview defaults.
      */
     @Test
