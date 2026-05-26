@@ -46,7 +46,11 @@ public class DvSslContextFactory {
             if (strictSsl) {
                 throw new IllegalStateException("No SSL certificate configured and strict-ssl is enabled");
             }
-            log.warn("INSECURE SSL: no certificate configured, falling back to insecure trust manager");
+            log.warn(
+                "INSECURE SSL MODE: No certificate configured and strict-ssl=false. "
+                    + "Using insecure trust manager that accepts all certificates. "
+                    + "WARNING: This is acceptable ONLY for development environment. "
+                    + "Production environment MUST have strict-ssl=true and valid certificate.");
             return createInsecureSslContext();
         }
 
@@ -88,8 +92,11 @@ public class DvSslContextFactory {
                 throw new IllegalStateException("Failed to create SSL context with certificate (strict-ssl enabled)", e);
             }
             log.error(
-                "INSECURE SSL: SSL context creation failed, falling back to insecure trust manager. "
-                    + "This is a security risk. Set strict-ssl=true to enforce certificate validation. Error: {}",
+                "SSL context creation failed and strict-ssl=false. "
+                    + "FALLING BACK TO INSECURE MODE. "
+                    + "This accepts ALL certificates and should ONLY be used in development. "
+                    + "Production environment requires strict-ssl=true and valid certificates. "
+                    + "Error: {}",
                 e.getMessage());
             return createInsecureSslContext();
         }

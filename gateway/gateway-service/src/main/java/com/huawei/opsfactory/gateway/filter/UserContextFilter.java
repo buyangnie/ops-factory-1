@@ -53,6 +53,9 @@ public class UserContextFilter implements jakarta.servlet.Filter {
     }
 
     private static boolean isTraceEndpoint(String path) {
+        if (path == null) {
+            return false;
+        }
         if (path.startsWith("/gateway/session-traces/")) {
             return true;
         }

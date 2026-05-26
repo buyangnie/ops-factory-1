@@ -83,6 +83,9 @@ public class GoosedProxy {
         HttpClient httpClient = HttpClient.newConnection().option(ChannelOption.CONNECT_TIMEOUT_MILLIS, 5000);
 
         if (properties.isGooseTls()) {
+            log.warn(
+                "INSECURE TLS CONFIGURATION: Using InsecureTrustManager for goosed proxy. "
+                    + "This is acceptable only for internal localhost communication.");
             try {
                 SslContext sslContext =
                     SslContextBuilder.forClient().trustManager(InsecureTrustManagerFactory.INSTANCE).build();

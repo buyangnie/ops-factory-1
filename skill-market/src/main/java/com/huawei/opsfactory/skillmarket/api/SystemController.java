@@ -19,16 +19,16 @@ public class SystemController {
 
     @GetMapping("/capabilities")
     public CapabilitiesResponse capabilities() {
-        SkillMarketProperties.PackageSettings pack = properties.getPackage();
+        SkillMarketProperties.PackageSettings packageSettings = properties.getPackage();
         return new CapabilitiesResponse(
             List.of("zip"),
             List.of("create", "import", "list", "detail", "download", "delete"),
             new CapabilitiesResponse.PackageLimits(
-                pack.getMaxUploadSizeMb(),
-                pack.getMaxUnpackedSizeMb(),
-                pack.getMaxFileCount(),
-                pack.getMaxSingleFileSizeMb(),
-                pack.isAllowScripts()
+                packageSettings.getMaxUploadSizeMb(),
+                packageSettings.getMaxUnpackedSizeMb(),
+                packageSettings.getMaxFileCount(),
+                packageSettings.getMaxSingleFileSizeMb(),
+                packageSettings.isAllowScripts()
             )
         );
     }

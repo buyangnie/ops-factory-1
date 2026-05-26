@@ -21,6 +21,8 @@ import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Component;
 
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
 
 /**
  * Auth Web Filter.
@@ -41,6 +43,35 @@ public class AuthWebFilter implements Filter {
     private static final String HEALTH_PATH = "/actuator/health";
 
     private final OperationIntelligenceProperties properties;
+
+    /**
+     * Compares two strings in constant time to prevent timing attacks.
+     *
+     * @param a first string
+     * @param b second string
+     * @return true if strings are equal, false otherwise
+     */
+    private static boolean constantTimeEquals(String a, String b) {
+        if (a == null && b == null) {
+            return true;
+        }
+        if (a == null || b == null) {
+            return false;
+        }
+        try {
+            MessageDigest digest = MessageDigest.getInstance("SHA-256");
+            byte[] aBytes = digest.digest(a.getBytes(StandardCharsets.UTF_8));
+            byte[] bBytes = digest.digest(b.getBytes(StandardCharsets.UTF_8));
+
+            int result = 0;
+            for (int i = 0; i < Math.min(aBytes.length, bBytes.length); i++) {
+                result |= aBytes[i] ^ bBytes[i];
+            }
+            return result == 0;
+        } catch (Exception e) {
+            return false;
+        }
+    }
 
     /**
      * Auth Web Filter.
@@ -70,8 +101,8 @@ public class AuthWebFilter implements Filter {
             key = httpRequest.getParameter(QUERY_KEY);
         }
 
-        if (!properties.getSecretKey().equals(key)) {
-            log.warn("Rejecting unauthorized request path={} reason=invalid-secret-key", path);
+        if (!constantTimeEquals(properties.getSecretKey(), key)) {
+            log.warn("Rejecting unauthorized request reason=invalid-secret-key");
             httpResponse.sendError(HttpStatus.UNAUTHORIZED.value());
             return;
         }
