@@ -62,7 +62,7 @@ public class AgentSkillController {
             return conflict(e.getMessage());
         } catch (IllegalArgumentException e) {
             return badRequest(e.getMessage());
-        } catch (Exception e) {
+        } catch (ResponseStatusException | IllegalStateException e) {
             throw new ResponseStatusException(HttpStatus.BAD_GATEWAY,
                 e.getMessage() == null ? "Failed to install skill" : e.getMessage(), e);
         }
@@ -83,7 +83,7 @@ public class AgentSkillController {
             return ResponseEntity.ok(installService.uninstall(agentId, skillId));
         } catch (IllegalArgumentException e) {
             return badRequest(e.getMessage());
-        } catch (Exception e) {
+        } catch (ResponseStatusException | IllegalStateException e) {
             throw new ResponseStatusException(HttpStatus.BAD_GATEWAY,
                 e.getMessage() == null ? "Failed to uninstall skill" : e.getMessage(), e);
         }

@@ -172,7 +172,7 @@ public class ReplyController {
             log.info("[SESSION-REPLY] completed agentId={} userId={} sessionId={} totalMs={}", agentId,
                 userId, sessionId, System.currentTimeMillis() - requestStart);
             return result;
-        } catch (Exception err) {
+        } catch (ResponseStatusException | WebClientResponseException | IllegalStateException err) {
             removeFileSnapshot(agentId, userId, sessionId, chatRequestId);
             log.warn("[SESSION-REPLY] failed agentId={} userId={} sessionId={} totalMs={} error={}", agentId, userId,
                 sessionId, System.currentTimeMillis() - requestStart, err.getMessage());
@@ -238,7 +238,7 @@ public class ReplyController {
             log.info("[SESSION-CANCEL] completed agentId={} userId={} sessionId={} totalMs={}", agentId,
                 userId, sessionId, System.currentTimeMillis() - requestStart);
             return result;
-        } catch (Exception err) {
+        } catch (ResponseStatusException | WebClientResponseException | IllegalStateException err) {
             log.warn("[SESSION-CANCEL] failed agentId={} userId={} sessionId={} totalMs={} error={}", agentId,
                 userId, sessionId, System.currentTimeMillis() - requestStart, err.getMessage());
             throw err;
@@ -311,7 +311,7 @@ public class ReplyController {
             log.info("[SESSION-EVENTS] detected {} output files agentId={} userId={} sessionId={} requestId={}",
                 changed.size(), agentId, userId, sessionId, requestId);
             return "data: " + json + "\n\n";
-        } catch (Exception err) {
+        } catch (IOException | IllegalStateException err) {
             log.warn("[SESSION-EVENTS] failed to build OutputFiles event agentId={} userId={} sessionId={}: {}",
                 agentId, userId, sessionId, err.getMessage());
             return "";
@@ -552,7 +552,7 @@ public class ReplyController {
         String resumeBody = "{\"session_id\":\"" + sessionId + "\",\"load_model_and_extensions\":true}";
         try {
             resumeSession(instance, sessionId, resumeBody, "[REPLY]");
-        } catch (Exception e) {
+        } catch (WebClientResponseException | IllegalStateException e) {
             log.warn("[REPLY] session {} resume failed on instance {}:{}: {} (will retry next request)", sessionId,
                 instance.getAgentId(), instance.getUserId(), e.getMessage());
         }

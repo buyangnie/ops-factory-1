@@ -9,9 +9,15 @@ import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 
 import java.io.ByteArrayInputStream;
+import java.io.IOException;
 import java.io.InputStream;
+import java.security.KeyManagementException;
 import java.security.KeyStore;
+import java.security.KeyStoreException;
+import java.security.NoSuchAlgorithmException;
 import java.security.SecureRandom;
+import java.security.UnrecoverableKeyException;
+import java.security.cert.CertificateException;
 import java.util.concurrent.ConcurrentHashMap;
 
 import javax.net.ssl.KeyManagerFactory;
@@ -87,7 +93,8 @@ public class DvSslContextFactory {
             sslContext.init(kmf.getKeyManagers(), tmf.getTrustManagers(), new SecureRandom());
 
             return sslContext;
-        } catch (Exception e) {
+        } catch (NoSuchAlgorithmException | KeyStoreException | KeyManagementException | IOException |
+                CertificateException | UnrecoverableKeyException e) {
             if (strictSsl) {
                 throw new IllegalStateException("Failed to create SSL context with certificate (strict-ssl enabled)", e);
             }
@@ -122,7 +129,7 @@ public class DvSslContextFactory {
                 }
             }, new SecureRandom());
             return sslContext;
-        } catch (Exception e) {
+        } catch (NoSuchAlgorithmException | KeyManagementException e) {
             throw new IllegalStateException("Failed to create insecure SSL context", e);
         }
     }

@@ -11,6 +11,7 @@ import com.huawei.opsfactory.operationintelligence.qos.model.TraceLogRecord;
 import com.huawei.opsfactory.operationintelligence.qos.parser.AppendInfoParser;
 import com.huawei.opsfactory.operationintelligence.qos.parser.TraceLogParser;
 import com.huawei.opsfactory.operationintelligence.service.CallChainStatistics;
+import com.huawei.opsfactory.operationintelligence.config.OperationIntelligenceProperties;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;

@@ -11,6 +11,7 @@ import com.huawei.opsfactory.operationintelligence.qos.model.TraceLogRecord;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.core.JsonProcessingException;
 
 import jakarta.annotation.PreDestroy;
 
@@ -162,7 +163,7 @@ public class DvClient {
             }
 
             return parseChildren(response);
-        } catch (Exception e) {
+        } catch (IOException | IllegalStateException e) {
             throw new IllegalStateException("Failed to fetch MOs from " + env.getServerUrl() + ": " + e.getMessage(), e);
         }
     }
@@ -222,7 +223,7 @@ public class DvClient {
             }
 
             return parsePerformanceResult(response);
-        } catch (Exception e) {
+        } catch (IOException | IllegalStateException e) {
             throw new IllegalStateException("Failed to fetch performance data from " + env.getServerUrl() + " moType="
                 + moType + ": " + e.getMessage(), e);
         }
@@ -265,7 +266,7 @@ public class DvClient {
             }
 
             return parseAlarms(response);
-        } catch (Exception e) {
+        } catch (IOException | IllegalStateException e) {
             throw new IllegalStateException("Failed to fetch alarms from " + env.getServerUrl() + ": " + e.getMessage(), e);
         }
     }
@@ -322,7 +323,7 @@ public class DvClient {
                         }
                     }
                 };
-            } catch (Exception e) {
+            } catch (IllegalStateException e) {
                 throw new IllegalStateException("Failed to create SSL context for " + url, e);
             }
             return RestClient.builder()
@@ -395,7 +396,7 @@ public class DvClient {
                     results.add(parsePerformanceDataItem(item));
                 }
             }
-        } catch (Exception e) {
+        } catch (JsonProcessingException e) {
             log.warn("Failed to parse performance result: {}", e.getMessage());
         }
         return results;
@@ -457,7 +458,7 @@ public class DvClient {
                 alarm.setAdditionalInformation(textVal(hit, "additionalInformation"));
                 alarms.add(alarm);
             }
-        } catch (Exception e) {
+        } catch (JsonProcessingException e) {
             log.warn("Failed to parse alarm response: {}", e.getMessage());
         }
         return alarms;
@@ -475,7 +476,7 @@ public class DvClient {
                     collectChildTexts(item, children);
                 }
             }
-        } catch (Exception e) {
+        } catch (JsonProcessingException e) {
             log.warn("Failed to parse MO children response: {}", e.getMessage());
         }
         return children;
@@ -582,7 +583,7 @@ public class DvClient {
             }
 
             return parseTraceLogResponse(response);
-        } catch (Exception e) {
+        } catch (IOException | IllegalStateException e) {
             throw new IllegalStateException("Failed to fetch tracelog from " + env.getServerUrl() + ": " + e.getMessage(), e);
         }
     }
@@ -620,7 +621,7 @@ public class DvClient {
             }
 
             return parseTraceLogResponse(response);
-        } catch (Exception e) {
+        } catch (IOException | IllegalStateException e) {
             throw new IllegalStateException("Failed to fetch tracelog by traceId from " + env.getServerUrl() + ": " + e.getMessage(), e);
         }
     }
@@ -804,7 +805,7 @@ public class DvClient {
 
                 results.add(record);
             }
-        } catch (Exception e) {
+        } catch (JsonProcessingException e) {
             log.warn("Failed to parse tracelog response: {}", e.getMessage());
         }
         return results;

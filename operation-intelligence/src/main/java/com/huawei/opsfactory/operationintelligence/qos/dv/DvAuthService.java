@@ -6,6 +6,7 @@ package com.huawei.opsfactory.operationintelligence.qos.dv;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.core.JsonProcessingException;
 
 import jakarta.annotation.PreDestroy;
 
@@ -152,7 +153,7 @@ public class DvAuthService {
             }
             log.info("DV SSO token acquired for {}", env.getEnvCode());
             return new TokenInfo(token, roaRand, System.currentTimeMillis(), ttlMs);
-        } catch (Exception e) {
+        } catch (IOException | IllegalStateException e) {
             log.error("Failed to get SSO token from {}: {}", env.getServerUrl(), e.getMessage());
             throw new IllegalStateException("DV SSO login failed", e);
         }

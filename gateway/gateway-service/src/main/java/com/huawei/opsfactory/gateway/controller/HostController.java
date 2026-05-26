@@ -137,6 +137,8 @@ public class HostController {
                 }
             } catch (IllegalArgumentException e) {
                 // Cluster not found, let normal flow handle it
+                log.debug("Cluster not found for id: {}", clusterId);
+                return null;
             }
         }
 
