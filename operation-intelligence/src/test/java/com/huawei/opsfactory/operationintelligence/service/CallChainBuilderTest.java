@@ -40,7 +40,8 @@ class CallChainBuilderTest {
     void setUp() {
         TraceLogParser parser = new TraceLogParser(new AppendInfoParser());
         statistics = new CallChainStatistics(parser);
-        builder = new CallChainBuilder(statistics);
+        OperationIntelligenceProperties properties = new OperationIntelligenceProperties();
+        builder = new CallChainBuilder(statistics, properties);
     }
 
     @Test
