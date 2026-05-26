@@ -25,7 +25,8 @@ public class RequestContextFilterTest {
     private RequestContextFilter filter;
 
     /**
-     * Sets the up.
+     * Initializes the test fixture before each test method.
+     * Creates filter instance with default gateway properties.
      */
     @Before
     public void setUp() {
@@ -34,7 +35,10 @@ public class RequestContextFilterTest {
     }
 
     /**
-     * Tests generates request id when missing.
+     * Tests that request ID is generated when not present in request header.
+     * Verifies generated ID is set as request attribute and response header.
+     *
+     * @throws Exception if filter chain processing fails
      */
     @Test
     public void testGeneratesRequestIdWhenMissing() throws Exception {
@@ -45,12 +49,15 @@ public class RequestContextFilterTest {
         filter.doFilter(request, response, chain);
 
         String requestId = (String) request.getAttribute(RequestContextFilter.REQUEST_ID_ATTR);
-        assertNotNull(requestId);
+        assertNotNull("Request ID should be generated", requestId);
         assertEquals(requestId, response.getHeader(RequestContextFilter.REQUEST_ID_HEADER));
     }
 
     /**
-     * Tests reuses incoming request id.
+     * Tests that existing request ID in header is reused.
+     * Verifies request attribute and response header match the incoming ID.
+     *
+     * @throws Exception if filter chain processing fails
      */
     @Test
     public void testReusesIncomingRequestId() throws Exception {

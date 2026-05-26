@@ -33,6 +33,18 @@ import org.springframework.web.server.ResponseStatusException;
  * @since 2026-05-26
  */
 public class CatchAllProxyControllerTest {
+    private static final String TEST_AGENT_ID = "test-agent";
+
+    private static final String TEST_USER_ID = "alice";
+
+    private static final String ADMIN_USER_ID = "admin";
+
+    private static final String SECRET_KEY = "test-secret";
+
+    private static final int INSTANCE_PORT = 9000;
+
+    private static final int TIMEOUT_SECONDS = 30;
+
     private InstanceManager instanceManager;
 
     private GoosedProxy goosedProxy;
@@ -40,7 +52,8 @@ public class CatchAllProxyControllerTest {
     private CatchAllProxyController controller;
 
     /**
-     * Sets the up.
+     * Initializes the test fixture before each test method.
+     * Sets up mocked instance manager and goosed proxy.
      */
     @Before
     public void setUp() {
@@ -50,75 +63,80 @@ public class CatchAllProxyControllerTest {
     }
 
     /**
-     * Tests authenticated user access to status.
+     * Tests that authenticated user can access agent status endpoint.
+     * Verifies request is proxied to the correct instance port.
      */
     @Test
     public void testAuthenticatedAccess_status() {
-        MockHttpServletRequest request = new MockHttpServletRequest("GET", "/gateway/agents/test-agent/status");
-        request.setAttribute(UserContextFilter.USER_ID_ATTR, "alice");
+        MockHttpServletRequest request = new MockHttpServletRequest("GET", "/gateway/agents/" + TEST_AGENT_ID + "/status");
+        request.setAttribute(UserContextFilter.USER_ID_ATTR, TEST_USER_ID);
 
-        ManagedInstance instance = new ManagedInstance("test-agent", "alice", 9000, 123L, null, "test-secret");
-        when(instanceManager.getOrSpawn("test-agent", "alice")).thenReturn(Mono.just(instance));
-        when(goosedProxy.fetchJson(eq(9000), any(), eq("/status"), any(), eq(30), eq("test-secret")))
+        ManagedInstance instance = new ManagedInstance(TEST_AGENT_ID, TEST_USER_ID, INSTANCE_PORT, 123L, null, SECRET_KEY);
+        when(instanceManager.getOrSpawn(TEST_AGENT_ID, TEST_USER_ID)).thenReturn(Mono.just(instance));
+        when(goosedProxy.fetchJson(eq(INSTANCE_PORT), any(), eq("/status"), any(), eq(TIMEOUT_SECONDS), eq(SECRET_KEY)))
             .thenReturn(Mono.just("{\"status\":\"ok\"}"));
 
-        String result = controller.proxyStatus("test-agent", request);
+        String result = controller.proxyStatus(TEST_AGENT_ID, request);
 
         assertEquals("{\"status\":\"ok\"}", result);
-        verify(instanceManager).getOrSpawn("test-agent", "alice");
+        verify(instanceManager).getOrSpawn(TEST_AGENT_ID, TEST_USER_ID);
     }
 
     /**
-     * Tests user access to system info allowed.
+     * Tests that user can access agent system_info endpoint.
+     * Verifies request is proxied correctly to goosed instance.
      */
     @Test
     public void testUserAccessToSystemInfo_allowed() {
-        MockHttpServletRequest request = new MockHttpServletRequest("GET", "/gateway/agents/test-agent/system_info");
-        request.setAttribute(UserContextFilter.USER_ID_ATTR, "alice");
+        MockHttpServletRequest request = new MockHttpServletRequest("GET", "/gateway/agents/" + TEST_AGENT_ID + "/system_info");
+        request.setAttribute(UserContextFilter.USER_ID_ATTR, TEST_USER_ID);
 
-        ManagedInstance instance = new ManagedInstance("test-agent", "alice", 9000, 123L, null, "test-secret");
-        when(instanceManager.getOrSpawn("test-agent", "alice")).thenReturn(Mono.just(instance));
-        when(goosedProxy.fetchJson(eq(9000), any(), eq("/system_info"), any(), eq(30), eq("test-secret")))
+        ManagedInstance instance = new ManagedInstance(TEST_AGENT_ID, TEST_USER_ID, INSTANCE_PORT, 123L, null, SECRET_KEY);
+        when(instanceManager.getOrSpawn(TEST_AGENT_ID, TEST_USER_ID)).thenReturn(Mono.just(instance));
+        when(goosedProxy.fetchJson(eq(INSTANCE_PORT), any(), eq("/system_info"), any(), eq(TIMEOUT_SECONDS), eq(SECRET_KEY)))
             .thenReturn(Mono.just("{\"info\":\"test\"}"));
 
-        String result = controller.proxySystemInfo("test-agent", request);
+        String result = controller.proxySystemInfo(TEST_AGENT_ID, request);
 
         assertEquals("{\"info\":\"test\"}", result);
-        verify(instanceManager).getOrSpawn("test-agent", "alice");
+        verify(instanceManager).getOrSpawn(TEST_AGENT_ID, TEST_USER_ID);
     }
 
     /**
-     * Tests query string forwarded to goosed.
+     * Tests that query string is forwarded to goosed instance.
+     * Verifies query parameters are preserved in proxied request.
      */
     @Test
     public void testQueryStringForwarding() {
-        MockHttpServletRequest request = new MockHttpServletRequest("GET", "/gateway/agents/test-agent/status?limit=5");
-        request.setQueryString("limit=5");
-        request.setAttribute(UserContextFilter.USER_ID_ATTR, "admin");
+        String queryString = "limit=5";
+        MockHttpServletRequest request = new MockHttpServletRequest("GET", "/gateway/agents/" + TEST_AGENT_ID + "/status?" + queryString);
+        request.setQueryString(queryString);
+        request.setAttribute(UserContextFilter.USER_ID_ATTR, ADMIN_USER_ID);
 
-        ManagedInstance instance = new ManagedInstance("test-agent", "admin", 9000, 123L, null, "test-secret");
-        when(instanceManager.getOrSpawn("test-agent", "admin")).thenReturn(Mono.just(instance));
-        when(goosedProxy.fetchJson(eq(9000), any(), eq("/status?limit=5"), any(), eq(30), eq("test-secret")))
+        ManagedInstance instance = new ManagedInstance(TEST_AGENT_ID, ADMIN_USER_ID, INSTANCE_PORT, 123L, null, SECRET_KEY);
+        when(instanceManager.getOrSpawn(TEST_AGENT_ID, ADMIN_USER_ID)).thenReturn(Mono.just(instance));
+        when(goosedProxy.fetchJson(eq(INSTANCE_PORT), any(), eq("/status?" + queryString), any(), eq(TIMEOUT_SECONDS), eq(SECRET_KEY)))
             .thenReturn(Mono.just("{\"status\":\"ok\"}"));
 
-        controller.proxyStatus("test-agent", request);
+        controller.proxyStatus(TEST_AGENT_ID, request);
 
-        verify(goosedProxy).fetchJson(eq(9000), any(), eq("/status?limit=5"), any(), eq(30), eq("test-secret"));
+        verify(goosedProxy).fetchJson(eq(INSTANCE_PORT), any(), eq("/status?" + queryString), any(), eq(TIMEOUT_SECONDS), eq(SECRET_KEY));
     }
 
     /**
-     * Tests instance manager throws exception.
+     * Tests that instance manager exceptions are propagated.
+     * Verifies RuntimeException is thrown when instance manager fails.
      */
     @Test
     public void testInstanceManagerThrowsException() {
-        MockHttpServletRequest request = new MockHttpServletRequest("GET", "/gateway/agents/test-agent/status");
-        request.setAttribute(UserContextFilter.USER_ID_ATTR, "admin");
+        MockHttpServletRequest request = new MockHttpServletRequest("GET", "/gateway/agents/" + TEST_AGENT_ID + "/status");
+        request.setAttribute(UserContextFilter.USER_ID_ATTR, ADMIN_USER_ID);
 
-        when(instanceManager.getOrSpawn("test-agent", "admin"))
+        when(instanceManager.getOrSpawn(TEST_AGENT_ID, ADMIN_USER_ID))
             .thenReturn(Mono.error(new RuntimeException("Instance not found")));
 
         try {
-            controller.proxyStatus("test-agent", request);
+            controller.proxyStatus(TEST_AGENT_ID, request);
             fail("Expected RuntimeException");
         } catch (RuntimeException ex) {
             assertEquals("Instance not found", ex.getMessage());
