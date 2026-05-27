@@ -4,6 +4,7 @@
 
 package com.huawei.opsfactory.operationintelligence.security;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
@@ -61,7 +62,7 @@ class AuthWebFilterTest {
         ServerWebExchange exchange = MockServerWebExchange.from(MockServerHttpRequest.get("/test").build());
 
         filter.filter(exchange, chain).block();
-        assertEquals(HttpStatus.UNAUTHORIZED, exchange.getResponse().getStatusCode());
+        assertEquals(HttpStatus.UNAUTHORIZED, (HttpStatus) exchange.getResponse().getStatusCode());
         verify(chain, never()).filter(any());
     }
 
@@ -71,7 +72,7 @@ class AuthWebFilterTest {
             MockServerWebExchange.from(MockServerHttpRequest.get("/test").header("x-secret-key", "wrong").build());
 
         filter.filter(exchange, chain).block();
-        assertEquals(HttpStatus.UNAUTHORIZED, exchange.getResponse().getStatusCode());
+        assertEquals(HttpStatus.UNAUTHORIZED, (HttpStatus) exchange.getResponse().getStatusCode());
         verify(chain, never()).filter(any());
     }
 
@@ -98,6 +99,6 @@ class AuthWebFilterTest {
             MockServerWebExchange.from(MockServerHttpRequest.get("/test").header("x-secret-key", "   ").build());
 
         filter.filter(exchange, chain).block();
-        assertEquals(HttpStatus.UNAUTHORIZED, exchange.getResponse().getStatusCode());
+        assertEquals(HttpStatus.UNAUTHORIZED, (HttpStatus) exchange.getResponse().getStatusCode());
     }
 }
