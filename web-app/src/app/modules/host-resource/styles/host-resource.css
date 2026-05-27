@@ -614,6 +614,7 @@
     border-radius: 4px;
     margin: 1px 4px;
     transition: background 0.1s;
+    overflow: hidden;
 }
 
 .hr-tree-node:hover {
@@ -737,6 +738,11 @@
     margin-left: auto;
     padding-left: var(--spacing-2);
     white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    flex-shrink: 1;
+    min-width: 0;
+    max-width: 45%;
 }
 
 /* ── Tree Node Actions (hover) ──────────────────────────── */
@@ -755,7 +761,19 @@
 /* ── Disabled node visual ────────────────────────────────── */
 
 .hr-tree-node-disabled {
-    opacity: 0.45;
+    color: var(--text-tertiary, #94a3b8);
+}
+
+.hr-tree-node-disabled .hr-tree-icon {
+    opacity: 0.4;
+}
+
+.hr-tree-node-disabled .hr-tree-label,
+.hr-tree-node-disabled .hr-tree-subtitle {
+    color: var(--text-tertiary, #94a3b8);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
 
 .hr-tree-node-action {
@@ -971,8 +989,10 @@
     font-size: var(--hr-font-size-sm);
     color: var(--text-primary, #0f172a);
     line-height: 1.35;
-    word-break: break-word;
-    overflow-wrap: anywhere;
+    min-width: 0;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
     font-variant-numeric: tabular-nums;
 }
 

@@ -851,7 +851,7 @@ export default function HostResourcePage() {
                                     }}
                                     options={[
                                         { value: '', label: t('hostResource.allGroups') },
-                                        ...groups.map(g => ({ value: g.id, label: g.name })),
+                                        ...groups.filter(g => !g.parentId).map(g => ({ value: g.id, label: g.name })),
                                     ]}
                                     placeholder={t('hostResource.filterByGroup')}
                                     style={{ minWidth: 180 }}

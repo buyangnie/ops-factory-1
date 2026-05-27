@@ -51,14 +51,13 @@ export default function ResourceTree({ tree, selectedId, selectedType, selectedI
                     onToggleSelect={onToggleSelect}
                     onEdit={onEdit}
                     onDelete={onDelete}
-                    inheritedDisabled={false}
                 />
             ))}
         </div>
     )
 }
 
-function TreeNodeItem({ node, depth, selectedId, selectedType, selectedIds, onSelect, onToggleSelect, onEdit, onDelete, inheritedDisabled }: {
+function TreeNodeItem({ node, depth, selectedId, selectedType, selectedIds, onSelect, onToggleSelect, onEdit, onDelete }: {
     node: TreeNode
     depth: number
     selectedId: string | null
@@ -68,14 +67,13 @@ function TreeNodeItem({ node, depth, selectedId, selectedType, selectedIds, onSe
     onToggleSelect?: (id: string, type: TreeNodeType) => void
     onEdit?: (id: string, type: TreeNodeType) => void
     onDelete?: (id: string, type: TreeNodeType) => void
-    inheritedDisabled: boolean
 }) {
     const isSelected = selectedId === node.id && selectedType === node.type
     const isChecked = selectedIds ? selectedIds.has(node.id) : false
     const hasChildren = node.children && node.children.length > 0
     const [expanded, setExpanded] = useState(false)
 
-    const isDisabled = inheritedDisabled === true
+    const isDisabled = node.inheritedDisabled === true
     const isCluster = node.type === 'cluster' || node.type === 'business-service'
 
     const handleClick = () => {
@@ -130,8 +128,8 @@ function TreeNodeItem({ node, depth, selectedId, selectedType, selectedIds, onSe
                         className={`hr-tree-icon hr-tree-icon-${node.type}`}
                     />
                 )}
-                <span className="hr-tree-label">{node.name}</span>
-                {node.subtitle && <span className="hr-tree-subtitle">{node.subtitle}</span>}
+                <span className="hr-tree-label" title={node.name}>{node.name}</span>
+                {node.subtitle && <span className="hr-tree-subtitle" title={node.subtitle}>{node.subtitle}</span>}
                 <span className="hr-tree-node-actions" onClick={e => e.stopPropagation()}>
                     {onEdit && (
                         <button
@@ -165,7 +163,6 @@ function TreeNodeItem({ node, depth, selectedId, selectedType, selectedIds, onSe
                             onSelect={onSelect}
                             onEdit={onEdit}
                             onDelete={onDelete}
-                            inheritedDisabled={isDisabled}
                         />
                     ))}
                 </div>

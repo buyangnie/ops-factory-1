@@ -143,6 +143,16 @@ export default function ImportDialog({ open, onClose, importing, progress, onImp
                 return t('hostResource.importErrorSourceNodeNotFound', { node: err.params?.node })
             case 'import.rowError':
                 return t('hostResource.importErrorRowError', { message: err.params?.message })
+            case 'import.hostNameRequired':
+                return t('hostResource.importErrorHostNameRequired')
+            case 'import.hostNameTooLong':
+                return t('hostResource.importErrorHostNameTooLong', { length: err.params?.length })
+            case 'import.hostIpRequired':
+                return t('hostResource.importErrorHostIpRequired')
+            case 'import.hostIpInvalid':
+                return t('hostResource.importErrorHostIpInvalid', { ip: err.params?.ip })
+            case 'import.hostUsernameRequired':
+                return t('hostResource.importErrorHostUsernameRequired')
             case 'import.duplicate':
                 return t('hostResource.importErrorDuplicate', { type: err.params?.type, name: err.params?.name })
             case 'import.setParentFailed':

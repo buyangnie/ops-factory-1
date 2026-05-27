@@ -217,29 +217,8 @@ export function useResourceExport() {
                 { name: 'whitelist.csv', data: encoder.encode(objectsToCsv(wlHeaders, wlRows)) },
             ]
 
-            // Manifest
-            const manifest = {
-                version: 1,
-                exportedAt: new Date().toISOString(),
-                counts: {
-                    clusterTypes: clusterTypes.length,
-                    businessTypes: businessTypes.length,
-                    groups: groups.length,
-                    clusters: clusters.length,
-                    hosts: allHosts.length,
-                    businessServices: businessServices.length,
-                    relations: relRows.length,
-                    sops: sops.length,
-                    whitelist: whitelistCommands.length,
-                },
-            }
-            const manifestFile = {
-                name: 'manifest.json',
-                data: encoder.encode(JSON.stringify(manifest, null, 2)),
-            }
-
             // Create ZIP and download
-            const zipBlob = createZip([manifestFile, ...csvFiles])
+            const zipBlob = createZip(csvFiles)
             const url = URL.createObjectURL(zipBlob)
             const a = document.createElement('a')
             a.href = url

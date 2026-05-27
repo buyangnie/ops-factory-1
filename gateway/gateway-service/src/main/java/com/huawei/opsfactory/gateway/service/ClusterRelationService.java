@@ -21,7 +21,9 @@ import java.nio.file.DirectoryStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Instant;
+import java.util.ArrayDeque;
 import java.util.ArrayList;
+import java.util.Deque;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -54,6 +56,8 @@ public class ClusterRelationService {
     private ClusterTypeService clusterTypeService;
 
     private BusinessServiceService businessServiceService;
+
+    private HostGroupService hostGroupService;
 
     /**
      * Creates the cluster relation service instance.
@@ -104,6 +108,17 @@ public class ClusterRelationService {
     @Autowired
     public void setBusinessServiceService(BusinessServiceService businessServiceService) {
         this.businessServiceService = businessServiceService;
+    }
+
+    /**
+     * Sets the host group service via lazy injection.
+     *
+     * @param hostGroupService the host group service via lazy injection
+     */
+    @Lazy
+    @Autowired
+    public void setHostGroupService(HostGroupService hostGroupService) {
+        this.hostGroupService = hostGroupService;
     }
 
     /**
@@ -775,11 +790,34 @@ public class ClusterRelationService {
     }
 
     private void collectSubGroupClusters(String groupId, List<Map<String, Object>> clusters) {
-        try {
-            List<Map<String, Object>> allClusters = clusterService.listClusters(null, null);
-            // Already collected direct clusters; nothing more needed since listClusters(groupId) already handles that
-        } catch (IllegalArgumentException e) {
-            log.debug("Skipping subgroup cluster collection for group {}", groupId);
+        List<Map<String, Object>> allGroups = hostGroupService.listGroups();
+
+        // Build child index: parentId -> list of child groups
+        Map<String, List<Map<String, Object>>> childrenMap = new LinkedHashMap<>();
+        for (Map<String, Object> g : allGroups) {
+            String parentId = (String) g.get("parentId");
+            if (parentId != null) {
+                childrenMap.computeIfAbsent(parentId, k -> new ArrayList<>()).add(g);
+            }
+        }
+
+        // Collect all descendant group IDs via BFS
+        List<String> descendantIds = new ArrayList<>();
+        Deque<String> queue = new ArrayDeque<>();
+        queue.add(groupId);
+        while (!queue.isEmpty()) {
+            String current = queue.poll();
+            List<Map<String, Object>> children = childrenMap.getOrDefault(current, List.of());
+            for (Map<String, Object> child : children) {
+                String childId = (String) child.get("id");
+                descendantIds.add(childId);
+                queue.add(childId);
+            }
+        }
+
+        // Collect clusters from all descendant groups
+        for (String childId : descendantIds) {
+            clusters.addAll(clusterService.listClusters(childId, null));
         }
     }
 

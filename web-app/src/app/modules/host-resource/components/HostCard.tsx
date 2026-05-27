@@ -80,9 +80,9 @@ export default function HostCard({ host, cluster, selected, testing, testResult,
                         )}
                     </div>
                     <div className="hr-host-card-title-line">
-                        <h3 className="hr-host-card-name">{host.name}</h3>
+                        <h3 className="hr-host-card-name" title={host.name}>{host.name}</h3>
                         {host.description && (
-                            <p className="hr-host-card-desc">{host.description}</p>
+                            <p className="hr-host-card-desc" title={host.description}>{host.description}</p>
                         )}
                     </div>
                 </div>
@@ -91,7 +91,7 @@ export default function HostCard({ host, cluster, selected, testing, testResult,
             <div className="hr-host-card-meta">
                 <div className="hr-host-card-meta-field">
                     <span className="hr-host-card-meta-label">{t('hostResource.ipPort')}</span>
-                    <span className="hr-host-card-meta-value hr-host-card-address-row">
+                    <span className="hr-host-card-meta-value hr-host-card-address-row" title={`${host.ip}:${host.port}`}>
                         <span className="hr-host-card-mono">{host.ip}:{host.port}</span>
                         {testResult && (
                             <button
@@ -109,29 +109,29 @@ export default function HostCard({ host, cluster, selected, testing, testResult,
                 {host.businessIp && (
                     <div className="hr-host-card-meta-field">
                         <span className="hr-host-card-meta-label">{t('hostResource.businessIp')}</span>
-                        <span className="hr-host-card-meta-value hr-host-card-mono">{host.businessIp}</span>
+                        <span className="hr-host-card-meta-value hr-host-card-mono" title={host.businessIp}>{host.businessIp}</span>
                     </div>
                 )}
                 <div className="hr-host-card-meta-field">
                     <span className="hr-host-card-meta-label">{t('hostResource.username')}</span>
-                    <span className="hr-host-card-meta-value">{host.username}</span>
+                    <span className="hr-host-card-meta-value" title={host.username}>{host.username}</span>
                 </div>
                 {host.location && (
                     <div className="hr-host-card-meta-field">
                         <span className="hr-host-card-meta-label">{t('hostResource.location')}</span>
-                        <span className="hr-host-card-meta-value">{host.location}</span>
+                        <span className="hr-host-card-meta-value" title={host.location}>{host.location}</span>
                     </div>
                 )}
                 {host.business && (
                     <div className="hr-host-card-meta-field">
                         <span className="hr-host-card-meta-label">{t('hostResource.business')}</span>
-                        <span className="hr-host-card-meta-value">{host.business}</span>
+                        <span className="hr-host-card-meta-value" title={host.business}>{host.business}</span>
                     </div>
                 )}
                 {cluster && (
                     <div className="hr-host-card-meta-field">
                         <span className="hr-host-card-meta-label">{t('hostResource.clusterName')}</span>
-                        <span className="hr-host-card-meta-value">{cluster.name}</span>
+                        <span className="hr-host-card-meta-value" title={cluster.name}>{cluster.name}</span>
                     </div>
                 )}
             </div>
