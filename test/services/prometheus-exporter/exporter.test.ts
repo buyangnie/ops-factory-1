@@ -73,12 +73,12 @@ async function startMockMonitoringGateway(): Promise<MockGateway> {
 
     if (pathname === '/runtime-source/system' || pathname === '/ops-gateway/runtime-source/system') {
       res.writeHead(200, { 'Content-Type': 'application/json' })
-      res.end(JSON.yaml.dump(MOCK_SYSTEM))
+      res.end(JSON.stringify(MOCK_SYSTEM))
       return
     }
     if (pathname === '/runtime-source/instances' || pathname === '/ops-gateway/runtime-source/instances') {
       res.writeHead(200, { 'Content-Type': 'application/json' })
-      res.end(JSON.yaml.dump(MOCK_INSTANCES))
+      res.end(JSON.stringify(MOCK_INSTANCES))
       return
     }
     if (pathname === '/status' || pathname === '/ops-gateway/status') {

@@ -448,7 +448,7 @@ export async function sendSessionReplyAndWait(
 
     const submitRes = await handle.fetchAs(userId, `/agents/${agentId}/sessions/${encodeURIComponent(sessionId)}/reply`, {
       method: 'POST',
-      body: JSON.yaml.dump({
+      body: JSON.stringify({
         request_id: requestId,
         user_message: makeSessionUserMessage(message),
       }),

@@ -272,7 +272,7 @@ describe('GET /operation-intelligence/qos/getEnvironments', () => {
   it('does not leak utmPassword in response', async () => {
     const res = await oi.fetch('/operation-intelligence/qos/getEnvironments')
     const data = await res.json()
-    const jsonStr = JSON.yaml.dump(data)
+    const jsonStr = JSON.stringify(data)
     expect(jsonStr).not.toContain('utmPassword')
     expect(jsonStr).not.toContain('test-password')
   })
@@ -287,7 +287,7 @@ describe('QoS API input validation', () => {
   it('getHealthIndicator requires envCode', async () => {
     const res = await oi.fetch(`${basePath}/getHealthIndicator`, {
       method: 'POST',
-      body: JSON.yaml.dump({ startTime: 1000, endTime: 2000 }),
+      body: JSON.stringify({ startTime: 1000, endTime: 2000 }),
     })
     expect(res.status).toBe(400)
     const data = await res.json()
@@ -297,7 +297,7 @@ describe('QoS API input validation', () => {
   it('getHealthIndicator requires valid time range', async () => {
     const res = await oi.fetch(`${basePath}/getHealthIndicator`, {
       method: 'POST',
-      body: JSON.yaml.dump({ envCode: 'TEST.env', startTime: 2000, endTime: 1000 }),
+      body: JSON.stringify({ envCode: 'TEST.env', startTime: 2000, endTime: 1000 }),
     })
     expect(res.status).toBe(400)
     const data = await res.json()
@@ -307,7 +307,7 @@ describe('QoS API input validation', () => {
   it('getHealthIndicator requires startTime and endTime', async () => {
     const res = await oi.fetch(`${basePath}/getHealthIndicator`, {
       method: 'POST',
-      body: JSON.yaml.dump({ envCode: 'TEST.env' }),
+      body: JSON.stringify({ envCode: 'TEST.env' }),
     })
     expect(res.status).toBe(400)
     const data = await res.json()
@@ -320,7 +320,7 @@ describe('QoS API input validation', () => {
     const endTime = Date.now()
     const res = await oi.fetch(`${basePath}/getHealthIndicator`, {
       method: 'POST',
-      body: JSON.yaml.dump({ envCode: 'TEST.env', startTime, endTime }),
+      body: JSON.stringify({ envCode: 'TEST.env', startTime, endTime }),
     })
     expect(res.status).toBe(400)
     const data = await res.json()
@@ -330,7 +330,7 @@ describe('QoS API input validation', () => {
   it('getAvailableIndicatorDetail requires envCode', async () => {
     const res = await oi.fetch(`${basePath}/getAvailableIndicatorDetail`, {
       method: 'POST',
-      body: JSON.yaml.dump({ startTime: 1000, endTime: 2000 }),
+      body: JSON.stringify({ startTime: 1000, endTime: 2000 }),
     })
     expect(res.status).toBe(400)
   })
@@ -338,7 +338,7 @@ describe('QoS API input validation', () => {
   it('getPerformanceIndicatorDetail requires envCode', async () => {
     const res = await oi.fetch(`${basePath}/getPerformanceIndicatorDetail`, {
       method: 'POST',
-      body: JSON.yaml.dump({ startTime: 1000, endTime: 2000 }),
+      body: JSON.stringify({ startTime: 1000, endTime: 2000 }),
     })
     expect(res.status).toBe(400)
   })
@@ -346,7 +346,7 @@ describe('QoS API input validation', () => {
   it('getResourceIndicatorDetail requires envCode', async () => {
     const res = await oi.fetch(`${basePath}/getResourceIndicatorDetail`, {
       method: 'POST',
-      body: JSON.yaml.dump({ startTime: 1000, endTime: 2000 }),
+      body: JSON.stringify({ startTime: 1000, endTime: 2000 }),
     })
     expect(res.status).toBe(400)
   })
@@ -354,7 +354,7 @@ describe('QoS API input validation', () => {
   it('getContributionData requires envCode', async () => {
     const res = await oi.fetch(`${basePath}/getContributionData`, {
       method: 'POST',
-      body: JSON.yaml.dump({ startTime: 1000, endTime: 2000 }),
+      body: JSON.stringify({ startTime: 1000, endTime: 2000 }),
     })
     expect(res.status).toBe(400)
   })
@@ -362,7 +362,7 @@ describe('QoS API input validation', () => {
   it('getAlarmIndicatorDetail requires envCode', async () => {
     const res = await oi.fetch(`${basePath}/getAlarmIndicatorDetail`, {
       method: 'POST',
-      body: JSON.yaml.dump({ startTime: 1000, endTime: 2000 }),
+      body: JSON.stringify({ startTime: 1000, endTime: 2000 }),
     })
     expect(res.status).toBe(400)
   })
@@ -370,7 +370,7 @@ describe('QoS API input validation', () => {
   it('getProductConfigRule returns 404 for unknown type', async () => {
     const res = await oi.fetch(`${basePath}/getProductConfigRule`, {
       method: 'POST',
-      body: JSON.yaml.dump({ agentSolutionType: 'NonExistentType' }),
+      body: JSON.stringify({ agentSolutionType: 'NonExistentType' }),
     })
     expect(res.status).toBe(404)
   })
@@ -378,7 +378,7 @@ describe('QoS API input validation', () => {
   it('rejects invalid numeric values', async () => {
     const res = await oi.fetch(`${basePath}/getHealthIndicator`, {
       method: 'POST',
-      body: JSON.yaml.dump({ envCode: 'TEST.env', startTime: 'not-a-number', endTime: 2000 }),
+      body: JSON.stringify({ envCode: 'TEST.env', startTime: 'not-a-number', endTime: 2000 }),
     })
     expect(res.status).toBe(400)
   })
@@ -387,7 +387,7 @@ describe('QoS API input validation', () => {
     const now = Date.now()
     const res = await oi.fetch(`${basePath}/getHealthIndicator`, {
       method: 'POST',
-      body: JSON.yaml.dump({ envCode: 'TEST.env', startTime: now - 3600000, endTime: now }),
+      body: JSON.stringify({ envCode: 'TEST.env', startTime: now - 3600000, endTime: now }),
     })
     expect(res.ok).toBe(true)
     const data = await res.json()
@@ -406,7 +406,7 @@ describe('QoS API response shapes (empty data)', () => {
   it('getHealthIndicator returns { results: [] }', async () => {
     const res = await oi.fetch(basePath, {
       method: 'POST',
-      body: JSON.yaml.dump({ envCode: 'TEST.env', startTime: oneHourAgo, endTime: now }),
+      body: JSON.stringify({ envCode: 'TEST.env', startTime: oneHourAgo, endTime: now }),
     })
     expect(res.ok).toBe(true)
     const data = await res.json()
@@ -417,7 +417,7 @@ describe('QoS API response shapes (empty data)', () => {
   it('getAvailableIndicatorDetail returns paginated shape', async () => {
     const res = await oi.fetch('/operation-intelligence/qos/getAvailableIndicatorDetail', {
       method: 'POST',
-      body: JSON.yaml.dump({ envCode: 'TEST.env', startTime: oneHourAgo, endTime: now, pageIndex: 1, pageSize: 10 }),
+      body: JSON.stringify({ envCode: 'TEST.env', startTime: oneHourAgo, endTime: now, pageIndex: 1, pageSize: 10 }),
     })
     expect(res.ok).toBe(true)
     const data = await res.json()
@@ -430,7 +430,7 @@ describe('QoS API response shapes (empty data)', () => {
   it('getPerformanceIndicatorDetail returns paginated shape', async () => {
     const res = await oi.fetch('/operation-intelligence/qos/getPerformanceIndicatorDetail', {
       method: 'POST',
-      body: JSON.yaml.dump({ envCode: 'TEST.env', startTime: oneHourAgo, endTime: now }),
+      body: JSON.stringify({ envCode: 'TEST.env', startTime: oneHourAgo, endTime: now }),
     })
     expect(res.ok).toBe(true)
     const data = await res.json()
@@ -441,7 +441,7 @@ describe('QoS API response shapes (empty data)', () => {
   it('getResourceIndicatorDetail returns { results: [] }', async () => {
     const res = await oi.fetch('/operation-intelligence/qos/getResourceIndicatorDetail', {
       method: 'POST',
-      body: JSON.yaml.dump({ envCode: 'TEST.env', startTime: oneHourAgo, endTime: now }),
+      body: JSON.stringify({ envCode: 'TEST.env', startTime: oneHourAgo, endTime: now }),
     })
     expect(res.ok).toBe(true)
     const data = await res.json()
@@ -451,7 +451,7 @@ describe('QoS API response shapes (empty data)', () => {
   it('getContributionData returns contribution array', async () => {
     const res = await oi.fetch('/operation-intelligence/qos/getContributionData', {
       method: 'POST',
-      body: JSON.yaml.dump({ envCode: 'TEST.env', startTime: oneHourAgo, endTime: now }),
+      body: JSON.stringify({ envCode: 'TEST.env', startTime: oneHourAgo, endTime: now }),
     })
     expect(res.ok).toBe(true)
     const data = await res.json()
@@ -462,7 +462,7 @@ describe('QoS API response shapes (empty data)', () => {
   it('getAlarmIndicatorDetail returns paginated shape', async () => {
     const res = await oi.fetch('/operation-intelligence/qos/getAlarmIndicatorDetail', {
       method: 'POST',
-      body: JSON.yaml.dump({ envCode: 'TEST.env', startTime: oneHourAgo, endTime: now, pageIndex: 1, pageSize: 10 }),
+      body: JSON.stringify({ envCode: 'TEST.env', startTime: oneHourAgo, endTime: now, pageIndex: 1, pageSize: 10 }),
     })
     expect(res.ok).toBe(true)
     const data = await res.json()
@@ -485,7 +485,7 @@ describe('Error handling', () => {
   it('returns JSON error for 400 validation', async () => {
     const res = await oi.fetch('/operation-intelligence/qos/getHealthIndicator', {
       method: 'POST',
-      body: JSON.yaml.dump({}),
+      body: JSON.stringify({}),
     })
     expect(res.status).toBe(400)
     const data = await res.json()
@@ -618,7 +618,7 @@ describe('Production environment - error detail suppression', () => {
   it('400 error in prod does NOT include detail field', async () => {
     const res = await prodOi!.fetch('/operation-intelligence/qos/getHealthIndicator', {
       method: 'POST',
-      body: JSON.yaml.dump({}),
+      body: JSON.stringify({}),
     })
     expect(res.status).toBe(400)
     const data = await res.json()
@@ -631,7 +631,7 @@ describe('Production environment - error detail suppression', () => {
   it('400 error in prod only includes standard fields', async () => {
     const res = await prodOi!.fetch('/operation-intelligence/qos/getHealthIndicator', {
       method: 'POST',
-      body: JSON.yaml.dump({ startTime: 1000, endTime: 2000 }),
+      body: JSON.stringify({ startTime: 1000, endTime: 2000 }),
     })
     expect(res.status).toBe(400)
     const data = await res.json()
