@@ -1,8 +1,18 @@
+/*
+ * Copyright (c) Huawei Technologies Co., Ltd. 2026-2026. All rights reserved.
+ */
+
 package com.huawei.opsfactory.skillmarket.config;
 
 import org.springframework.boot.context.properties.ConfigurationProperties;
 
 @ConfigurationProperties(prefix = "skill-market")
+/**
+ * Skill Market Properties.
+ *
+ * @author x00000000
+ * @since 2026-05-27
+ */
 public class SkillMarketProperties {
 
     private String corsOrigin = "*";
@@ -42,6 +52,12 @@ public class SkillMarketProperties {
         this.logging = logging;
     }
 
+/**
+     * Runtime.
+     *
+     * @author x00000000
+     * @since 2026-05-27
+     */
     public static class Runtime {
         private String baseDir = "./data";
 
@@ -54,6 +70,12 @@ public class SkillMarketProperties {
         }
     }
 
+/**
+     * Package Settings.
+     *
+     * @author x00000000
+     * @since 2026-05-27
+     */
     public static class PackageSettings {
         private int maxUploadSizeMb = 50;
         private int maxUnpackedSizeMb = 200;
@@ -111,6 +133,12 @@ public class SkillMarketProperties {
         }
     }
 
+/**
+     * Logging.
+     *
+     * @author x00000000
+     * @since 2026-05-27
+     */
     public static class Logging {
         private boolean accessLogEnabled = true;
 

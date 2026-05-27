@@ -13,12 +13,14 @@ import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.autoconfigure.web.reactive.AutoConfigureWebTestClient;
+import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.core.io.ClassPathResource;
 import org.springframework.http.MediaType;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
+import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.client.MockMvcWebTestClient;
 import org.springframework.test.web.reactive.server.WebTestClient;
 
 import java.io.IOException;
@@ -32,13 +34,15 @@ import java.util.stream.Stream;
 
 /** Integration tests for KnowledgeGraph REST API endpoints. */
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.MOCK)
-@AutoConfigureWebTestClient
+@AutoConfigureMockMvc
 class KnowledgeGraphControllerTest {
     private static final String SECRET_KEY = "kg-secret";
 
     private static final Path DATA_ROOT = createTempDataRoot();
 
     @Autowired
+    private MockMvc mockMvc;
+
     private WebTestClient webTestClient;
 
     @Autowired
@@ -86,6 +90,7 @@ class KnowledgeGraphControllerTest {
     void setUp() throws IOException {
         deleteRecursively(DATA_ROOT);
         Files.createDirectories(DATA_ROOT);
+        webTestClient = MockMvcWebTestClient.bindTo(mockMvc).build();
     }
 
     @Test

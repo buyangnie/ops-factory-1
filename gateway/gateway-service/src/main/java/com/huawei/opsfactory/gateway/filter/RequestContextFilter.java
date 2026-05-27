@@ -5,31 +5,30 @@
 package com.huawei.opsfactory.gateway.filter;
 
 import com.huawei.opsfactory.gateway.config.GatewayProperties;
-import com.huawei.opsfactory.gateway.config.ReactorMdcConfiguration;
 
-import reactor.core.publisher.Mono;
-import reactor.util.context.Context;
+import jakarta.servlet.FilterChain;
+import jakarta.servlet.ServletException;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.slf4j.MDC;
 import org.springframework.core.annotation.Order;
-import org.springframework.http.server.reactive.ServerHttpRequest;
 import org.springframework.stereotype.Component;
-import org.springframework.web.server.ServerWebExchange;
-import org.springframework.web.server.WebFilter;
-import org.springframework.web.server.WebFilterChain;
 
+import java.io.IOException;
 import java.util.UUID;
 
 /**
- * Web filter that assigns a unique request ID and logs access details for each HTTP request.
+ * Servlet filter that assigns a unique request ID and logs access details for each HTTP request.
  *
  * @author x00000000
  * @since 2026-05-09
  */
-@Component
+@Component("gatewayRequestContextFilter")
 @Order(1)
-public class RequestContextFilter implements WebFilter {
+public class RequestContextFilter implements jakarta.servlet.Filter {
     public static final String REQUEST_ID_ATTR = "requestId";
 
     public static final String REQUEST_ID_HEADER = "X-Request-Id";
@@ -50,34 +49,41 @@ public class RequestContextFilter implements WebFilter {
     /**
      * Assigns a unique request ID and logs access details for each HTTP request.
      *
-     * @param exchange current HTTP exchange
-     * @param chain filter chain to continue processing
-     * @return Mono that completes when filtering is done
+     * @param servletRequest  the servlet request
+     * @param servletResponse the servlet response
+     * @param filterChain     the filter chain
+     * @throws IOException      if an I/O error occurs
+     * @throws ServletException if a servlet error occurs
      */
     @Override
-    public Mono<Void> filter(ServerWebExchange exchange, WebFilterChain chain) {
-        ServerHttpRequest request = exchange.getRequest();
+    public void doFilter(jakarta.servlet.ServletRequest servletRequest, jakarta.servlet.ServletResponse servletResponse,
+            FilterChain filterChain) throws IOException, ServletException {
+        HttpServletRequest request = (HttpServletRequest) servletRequest;
+        HttpServletResponse response = (HttpServletResponse) servletResponse;
+
         String requestId = resolveRequestId(request);
         long startedAt = System.currentTimeMillis();
 
-        exchange.getAttributes().put(REQUEST_ID_ATTR, requestId);
-        exchange.getResponse().getHeaders().set(REQUEST_ID_HEADER, requestId);
+        request.setAttribute(REQUEST_ID_ATTR, requestId);
+        response.setHeader(REQUEST_ID_HEADER, requestId);
+        MDC.put("requestId", requestId);
 
-        return chain.filter(exchange)
-            .contextWrite(Context.of(ReactorMdcConfiguration.REQUEST_ID_KEY, requestId))
-            .doFinally(signalType -> {
-                if (!properties.getLogging().isAccessLogEnabled()) {
-                    return;
-                }
-                Integer status = exchange.getResponse().getRawStatusCode();
-                String userId = exchange.getAttribute(UserContextFilter.USER_ID_ATTR);
-                log.info("HTTP {} {} completed status={} durationMs={}", request.getMethod(),
-                    request.getURI().getPath(), status != null ? status : 200, System.currentTimeMillis() - startedAt);
-            });
+        try {
+            filterChain.doFilter(request, response);
+
+            if (properties.getLogging().isAccessLogEnabled()) {
+                int status = response.getStatus();
+                String userId = (String) request.getAttribute(UserContextFilter.USER_ID_ATTR);
+                log.info("HTTP {} {} completed status={} durationMs={}", request.getMethod(), request.getRequestURI(),
+                    status, System.currentTimeMillis() - startedAt);
+            }
+        } finally {
+            MDC.remove("requestId");
+        }
     }
 
-    private String resolveRequestId(ServerHttpRequest request) {
-        String requestId = request.getHeaders().getFirst(REQUEST_ID_HEADER);
+    private String resolveRequestId(HttpServletRequest request) {
+        String requestId = request.getHeader(REQUEST_ID_HEADER);
         if (requestId == null || requestId.isBlank()) {
             return UUID.randomUUID().toString();
         }

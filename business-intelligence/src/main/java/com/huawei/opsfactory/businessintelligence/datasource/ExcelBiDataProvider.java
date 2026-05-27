@@ -1,3 +1,7 @@
+/*
+ * Copyright (c) Huawei Technologies Co., Ltd. 2026-2026. All rights reserved.
+ */
+
 package com.huawei.opsfactory.businessintelligence.datasource;
 
 import com.huawei.opsfactory.businessintelligence.config.BusinessIntelligenceRuntimeProperties;
@@ -22,6 +26,12 @@ import org.apache.poi.ss.usermodel.WorkbookFactory;
 import org.springframework.stereotype.Component;
 
 @Component
+/**
+ * Excel Bi Data Provider.
+ *
+ * @author x00000000
+ * @since 2026-05-27
+ */
 public class ExcelBiDataProvider implements BiDataProvider {
 
     private static final Logger log = LoggerFactory.getLogger(ExcelBiDataProvider.class);

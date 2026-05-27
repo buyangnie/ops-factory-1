@@ -4,10 +4,10 @@
 
 package com.huawei.opsfactory.gateway.controller;
 
+import org.apache.servicecomb.provider.rest.common.RestSchema;
 import com.huawei.opsfactory.gateway.service.BusinessTypeService;
 
-import reactor.core.publisher.Mono;
-import reactor.core.scheduler.Schedulers;
+import jakarta.servlet.http.HttpServletRequest;
 
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -19,7 +19,6 @@ import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
-import org.springframework.web.server.ServerWebExchange;
 
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -32,6 +31,7 @@ import java.util.Map;
  * @since 2026-05-09
  */
 @RestController
+@RestSchema(schemaId = "businessTypeController")
 @RequestMapping("/gateway/business-types")
 public class BusinessTypeController {
     private final BusinessTypeService businessTypeService;
@@ -48,119 +48,109 @@ public class BusinessTypeController {
     /**
      * Lists all business type definitions.
      *
-     * @param exchange current HTTP exchange carrying user context
-     * @return Mono emitting a map with "businessTypes" list
+     * @param request current HTTP request
+     * @return a map with "businessTypes" list
      */
     @GetMapping
-    public Mono<Map<String, Object>> listBusinessTypes(ServerWebExchange exchange) {
-        return Mono.fromCallable(() -> {
-            List<Map<String, Object>> types = businessTypeService.listBusinessTypes();
-            Map<String, Object> result = new LinkedHashMap<>();
-            result.put("businessTypes", types);
-            return result;
-        }).subscribeOn(Schedulers.boundedElastic());
+    public Map<String, Object> listBusinessTypes(HttpServletRequest request) {
+        List<Map<String, Object>> types = businessTypeService.listBusinessTypes();
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("businessTypes", types);
+        return result;
     }
 
     /**
      * Gets a business type by ID.
      *
-     * @param id business type identifier
-     * @param exchange current HTTP exchange carrying user context
-     * @return Mono emitting ResponseEntity containing the business type or 404
+     * @param id      business type identifier
+     * @param request current HTTP request
+     * @return ResponseEntity containing the business type or 404
      */
     @GetMapping("/{id}")
-    public Mono<ResponseEntity<Map<String, Object>>> getBusinessType(@PathVariable("id") String id,
-        ServerWebExchange exchange) {
-        return Mono.fromCallable(() -> {
-            try {
-                Map<String, Object> bt = businessTypeService.getBusinessType(id);
-                Map<String, Object> body = new LinkedHashMap<>();
-                body.put("success", true);
-                body.put("businessType", bt);
-                return ResponseEntity.ok(body);
-            } catch (IllegalArgumentException e) {
-                Map<String, Object> body = new LinkedHashMap<>();
-                body.put("success", false);
-                body.put("error", "Business type not found");
-                return ResponseEntity.status(HttpStatus.NOT_FOUND).body(body);
-            }
-        }).subscribeOn(Schedulers.boundedElastic());
+    public ResponseEntity<Map<String, Object>> getBusinessType(@PathVariable("id") String id,
+            HttpServletRequest request) {
+        try {
+            Map<String, Object> bt = businessTypeService.getBusinessType(id);
+            Map<String, Object> body = new LinkedHashMap<>();
+            body.put("success", true);
+            body.put("businessType", bt);
+            return ResponseEntity.ok(body);
+        } catch (IllegalArgumentException e) {
+            Map<String, Object> body = new LinkedHashMap<>();
+            body.put("success", false);
+            body.put("error", "Business type not found");
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(body);
+        }
     }
 
     /**
      * Creates a new business type.
      *
      * @param request request body containing business type fields
-     * @param exchange current HTTP exchange carrying user context
-     * @return Mono emitting ResponseEntity with created business type or 400
+     * @param httpRequest current HTTP request
+     * @return ResponseEntity with created business type or 400
      */
     @PostMapping
-    public Mono<ResponseEntity<Map<String, Object>>> createBusinessType(@RequestBody Map<String, Object> request,
-        ServerWebExchange exchange) {
-        return Mono.fromCallable(() -> {
-            try {
-                Map<String, Object> bt = businessTypeService.createBusinessType(request);
-                Map<String, Object> body = new LinkedHashMap<>();
-                body.put("success", true);
-                body.put("businessType", bt);
-                return ResponseEntity.status(HttpStatus.CREATED).body(body);
-            } catch (IllegalArgumentException e) {
-                Map<String, Object> body = new LinkedHashMap<>();
-                body.put("success", false);
-                body.put("error", "Invalid business type request");
-                return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(body);
-            }
-        }).subscribeOn(Schedulers.boundedElastic());
+    public ResponseEntity<Map<String, Object>> createBusinessType(@RequestBody Map<String, Object> request,
+            HttpServletRequest httpRequest) {
+        try {
+            Map<String, Object> bt = businessTypeService.createBusinessType(request);
+            Map<String, Object> body = new LinkedHashMap<>();
+            body.put("success", true);
+            body.put("businessType", bt);
+            return ResponseEntity.status(HttpStatus.CREATED).body(body);
+        } catch (IllegalArgumentException e) {
+            Map<String, Object> body = new LinkedHashMap<>();
+            body.put("success", false);
+            body.put("error", "Invalid business type request");
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(body);
+        }
     }
 
     /**
      * Updates a business type by ID.
      *
-     * @param id business type identifier
-     * @param request request body containing updated fields
-     * @param exchange current HTTP exchange carrying user context
-     * @return Mono emitting ResponseEntity with updated business type or 404
+     * @param id          business type identifier
+     * @param request     request body containing updated fields
+     * @param httpRequest current HTTP request
+     * @return ResponseEntity with updated business type or 404
      */
     @PutMapping("/{id}")
-    public Mono<ResponseEntity<Map<String, Object>>> updateBusinessType(@PathVariable("id") String id,
-        @RequestBody Map<String, Object> request, ServerWebExchange exchange) {
-        return Mono.fromCallable(() -> {
-            try {
-                Map<String, Object> bt = businessTypeService.updateBusinessType(id, request);
-                Map<String, Object> body = new LinkedHashMap<>();
-                body.put("success", true);
-                body.put("businessType", bt);
-                return ResponseEntity.ok(body);
-            } catch (IllegalArgumentException e) {
-                Map<String, Object> body = new LinkedHashMap<>();
-                body.put("success", false);
-                body.put("error", "Business type not found");
-                return ResponseEntity.status(HttpStatus.NOT_FOUND).body(body);
-            }
-        }).subscribeOn(Schedulers.boundedElastic());
+    public ResponseEntity<Map<String, Object>> updateBusinessType(@PathVariable("id") String id,
+            @RequestBody Map<String, Object> request, HttpServletRequest httpRequest) {
+        try {
+            Map<String, Object> bt = businessTypeService.updateBusinessType(id, request);
+            Map<String, Object> body = new LinkedHashMap<>();
+            body.put("success", true);
+            body.put("businessType", bt);
+            return ResponseEntity.ok(body);
+        } catch (IllegalArgumentException e) {
+            Map<String, Object> body = new LinkedHashMap<>();
+            body.put("success", false);
+            body.put("error", "Business type not found");
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(body);
+        }
     }
 
     /**
      * Deletes a business type by ID.
      *
-     * @param id business type identifier
-     * @param exchange current HTTP exchange carrying user context
-     * @return Mono emitting ResponseEntity with success status or 404
+     * @param id      business type identifier
+     * @param request current HTTP request
+     * @return ResponseEntity with success status or 404
      */
     @DeleteMapping("/{id}")
-    public Mono<ResponseEntity<Map<String, Object>>> deleteBusinessType(@PathVariable("id") String id,
-        ServerWebExchange exchange) {
-        return Mono.fromCallable(() -> {
-            boolean deleted = businessTypeService.deleteBusinessType(id);
-            if (!deleted) {
-                Map<String, Object> body = new LinkedHashMap<>();
-                body.put("success", false);
-                body.put("error", "Business type not found: " + id);
-                return ResponseEntity.status(HttpStatus.NOT_FOUND).body(body);
-            }
+    public ResponseEntity<Map<String, Object>> deleteBusinessType(@PathVariable("id") String id,
+            HttpServletRequest request) {
+        boolean deleted = businessTypeService.deleteBusinessType(id);
+        if (!deleted) {
             Map<String, Object> body = new LinkedHashMap<>();
-            body.put("success", true);
-            return ResponseEntity.ok(body);
-        }).subscribeOn(Schedulers.boundedElastic());
+            body.put("success", false);
+            body.put("error", "Business type not found: " + id);
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(body);
+        }
+        Map<String, Object> body = new LinkedHashMap<>();
+        body.put("success", true);
+        return ResponseEntity.ok(body);
     }
 }

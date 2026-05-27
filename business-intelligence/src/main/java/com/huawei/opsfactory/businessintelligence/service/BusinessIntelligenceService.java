@@ -1,3 +1,7 @@
+/*
+ * Copyright (c) Huawei Technologies Co., Ltd. 2026-2026. All rights reserved.
+ */
+
 package com.huawei.opsfactory.businessintelligence.service;
 
 import com.huawei.opsfactory.businessintelligence.config.BusinessIntelligenceRuntimeProperties;
@@ -47,6 +51,12 @@ import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
 @Service
+/**
+ * Business Intelligence Service.
+ *
+ * @author x00000000
+ * @since 2026-05-27
+ */
 public class BusinessIntelligenceService {
 
     private static final Logger log = LoggerFactory.getLogger(BusinessIntelligenceService.class);

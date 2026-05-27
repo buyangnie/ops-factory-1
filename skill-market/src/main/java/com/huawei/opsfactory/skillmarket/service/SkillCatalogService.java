@@ -1,3 +1,7 @@
+/*
+ * Copyright (c) Huawei Technologies Co., Ltd. 2026-2026. All rights reserved.
+ */
+
 package com.huawei.opsfactory.skillmarket.service;
 
 import com.huawei.opsfactory.skillmarket.common.error.ApiConflictException;
@@ -41,6 +45,12 @@ import org.springframework.web.multipart.MultipartFile;
 import org.yaml.snakeyaml.Yaml;
 
 @Service
+/**
+ * Skill Catalog Service.
+ *
+ * @author x00000000
+ * @since 2026-05-27
+ */
 public class SkillCatalogService {
 
     private static final Logger log = LoggerFactory.getLogger(SkillCatalogService.class);

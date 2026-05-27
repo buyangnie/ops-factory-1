@@ -3,13 +3,12 @@
  */
 
 package com.huawei.opsfactory.gateway.controller;
+import org.apache.servicecomb.provider.rest.common.RestSchema;
+import jakarta.servlet.http.HttpServletRequest;
 
 import com.huawei.opsfactory.gateway.filter.UserContextFilter;
 import com.huawei.opsfactory.gateway.service.AgentConfigService;
 import com.huawei.opsfactory.gateway.service.FileService;
-
-import reactor.core.publisher.Mono;
-import reactor.core.scheduler.Schedulers;
 
 import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -19,7 +18,6 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
-import org.springframework.web.server.ServerWebExchange;
 
 import java.nio.file.Path;
 import java.util.List;
@@ -32,7 +30,9 @@ import java.util.Map;
  * @author x00000000
  * @since 2026-05-09
  */
+
 @RestController
+@RestSchema(schemaId = "fileCapsuleController")
 @RequestMapping("/gateway/agents/{agentId}/file-capsules")
 public class FileCapsuleController {
     private final AgentConfigService agentConfigService;
@@ -59,14 +59,12 @@ public class FileCapsuleController {
      * @return Mono emitting a map with "entries" keyed by messageId
      */
     @GetMapping(produces = MediaType.APPLICATION_JSON_VALUE)
-    public Mono<Map<String, Object>> getFileCapsules(@PathVariable String agentId, @RequestParam String sessionId,
-        ServerWebExchange exchange) {
-        String userId = exchange.getAttribute(UserContextFilter.USER_ID_ATTR);
+    public Map<String, Object> getFileCapsules(@PathVariable String agentId, @RequestParam String sessionId,
+        HttpServletRequest request) {
+        String userId = (String) request.getAttribute(UserContextFilter.USER_ID_ATTR);
         Path workingDir = agentConfigService.getUserAgentDir(userId, agentId);
-        return Mono.fromCallable(() -> {
-            Map<String, List<Map<String, String>>> entries = fileService.loadOutputFiles(workingDir, sessionId);
-            return Map.<String, Object> of("entries", entries);
-        }).subscribeOn(Schedulers.boundedElastic());
+        Map<String, List<Map<String, String>>> entries = fileService.loadOutputFiles(workingDir, sessionId);
+        return Map.of("entries", entries);
     }
 
     /**
@@ -78,9 +76,9 @@ public class FileCapsuleController {
      * @return Mono emitting a map with "status" key
      */
     @PostMapping(consumes = MediaType.APPLICATION_JSON_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
-    public Mono<Map<String, Object>> saveFileCapsule(@PathVariable String agentId,
-        @RequestBody Map<String, Object> body, ServerWebExchange exchange) {
-        String userId = exchange.getAttribute(UserContextFilter.USER_ID_ATTR);
+    public Map<String, Object> saveFileCapsule(@PathVariable String agentId,
+        @RequestBody Map<String, Object> body, HttpServletRequest request) {
+        String userId = (String) request.getAttribute(UserContextFilter.USER_ID_ATTR);
         Path workingDir = agentConfigService.getUserAgentDir(userId, agentId);
 
         String sessionId = (String) body.get("sessionId");
@@ -88,7 +86,7 @@ public class FileCapsuleController {
         Object rawFiles = body.get("files");
 
         if (sessionId == null || messageId == null || !(rawFiles instanceof List<?> fileList)) {
-            return Mono.just(Map.of("status", "error", "message", "sessionId, messageId, and files are required"));
+            return Map.of("status", "error", "message", "sessionId, messageId, and files are required");
         }
 
         // Convert List<Object> → List<Map<String, String>>
@@ -98,9 +96,7 @@ public class FileCapsuleController {
             return entry;
         }).toList();
 
-        return Mono.fromCallable(() -> {
-            fileService.persistOutputFiles(workingDir, sessionId, messageId, files);
-            return Map.<String, Object> of("status", "ok");
-        }).subscribeOn(Schedulers.boundedElastic());
+        fileService.persistOutputFiles(workingDir, sessionId, messageId, files);
+        return Map.of("status", "ok");
     }
 }

@@ -55,7 +55,7 @@ spring:
     import: optional:file:${GATEWAY_CONFIG_PATH:config.yaml}
   codec:
     max-in-memory-size: 50MB
-  webflux:
+  servlet:
     multipart:
       max-file-size: 50MB
       max-request-size: 100MB

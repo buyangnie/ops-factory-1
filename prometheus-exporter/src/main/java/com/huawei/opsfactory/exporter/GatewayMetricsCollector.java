@@ -1,3 +1,7 @@
+/*
+ * Copyright (c) Huawei Technologies Co., Ltd. 2026-2026. All rights reserved.
+ */
+
 package com.huawei.opsfactory.exporter;
 
 import io.prometheus.client.CollectorRegistry;
@@ -27,6 +31,12 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
 @Component
+/**
+ * Gateway Metrics Collector.
+ *
+ * @author x00000000
+ * @since 2026-05-27
+ */
 public class GatewayMetricsCollector {
 
     private static final Logger log = LoggerFactory.getLogger(GatewayMetricsCollector.class);
@@ -168,6 +178,12 @@ public class GatewayMetricsCollector {
     }
 
     @FunctionalInterface
+/**
+     * Gateway Api interface.
+     *
+     * @author x00000000
+     * @since 2026-05-27
+     */
     interface GatewayApi {
         Map<String, Object> fetch(String path) throws IOException, InterruptedException;
     }

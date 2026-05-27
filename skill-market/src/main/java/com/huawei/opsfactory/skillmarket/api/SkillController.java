@@ -1,3 +1,7 @@
+/*
+ * Copyright (c) Huawei Technologies Co., Ltd. 2026-2026. All rights reserved.
+ */
+
 package com.huawei.opsfactory.skillmarket.api;
 
 import com.huawei.opsfactory.skillmarket.model.CreateSkillRequest;
@@ -29,6 +33,12 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
 
+/**
+ * REST controller for skill catalog operations.
+ *
+ * @author x00000000
+ * @since 2026-05-27
+ */
 @RestController
 @RequestMapping("/skill-market")
 public class SkillController {

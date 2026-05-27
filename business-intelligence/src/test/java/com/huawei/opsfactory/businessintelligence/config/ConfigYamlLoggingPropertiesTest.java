@@ -1,3 +1,7 @@
+/*
+ * Copyright (c) Huawei Technologies Co., Ltd. 2026-2026. All rights reserved.
+ */
+
 package com.huawei.opsfactory.businessintelligence.config;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -12,6 +16,12 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.core.env.Environment;
 
 @SpringBootTest
+/**
+ * Config Yaml Logging Properties Test.
+ *
+ * @author x00000000
+ * @since 2026-05-27
+ */
 class ConfigYamlLoggingPropertiesTest {
 
     @Autowired

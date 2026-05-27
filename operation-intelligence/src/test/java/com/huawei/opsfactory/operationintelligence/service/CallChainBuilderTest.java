@@ -11,6 +11,7 @@ import com.huawei.opsfactory.operationintelligence.qos.model.TraceLogRecord;
 import com.huawei.opsfactory.operationintelligence.qos.parser.AppendInfoParser;
 import com.huawei.opsfactory.operationintelligence.qos.parser.TraceLogParser;
 import com.huawei.opsfactory.operationintelligence.service.CallChainStatistics;
+import com.huawei.opsfactory.operationintelligence.config.OperationIntelligenceProperties;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -27,7 +28,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 /**
  * Call Chain Builder Test.
  *
- * @author call-chain
+ * @author x00000000
  * @since 2026-05-14
  */
 class CallChainBuilderTest {
@@ -39,7 +40,8 @@ class CallChainBuilderTest {
     void setUp() {
         TraceLogParser parser = new TraceLogParser(new AppendInfoParser());
         statistics = new CallChainStatistics(parser);
-        builder = new CallChainBuilder(statistics);
+        OperationIntelligenceProperties properties = new OperationIntelligenceProperties();
+        builder = new CallChainBuilder(statistics, properties);
     }
 
     @Test

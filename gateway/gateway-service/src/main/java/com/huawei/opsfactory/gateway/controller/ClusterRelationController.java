@@ -3,11 +3,10 @@
  */
 
 package com.huawei.opsfactory.gateway.controller;
+import org.apache.servicecomb.provider.rest.common.RestSchema;
+import jakarta.servlet.http.HttpServletRequest;
 
 import com.huawei.opsfactory.gateway.service.ClusterRelationService;
-
-import reactor.core.publisher.Mono;
-import reactor.core.scheduler.Schedulers;
 
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -20,7 +19,6 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
-import org.springframework.web.server.ServerWebExchange;
 
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -32,7 +30,9 @@ import java.util.Map;
  * @author x00000000
  * @since 2026-05-09
  */
+
 @RestController
+@RestSchema(schemaId = "clusterRelationController")
 @RequestMapping("/gateway/cluster-relations")
 public class ClusterRelationController {
     private final ClusterRelationService clusterRelationService;
@@ -54,14 +54,12 @@ public class ClusterRelationController {
      * @return Mono emitting a map with "relations" list
      */
     @GetMapping
-    public Mono<Map<String, Object>> listRelations(
-        @RequestParam(value = "clusterId", required = false) String clusterId, ServerWebExchange exchange) {
-        return Mono.fromCallable(() -> {
-            List<Map<String, Object>> relations = clusterRelationService.listRelations(clusterId);
-            Map<String, Object> result = new LinkedHashMap<>();
-            result.put("relations", relations);
-            return result;
-        }).subscribeOn(Schedulers.boundedElastic());
+    public Map<String, Object> listRelations(
+        @RequestParam(value = "clusterId", required = false) String clusterId, HttpServletRequest request) {
+        List<Map<String, Object>> relations = clusterRelationService.listRelations(clusterId);
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("relations", relations);
+        return result;
     }
 
     /**
@@ -72,10 +70,9 @@ public class ClusterRelationController {
      * @return Mono emitting a map with graph nodes and edges
      */
     @GetMapping("/graph")
-    public Mono<Map<String, Object>> getGraph(@RequestParam(value = "groupId", required = false) String groupId,
-        ServerWebExchange exchange) {
-        return Mono.fromCallable(() -> clusterRelationService.getGraphData(groupId))
-            .subscribeOn(Schedulers.boundedElastic());
+    public Map<String, Object> getGraph(@RequestParam(value = "groupId", required = false) String groupId,
+        HttpServletRequest request) {
+        return clusterRelationService.getGraphData(groupId);
     }
 
     /**
@@ -86,10 +83,9 @@ public class ClusterRelationController {
      * @return Mono emitting a map with neighbor cluster data
      */
     @GetMapping("/clusters/{clusterId}/neighbors")
-    public Mono<Map<String, Object>> getClusterNeighbors(@PathVariable("clusterId") String clusterId,
-        ServerWebExchange exchange) {
-        return Mono.fromCallable(() -> clusterRelationService.getClusterNeighbors(clusterId))
-            .subscribeOn(Schedulers.boundedElastic());
+    public Map<String, Object> getClusterNeighbors(@PathVariable("clusterId") String clusterId,
+        HttpServletRequest request) {
+        return clusterRelationService.getClusterNeighbors(clusterId);
     }
 
     /**
@@ -100,10 +96,9 @@ public class ClusterRelationController {
      * @return Mono emitting a map with neighbor host data
      */
     @GetMapping("/hosts/{hostId}/neighbors")
-    public Mono<Map<String, Object>> getHostNeighbors(@PathVariable("hostId") String hostId,
-        ServerWebExchange exchange) {
-        return Mono.fromCallable(() -> clusterRelationService.getHostNeighborsByCluster(hostId))
-            .subscribeOn(Schedulers.boundedElastic());
+    public Map<String, Object> getHostNeighbors(@PathVariable("hostId") String hostId,
+        HttpServletRequest request) {
+        return clusterRelationService.getHostNeighborsByCluster(hostId);
     }
 
     /**
@@ -114,22 +109,20 @@ public class ClusterRelationController {
      * @return Mono emitting ResponseEntity with created relation or 400
      */
     @PostMapping
-    public Mono<ResponseEntity<Map<String, Object>>> createRelation(@RequestBody Map<String, Object> request,
-        ServerWebExchange exchange) {
-        return Mono.fromCallable(() -> {
-            try {
-                Map<String, Object> relation = clusterRelationService.createRelation(request);
-                Map<String, Object> body = new LinkedHashMap<>();
-                body.put("success", true);
-                body.put("relation", relation);
-                return ResponseEntity.status(HttpStatus.CREATED).body(body);
-            } catch (IllegalArgumentException e) {
-                Map<String, Object> body = new LinkedHashMap<>();
-                body.put("success", false);
-                body.put("error", "Invalid cluster relation request");
-                return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(body);
-            }
-        }).subscribeOn(Schedulers.boundedElastic());
+    public ResponseEntity<Map<String, Object>> createRelation(@RequestBody Map<String, Object> requestBody,
+        HttpServletRequest request) {
+        try {
+            Map<String, Object> relation = clusterRelationService.createRelation(requestBody);
+            Map<String, Object> body = new LinkedHashMap<>();
+            body.put("success", true);
+            body.put("relation", relation);
+            return ResponseEntity.status(HttpStatus.CREATED).body(body);
+        } catch (IllegalArgumentException e) {
+            Map<String, Object> body = new LinkedHashMap<>();
+            body.put("success", false);
+            body.put("error", "Invalid cluster relation request");
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(body);
+        }
     }
 
     /**
@@ -141,22 +134,20 @@ public class ClusterRelationController {
      * @return Mono emitting ResponseEntity with updated relation or 404
      */
     @PutMapping("/{id}")
-    public Mono<ResponseEntity<Map<String, Object>>> updateRelation(@PathVariable("id") String id,
-        @RequestBody Map<String, Object> request, ServerWebExchange exchange) {
-        return Mono.fromCallable(() -> {
-            try {
-                Map<String, Object> relation = clusterRelationService.updateRelation(id, request);
-                Map<String, Object> body = new LinkedHashMap<>();
-                body.put("success", true);
-                body.put("relation", relation);
-                return ResponseEntity.ok(body);
-            } catch (IllegalArgumentException e) {
-                Map<String, Object> body = new LinkedHashMap<>();
-                body.put("success", false);
-                body.put("error", "Cluster relation not found");
-                return ResponseEntity.status(HttpStatus.NOT_FOUND).body(body);
-            }
-        }).subscribeOn(Schedulers.boundedElastic());
+    public ResponseEntity<Map<String, Object>> updateRelation(@PathVariable("id") String id,
+        @RequestBody Map<String, Object> requestBody, HttpServletRequest request) {
+        try {
+            Map<String, Object> relation = clusterRelationService.updateRelation(id, requestBody);
+            Map<String, Object> body = new LinkedHashMap<>();
+            body.put("success", true);
+            body.put("relation", relation);
+            return ResponseEntity.ok(body);
+        } catch (IllegalArgumentException e) {
+            Map<String, Object> body = new LinkedHashMap<>();
+            body.put("success", false);
+            body.put("error", "Cluster relation not found");
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(body);
+        }
     }
 
     /**
@@ -167,19 +158,17 @@ public class ClusterRelationController {
      * @return Mono emitting ResponseEntity with success status or 404
      */
     @DeleteMapping("/{id}")
-    public Mono<ResponseEntity<Map<String, Object>>> deleteRelation(@PathVariable("id") String id,
-        ServerWebExchange exchange) {
-        return Mono.fromCallable(() -> {
-            boolean deleted = clusterRelationService.deleteRelation(id);
-            if (!deleted) {
-                Map<String, Object> body = new LinkedHashMap<>();
-                body.put("success", false);
-                body.put("error", "Cluster relation not found: " + id);
-                return ResponseEntity.status(HttpStatus.NOT_FOUND).body(body);
-            }
+    public ResponseEntity<Map<String, Object>> deleteRelation(@PathVariable("id") String id,
+        HttpServletRequest request) {
+        boolean deleted = clusterRelationService.deleteRelation(id);
+        if (!deleted) {
             Map<String, Object> body = new LinkedHashMap<>();
-            body.put("success", true);
-            return ResponseEntity.ok(body);
-        }).subscribeOn(Schedulers.boundedElastic());
+            body.put("success", false);
+            body.put("error", "Cluster relation not found: " + id);
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(body);
+        }
+        Map<String, Object> body = new LinkedHashMap<>();
+        body.put("success", true);
+        return ResponseEntity.ok(body);
     }
 }

@@ -1,3 +1,7 @@
+/*
+ * Copyright (c) Huawei Technologies Co., Ltd. 2026-2026. All rights reserved.
+ */
+
 package com.huawei.opsfactory.controlcenter.registry;
 
 import com.huawei.opsfactory.controlcenter.config.ControlCenterProperties;
@@ -8,6 +12,12 @@ import java.util.List;
 import java.util.Map;
 
 @Component
+/**
+ * Managed Service Registry.
+ *
+ * @author x00000000
+ * @since 2026-05-27
+ */
 public class ManagedServiceRegistry {
 
     private final Map<String, ControlCenterProperties.ServiceTarget> servicesById;

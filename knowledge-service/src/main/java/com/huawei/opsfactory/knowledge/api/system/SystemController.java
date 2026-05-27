@@ -16,7 +16,7 @@ import org.springframework.web.bind.annotation.RestController;
  * @since 2026-05-26
  */
 
-@RestController
+@RestController("knowledgeSystemController")
 @RequestMapping("/knowledge")
 public class SystemController {
 

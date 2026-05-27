@@ -4,44 +4,32 @@
 
 package com.huawei.opsfactory.operationintelligence.config;
 
-import org.junit.jupiter.api.Test;
-
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+
+import org.junit.jupiter.api.Test;
+
+import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.web.filter.CorsFilter;
 
 /**
  * Web Config Test.
  *
- * @author call-chain
- * @since 2026-05-18
+ * @author x00000000
+ * @since 2026-05-11
  */
+@SpringBootTest
 class WebConfigTest {
 
     @Test
-    void testCorsWebFilter() {
-        OperationIntelligenceProperties properties = new OperationIntelligenceProperties();
-        WebConfig config = new WebConfig(properties);
-
-        var filter = config.corsWebFilter();
+    void corsFilterBeanExists() {
+        CorsFilter filter = new WebConfig(new OperationIntelligenceProperties()).corsFilter();
         assertNotNull(filter);
     }
 
     @Test
-    void testCorsWebFilterWithOrigin() {
-        OperationIntelligenceProperties properties = new OperationIntelligenceProperties();
-        properties.setCorsOrigin("https://example.com,https://test.com");
-        WebConfig config = new WebConfig(properties);
-
-        var filter = config.corsWebFilter();
-        assertNotNull(filter);
-    }
-
-    @Test
-    void testCorsWebFilterWithoutOrigin() {
-        OperationIntelligenceProperties properties = new OperationIntelligenceProperties();
-        WebConfig config = new WebConfig(properties);
-
-        var filter = config.corsWebFilter();
-        assertNotNull(filter);
+    void corsFilterIsServletFilter() {
+        CorsFilter filter = new WebConfig(new OperationIntelligenceProperties()).corsFilter();
+        assertTrue(filter instanceof jakarta.servlet.Filter);
     }
 }

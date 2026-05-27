@@ -4,23 +4,27 @@
 
 package com.huawei.opsfactory.operationintelligence.qos.dv;
 
-import io.netty.handler.ssl.SslContext;
-import io.netty.handler.ssl.SslContextBuilder;
-import io.netty.handler.ssl.util.InsecureTrustManagerFactory;
-
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 
 import java.io.ByteArrayInputStream;
+import java.io.IOException;
 import java.io.InputStream;
+import java.security.KeyManagementException;
 import java.security.KeyStore;
+import java.security.KeyStoreException;
+import java.security.NoSuchAlgorithmException;
 import java.security.SecureRandom;
+import java.security.UnrecoverableKeyException;
+import java.security.cert.CertificateException;
 import java.util.concurrent.ConcurrentHashMap;
 
 import javax.net.ssl.KeyManagerFactory;
 import javax.net.ssl.SSLContext;
+import javax.net.ssl.TrustManager;
 import javax.net.ssl.TrustManagerFactory;
+import javax.net.ssl.X509TrustManager;
 
 /**
  * Dv Ssl Context Factory.
@@ -33,7 +37,7 @@ public class DvSslContextFactory {
 
     private static final Logger log = LoggerFactory.getLogger(DvSslContextFactory.class);
 
-    private final ConcurrentHashMap<String, SslContext> sslContextCache = new ConcurrentHashMap<>();
+    private final ConcurrentHashMap<String, SSLContext> sslContextCache = new ConcurrentHashMap<>();
 
     /**
      * create Ssl Context.
@@ -43,12 +47,16 @@ public class DvSslContextFactory {
      * @param strictSsl the strictSsl
      * @return the result
      */
-    public SslContext createSslContext(String crtContent, String fileName, boolean strictSsl) {
+    public SSLContext createSslContext(String crtContent, String fileName, boolean strictSsl) {
         if (crtContent == null || crtContent.isBlank()) {
             if (strictSsl) {
                 throw new IllegalStateException("No SSL certificate configured and strict-ssl is enabled");
             }
-            log.warn("INSECURE SSL: no certificate configured, falling back to insecure trust manager");
+            log.warn(
+                "INSECURE SSL MODE: No certificate configured and strict-ssl=false. "
+                    + "Using insecure trust manager that accepts all certificates. "
+                    + "WARNING: This is acceptable ONLY for development environment. "
+                    + "Production environment MUST have strict-ssl=true and valid certificate.");
             return createInsecureSslContext();
         }
 
@@ -62,11 +70,11 @@ public class DvSslContextFactory {
      * @param fileName the fileName
      * @return the result
      */
-    public SslContext createSslContext(String crtContent, String fileName) {
+    public SSLContext createSslContext(String crtContent, String fileName) {
         return createSslContext(crtContent, fileName, true);
     }
 
-    private SslContext doCreateSslContext(String crtContent, String fileName, boolean strictSsl) {
+    private SSLContext doCreateSslContext(String crtContent, String fileName, boolean strictSsl) {
         try {
             byte[] certBytes = java.util.Base64.getDecoder().decode(crtContent);
             String type = (fileName != null && fileName.endsWith(".p12")) ? "PKCS12" : "JKS";
@@ -84,14 +92,18 @@ public class DvSslContextFactory {
             SSLContext sslContext = SSLContext.getInstance("TLSv1.2");
             sslContext.init(kmf.getKeyManagers(), tmf.getTrustManagers(), new SecureRandom());
 
-            return SslContextBuilder.forClient().sslContextProvider(null).trustManager(tmf).keyManager(kmf).build();
-        } catch (Exception e) {
+            return sslContext;
+        } catch (NoSuchAlgorithmException | KeyStoreException | KeyManagementException | IOException |
+                CertificateException | UnrecoverableKeyException e) {
             if (strictSsl) {
                 throw new IllegalStateException("Failed to create SSL context with certificate (strict-ssl enabled)", e);
             }
             log.error(
-                "INSECURE SSL: SSL context creation failed, falling back to insecure trust manager. "
-                    + "This is a security risk. Set strict-ssl=true to enforce certificate validation. Error: {}",
+                "SSL context creation failed and strict-ssl=false. "
+                    + "FALLING BACK TO INSECURE MODE. "
+                    + "This accepts ALL certificates and should ONLY be used in development. "
+                    + "Production environment requires strict-ssl=true and valid certificates. "
+                    + "Error: {}",
                 e.getMessage());
             return createInsecureSslContext();
         }
@@ -102,10 +114,22 @@ public class DvSslContextFactory {
      *
      * @return the result
      */
-    public SslContext createInsecureSslContext() {
+    private SSLContext createInsecureSslContext() {
         try {
-            return SslContextBuilder.forClient().trustManager(InsecureTrustManagerFactory.INSTANCE).build();
-        } catch (Exception e) {
+            SSLContext sslContext = SSLContext.getInstance("TLS");
+            sslContext.init(null, new TrustManager[] {
+                new javax.net.ssl.X509TrustManager() {
+                    public java.security.cert.X509Certificate[] getAcceptedIssuers() {
+                        return new java.security.cert.X509Certificate[0];
+                    }
+                    public void checkClientTrusted(java.security.cert.X509Certificate[] certs, String authType) {
+                    }
+                    public void checkServerTrusted(java.security.cert.X509Certificate[] certs, String authType) {
+                    }
+                }
+            }, new SecureRandom());
+            return sslContext;
+        } catch (NoSuchAlgorithmException | KeyManagementException e) {
             throw new IllegalStateException("Failed to create insecure SSL context", e);
         }
     }

@@ -5,100 +5,108 @@
 package com.huawei.opsfactory.operationintelligence.security;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.when;
 
 import com.huawei.opsfactory.operationintelligence.config.OperationIntelligenceProperties;
 
-import reactor.core.publisher.Mono;
-
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
-import org.springframework.mock.http.server.reactive.MockServerHttpRequest;
-import org.springframework.mock.web.server.MockServerWebExchange;
-import org.springframework.web.server.ServerWebExchange;
-import org.springframework.web.server.WebFilterChain;
+
+import jakarta.servlet.FilterChain;
+
+import org.springframework.mock.web.MockHttpServletRequest;
+import org.springframework.mock.web.MockHttpServletResponse;
 
 class AuthWebFilterTest {
 
     private AuthWebFilter filter;
 
-    private WebFilterChain chain;
+    private FilterChain chain;
 
     @BeforeEach
     void setUp() {
         OperationIntelligenceProperties props = new OperationIntelligenceProperties();
         props.setSecretKey("test-secret");
         filter = new AuthWebFilter(props);
-        chain = mock(WebFilterChain.class);
-        when(chain.filter(any())).thenReturn(Mono.empty());
+        chain = mock(FilterChain.class);
     }
 
     @Test
-    void validSecretKeyHeader_passes() {
-        ServerWebExchange exchange = MockServerWebExchange
-            .from(MockServerHttpRequest.get("/test").header("x-secret-key", "test-secret").build());
+    void validSecretKeyHeader_passes() throws Exception {
+        MockHttpServletRequest request = new MockHttpServletRequest("GET", "/test");
+        request.addHeader("x-secret-key", "test-secret");
+        MockHttpServletResponse response = new MockHttpServletResponse();
 
-        filter.filter(exchange, chain).block();
-        verify(chain).filter(exchange);
+        filter.doFilter(request, response, chain);
+
+        verify(chain).doFilter(request, response);
     }
 
     @Test
-    void validSecretKeyQueryParam_passes() {
-        ServerWebExchange exchange =
-            MockServerWebExchange.from(MockServerHttpRequest.get("/test?key=test-secret").build());
+    void validSecretKeyQueryParam_passes() throws Exception {
+        MockHttpServletRequest request = new MockHttpServletRequest("GET", "/test");
+        request.setParameter("key", "test-secret");
+        MockHttpServletResponse response = new MockHttpServletResponse();
 
-        filter.filter(exchange, chain).block();
-        verify(chain).filter(exchange);
+        filter.doFilter(request, response, chain);
+
+        verify(chain).doFilter(request, response);
     }
 
     @Test
-    void missingSecretKey_returns401() {
-        ServerWebExchange exchange = MockServerWebExchange.from(MockServerHttpRequest.get("/test").build());
+    void missingSecretKey_returns401() throws Exception {
+        MockHttpServletRequest request = new MockHttpServletRequest("GET", "/test");
+        MockHttpServletResponse response = new MockHttpServletResponse();
 
-        filter.filter(exchange, chain).block();
-        assertEquals(HttpStatus.UNAUTHORIZED, (HttpStatus) exchange.getResponse().getStatusCode());
-        verify(chain, never()).filter(any());
+        filter.doFilter(request, response, chain);
+
+        assertEquals(HttpStatus.UNAUTHORIZED.value(), response.getStatus());
+        verify(chain, never()).doFilter(request, response);
     }
 
     @Test
-    void invalidSecretKey_returns401() {
-        ServerWebExchange exchange =
-            MockServerWebExchange.from(MockServerHttpRequest.get("/test").header("x-secret-key", "wrong").build());
+    void invalidSecretKey_returns401() throws Exception {
+        MockHttpServletRequest request = new MockHttpServletRequest("GET", "/test");
+        request.addHeader("x-secret-key", "wrong");
+        MockHttpServletResponse response = new MockHttpServletResponse();
 
-        filter.filter(exchange, chain).block();
-        assertEquals(HttpStatus.UNAUTHORIZED, (HttpStatus) exchange.getResponse().getStatusCode());
-        verify(chain, never()).filter(any());
+        filter.doFilter(request, response, chain);
+
+        assertEquals(HttpStatus.UNAUTHORIZED.value(), response.getStatus());
+        verify(chain, never()).doFilter(request, response);
     }
 
     @Test
-    void optionsRequest_passesWithoutAuth() {
-        ServerWebExchange exchange =
-            MockServerWebExchange.from(MockServerHttpRequest.method(HttpMethod.OPTIONS, "/test").build());
+    void optionsRequest_passesWithoutAuth() throws Exception {
+        MockHttpServletRequest request = new MockHttpServletRequest("OPTIONS", "/test");
+        MockHttpServletResponse response = new MockHttpServletResponse();
 
-        filter.filter(exchange, chain).block();
-        verify(chain).filter(exchange);
+        filter.doFilter(request, response, chain);
+
+        verify(chain).doFilter(request, response);
     }
 
     @Test
-    void healthCheck_passesWithoutAuth() {
-        ServerWebExchange exchange = MockServerWebExchange.from(MockServerHttpRequest.get("/actuator/health").build());
+    void healthCheck_passesWithoutAuth() throws Exception {
+        MockHttpServletRequest request = new MockHttpServletRequest("GET", "/actuator/health");
+        MockHttpServletResponse response = new MockHttpServletResponse();
 
-        filter.filter(exchange, chain).block();
-        verify(chain).filter(exchange);
+        filter.doFilter(request, response, chain);
+
+        verify(chain).doFilter(request, response);
     }
 
     @Test
-    void blankSecretKeyHeader_treatedAsMissing() {
-        ServerWebExchange exchange =
-            MockServerWebExchange.from(MockServerHttpRequest.get("/test").header("x-secret-key", "   ").build());
+    void blankSecretKeyHeader_treatedAsMissing() throws Exception {
+        MockHttpServletRequest request = new MockHttpServletRequest("GET", "/test");
+        request.addHeader("x-secret-key", "   ");
+        MockHttpServletResponse response = new MockHttpServletResponse();
 
-        filter.filter(exchange, chain).block();
-        assertEquals(HttpStatus.UNAUTHORIZED, (HttpStatus) exchange.getResponse().getStatusCode());
+        filter.doFilter(request, response, chain);
+
+        assertEquals(HttpStatus.UNAUTHORIZED.value(), response.getStatus());
     }
 }

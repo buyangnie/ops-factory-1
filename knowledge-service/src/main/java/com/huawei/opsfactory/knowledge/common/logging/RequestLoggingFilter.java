@@ -24,7 +24,7 @@ import org.springframework.web.filter.OncePerRequestFilter;
  * @since 2026-05-26
  */
 
-@Component
+@Component("knowledgeRequestLoggingFilter")
 @Order(Ordered.HIGHEST_PRECEDENCE)
 public class RequestLoggingFilter extends OncePerRequestFilter {
 

@@ -1,3 +1,7 @@
+/*
+ * Copyright (c) Huawei Technologies Co., Ltd. 2026-2026. All rights reserved.
+ */
+
 package com.huawei.opsfactory.businessintelligence.api;
 
 import com.huawei.opsfactory.businessintelligence.model.BiModels.Snapshot;
@@ -20,6 +24,12 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+/**
+ * REST controller for business intelligence operations.
+ *
+ * @author x00000000
+ * @since 2026-05-27
+ */
 @RestController
 @RequestMapping("/business-intelligence")
 public class BusinessIntelligenceController {

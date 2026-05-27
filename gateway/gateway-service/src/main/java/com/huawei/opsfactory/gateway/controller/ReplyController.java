@@ -3,6 +3,8 @@
  */
 
 package com.huawei.opsfactory.gateway.controller;
+import org.apache.servicecomb.provider.rest.common.RestSchema;
+import jakarta.servlet.http.HttpServletRequest;
 
 import com.huawei.opsfactory.gateway.common.model.ManagedInstance;
 import com.huawei.opsfactory.gateway.common.util.JsonUtil;
@@ -20,9 +22,6 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 
-import reactor.core.publisher.Mono;
-import reactor.core.scheduler.Schedulers;
-
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.core.io.buffer.DataBuffer;
@@ -38,9 +37,10 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.reactive.function.client.WebClientResponseException;
 import org.springframework.web.server.ResponseStatusException;
-import org.springframework.web.server.ServerWebExchange;
+import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 import org.springframework.web.util.UriUtils;
 
+import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.time.Duration;
@@ -53,6 +53,11 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
+
+import jakarta.annotation.PreDestroy;
 
 /**
  * Core session controller handling chat replies, SSE event streams, session resume, and restart.
@@ -60,7 +65,9 @@ import java.util.concurrent.ConcurrentHashMap;
  * @author x00000000
  * @since 2026-05-09
  */
+
 @RestController
+@RestSchema(schemaId = "replyController")
 @RequestMapping("/gateway/agents/{agentId}")
 public class ReplyController {
     private static final Logger log = LoggerFactory.getLogger(ReplyController.class);
@@ -103,11 +110,13 @@ public class ReplyController {
 
     private final FileService fileService;
 
-    private final ConcurrentHashMap<String, Mono<String>> inFlightResumes = new ConcurrentHashMap<>();
+    private final ConcurrentHashMap<String, String> inFlightResumes = new ConcurrentHashMap<>();
 
     private final ConcurrentHashMap<String, List<Map<String, Object>>> fileSnapshots = new ConcurrentHashMap<>();
 
     private final ConcurrentHashMap<String, String> pendingFileSnapshotRequests = new ConcurrentHashMap<>();
+
+    private final ScheduledExecutorService scheduledExecutorService = Executors.newScheduledThreadPool(1);
 
     /**
      * Creates the reply controller instance.
@@ -134,48 +143,41 @@ public class ReplyController {
      * @param sessionId unique identifier of the chat session to reply in
      * @param body JSON request body containing the user message and request metadata
      * @param exchange reactive server exchange providing request attributes and the response sink
-     * @return a {@code Mono<Void>} that completes once the proxied reply and SSE stream are finished
+     * @return a {@code void} that completes once the proxied reply and SSE stream are finished
      */
     @PostMapping(value = "/sessions/{sessionId}/reply", produces = MediaType.APPLICATION_JSON_VALUE)
-    public Mono<Void> sessionReply(@PathVariable("agentId") String agentId, @PathVariable("sessionId") String sessionId,
-        @RequestBody String body, ServerWebExchange exchange) {
+    public String sessionReply(@PathVariable("agentId") String agentId, @PathVariable("sessionId") String sessionId,
+        @RequestBody String body, HttpServletRequest request) {
         long requestStart = System.currentTimeMillis();
-        String userId = exchange.getAttribute(UserContextFilter.USER_ID_ATTR);
+        String userId = (String) request.getAttribute(UserContextFilter.USER_ID_ATTR);
         HookContext ctx = new HookContext(body, agentId, userId);
         log.info("[SESSION-REPLY] request received agentId={} userId={} sessionId={} bodyLen={}", agentId, userId, sessionId,
             body.length());
         String chatRequestId = extractRequestId(body);
 
-        return hookPipeline.executeRequest(ctx)
-            .map(this::normalizeReplyUserMessageCreated)
-            .flatMap(processedBody -> instanceManager.getOrSpawn(agentId, userId).flatMap(instance -> {
-                instance.touch();
-                instanceManager.touchAllForUser(userId);
-                String path = goosedSessionPath(sessionId, "reply");
-                return ensureSessionResumed(instance, sessionId)
-                    .then(snapshotFilesBeforeReply(agentId, userId, sessionId, chatRequestId))
-                    .then(goosedProxy.proxySessionCommandWithBody(exchange.getResponse(), instance.getPort(), path,
-                        HttpMethod.POST, processedBody, instance.getSecretKey()))
-                    .doOnSubscribe(sub -> log
-                        .info("[SESSION-REPLY] forwarding agentId={} userId={} sessionId={} port={} path={}", agentId,
-                            userId, sessionId, instance.getPort(), path))
-                    .doOnSuccess(ignored -> {
-                        if (exchange.getResponse().getStatusCode() == null
-                            || !exchange.getResponse().getStatusCode().is2xxSuccessful()) {
-                            removeFileSnapshot(agentId, userId, sessionId, chatRequestId);
-                        }
-                        log.info("[SESSION-REPLY] completed agentId={} userId={} sessionId={} totalMs={} status={}", agentId,
-                            userId, sessionId, System.currentTimeMillis() - requestStart,
-                            exchange.getResponse().getStatusCode());
-                    })
-                    .doOnError(err -> {
-                        removeFileSnapshot(agentId, userId, sessionId, chatRequestId);
-                        log.warn("[SESSION-REPLY] failed agentId={} userId={} sessionId={} totalMs={} error={}", agentId, userId,
-                            sessionId, System.currentTimeMillis() - requestStart, err.getMessage());
-                    });
-            }))
-            .onErrorResume(err -> writeSessionError(exchange, err, agentId, userId, sessionId, chatRequestId,
-                "gateway_submit_failed", requestStart));
+        try {
+            String processedBody = hookPipeline.executeRequest(ctx)
+                .map(this::normalizeReplyUserMessageCreated)
+                .block();
+            ManagedInstance instance = instanceManager.getOrSpawn(agentId, userId).block();
+            instance.touch();
+            instanceManager.touchAllForUser(userId);
+            String path = goosedSessionPath(sessionId, "reply");
+            ensureSessionResumed(instance, sessionId);
+            snapshotFilesBeforeReply(agentId, userId, sessionId, chatRequestId);
+            log.info("[SESSION-REPLY] forwarding agentId={} userId={} sessionId={} port={} path={}", agentId,
+                userId, sessionId, instance.getPort(), path);
+            String result = goosedProxy.fetchJson(instance.getPort(), HttpMethod.POST, path,
+                processedBody, 120, instance.getSecretKey()).block();
+            log.info("[SESSION-REPLY] completed agentId={} userId={} sessionId={} totalMs={}", agentId,
+                userId, sessionId, System.currentTimeMillis() - requestStart);
+            return result;
+        } catch (ResponseStatusException | WebClientResponseException | IllegalStateException err) {
+            removeFileSnapshot(agentId, userId, sessionId, chatRequestId);
+            log.warn("[SESSION-REPLY] failed agentId={} userId={} sessionId={} totalMs={} error={}", agentId, userId,
+                sessionId, System.currentTimeMillis() - requestStart, err.getMessage());
+            throw err;
+        }
     }
 
     /**
@@ -185,37 +187,25 @@ public class ReplyController {
      * @param sessionId unique identifier of the chat session to stream events from
      * @param lastEventId ID of the last received SSE event for resumption, may be {@code null}
      * @param exchange reactive server exchange providing request attributes and the response sink
-     * @return a {@code Mono<Void>} that completes when the SSE stream ends or errors out
+     * @return a {@code void} that completes when the SSE stream ends or errors out
      */
     @GetMapping(value = "/sessions/{sessionId}/events", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
-    public Mono<Void> sessionEvents(@PathVariable("agentId") String agentId,
-        @PathVariable("sessionId") String sessionId,
-        @RequestHeader(value = "Last-Event-ID", required = false) String lastEventId, ServerWebExchange exchange) {
+    public SseEmitter sessionEvents(@PathVariable("agentId") String agentId, @PathVariable("sessionId") String sessionId,
+        @RequestHeader(value = "Last-Event-ID", required = false) String lastEventId, HttpServletRequest request) {
         long requestStart = System.currentTimeMillis();
-        String userId = exchange.getAttribute(UserContextFilter.USER_ID_ATTR);
+        String userId = (String) request.getAttribute(UserContextFilter.USER_ID_ATTR);
         log.info("[SESSION-EVENTS] subscribe agentId={} userId={} sessionId={} lastEventId={}", agentId, userId, sessionId,
             lastEventId);
 
-        return instanceManager.getOrSpawn(agentId, userId).flatMap(instance -> {
-            instance.touch();
-            instanceManager.touchAllForUser(userId);
-            String path = goosedSessionPath(sessionId, "events");
-            return ensureSessionResumed(instance, sessionId)
-                .then(goosedProxy.proxySessionEvents(exchange.getResponse(), instance.getPort(), path,
-                    instance.getSecretKey(), lastEventId, agentId, userId, sessionId,
-                    eventJson -> outputFilesBeforeTerminalEvent(agentId, userId, sessionId, eventJson)))
-                .doOnSubscribe(sub -> log
-                    .info("[SESSION-EVENTS] forwarding agentId={} userId={} sessionId={} port={} path={}", agentId,
-                        userId, sessionId, instance.getPort(), path))
-                .doOnSuccess(ignored -> log
-                    .info("[SESSION-EVENTS] ended agentId={} userId={} sessionId={} totalMs={} status={}", agentId,
-                        userId, sessionId, System.currentTimeMillis() - requestStart,
-                        exchange.getResponse().getStatusCode()))
-                .doOnError(err -> log.warn("[SESSION-EVENTS] failed agentId={} userId={} sessionId={} totalMs={} error={}",
-                    agentId, userId, sessionId, System.currentTimeMillis() - requestStart, err.getMessage()));
-        })
-            .onErrorResume(err -> writeSessionError(exchange, err, agentId, userId, sessionId, null,
-                "gateway_events_failed", requestStart));
+        ManagedInstance instance = instanceManager.getOrSpawn(agentId, userId).block();
+        instance.touch();
+        instanceManager.touchAllForUser(userId);
+        String path = goosedSessionPath(sessionId, "events");
+        log.info("[SESSION-EVENTS] forwarding agentId={} userId={} sessionId={} port={} path={}", agentId,
+            userId, sessionId, instance.getPort(), path);
+
+        return goosedProxy.proxySessionEventsToEmitter(instance.getPort(), path,
+            instance.getSecretKey(), lastEventId, agentId, userId, sessionId);
     }
 
     /**
@@ -225,37 +215,34 @@ public class ReplyController {
      * @param sessionId unique identifier of the chat session containing the request to cancel
      * @param body JSON request body with the request ID to cancel
      * @param exchange reactive server exchange providing request attributes and the response sink
-     * @return a {@code Mono<Void>} that completes once the cancel command has been proxied
+     * @return a {@code void} that completes once the cancel command has been proxied
      */
     @PostMapping(value = "/sessions/{sessionId}/cancel", produces = MediaType.APPLICATION_JSON_VALUE)
-    public Mono<Void> sessionCancel(@PathVariable("agentId") String agentId,
-        @PathVariable("sessionId") String sessionId, @RequestBody String body, ServerWebExchange exchange) {
+    public String sessionCancel(@PathVariable("agentId") String agentId, @PathVariable("sessionId") String sessionId,
+        @RequestBody String body, HttpServletRequest request) {
         long requestStart = System.currentTimeMillis();
-        String userId = exchange.getAttribute(UserContextFilter.USER_ID_ATTR);
+        String userId = (String) request.getAttribute(UserContextFilter.USER_ID_ATTR);
         log.info("[SESSION-CANCEL] request received agentId={} userId={} sessionId={} bodyLen={}", agentId, userId,
             sessionId, body.length());
         String requestId = extractRequestId(body);
 
-        return instanceManager.getOrSpawn(agentId, userId).flatMap(instance -> {
+        try {
+            ManagedInstance instance = instanceManager.getOrSpawn(agentId, userId).block();
             instance.touch();
             instanceManager.touchAllForUser(userId);
             String path = goosedSessionPath(sessionId, "cancel");
-            return goosedProxy
-                .proxySessionCommandWithBody(exchange.getResponse(), instance.getPort(), path, HttpMethod.POST, body,
-                    instance.getSecretKey())
-                .doOnSubscribe(sub -> log.info(
-                    "[SESSION-CANCEL] forwarding agentId={} " + "userId={} sessionId={} port={} path={}", agentId,
-                    userId, sessionId, instance.getPort(), path))
-                .doOnSuccess(ignored -> log.info(
-                    "[SESSION-CANCEL] completed agentId={} userId={} " + "sessionId={} totalMs={} status={}", agentId,
-                    userId, sessionId, System.currentTimeMillis() - requestStart,
-                    exchange.getResponse().getStatusCode()))
-                .doOnError(err -> log.warn(
-                    "[SESSION-CANCEL] failed agentId={} userId={} " + "sessionId={} totalMs={} error={}", agentId,
-                    userId, sessionId, System.currentTimeMillis() - requestStart, err.getMessage()));
-        })
-            .onErrorResume(err -> writeSessionError(exchange, err, agentId, userId, sessionId, requestId,
-                "gateway_cancel_failed", requestStart));
+            log.info("[SESSION-CANCEL] forwarding agentId={} userId={} sessionId={} port={} path={}", agentId,
+                userId, sessionId, instance.getPort(), path);
+            String result = goosedProxy.fetchJson(instance.getPort(), HttpMethod.POST, path,
+                body, 30, instance.getSecretKey()).block();
+            log.info("[SESSION-CANCEL] completed agentId={} userId={} sessionId={} totalMs={}", agentId,
+                userId, sessionId, System.currentTimeMillis() - requestStart);
+            return result;
+        } catch (ResponseStatusException | WebClientResponseException | IllegalStateException err) {
+            log.warn("[SESSION-CANCEL] failed agentId={} userId={} sessionId={} totalMs={} error={}", agentId,
+                userId, sessionId, System.currentTimeMillis() - requestStart, err.getMessage());
+            throw err;
+        }
     }
 
     private String goosedSessionPath(String sessionId, String suffix) {
@@ -275,27 +262,25 @@ public class ReplyController {
         }
     }
 
-    private Mono<Void> snapshotFilesBeforeReply(String agentId, String userId, String sessionId, String requestId) {
+    private void snapshotFilesBeforeReply(String agentId, String userId, String sessionId, String requestId) {
         if (requestId == null || requestId.isBlank()) {
-            return Mono.empty();
+            return;
         }
-        return Mono.fromRunnable(() -> {
-            Path workingDir = agentConfigService.getUserAgentDir(userId, agentId);
-            List<Map<String, Object>> beforeFiles = snapshotFiles(workingDir);
-            String key = fileSnapshotKey(agentId, userId, sessionId, requestId);
-            String sessionKey = fileSnapshotSessionKey(agentId, userId, sessionId);
-            fileSnapshots.put(key, beforeFiles);
-            pendingFileSnapshotRequests.put(sessionKey, requestId);
-            scheduleFileSnapshotRemoval(key, sessionKey, requestId);
-            log.debug(
-                "[SESSION-REPLY] captured {} file snapshot entries agentId={} userId={} sessionId={} " + "requestId={}",
-                beforeFiles.size(), agentId, userId, sessionId, requestId);
-        }).subscribeOn(Schedulers.boundedElastic()).then();
+        Path workingDir = agentConfigService.getUserAgentDir(userId, agentId);
+        List<Map<String, Object>> beforeFiles = snapshotFiles(workingDir);
+        String key = fileSnapshotKey(agentId, userId, sessionId, requestId);
+        String sessionKey = fileSnapshotSessionKey(agentId, userId, sessionId);
+        fileSnapshots.put(key, beforeFiles);
+        pendingFileSnapshotRequests.put(sessionKey, requestId);
+        scheduleFileSnapshotRemoval(key, sessionKey, requestId);
+        log.debug(
+            "[SESSION-REPLY] captured {} file snapshot entries agentId={} userId={} sessionId={} " + "requestId={}",
+            beforeFiles.size(), agentId, userId, sessionId, requestId);
     }
 
-    private Mono<String> outputFilesBeforeTerminalEvent(String agentId, String userId, String sessionId,
+    private String outputFilesBeforeTerminalEvent(String agentId, String userId, String sessionId,
         String eventJson) {
-        return Mono.fromCallable(() -> {
+        try {
             JsonNode event = MAPPER.readTree(eventJson);
             String type = event.path("type").asText("");
             boolean activeRequestsDrained = "ActiveRequests".equals(type) && event.path("request_ids").isArray()
@@ -326,11 +311,11 @@ public class ReplyController {
             log.info("[SESSION-EVENTS] detected {} output files agentId={} userId={} sessionId={} requestId={}",
                 changed.size(), agentId, userId, sessionId, requestId);
             return "data: " + json + "\n\n";
-        }).subscribeOn(Schedulers.boundedElastic()).onErrorResume(err -> {
+        } catch (IOException | IllegalStateException err) {
             log.warn("[SESSION-EVENTS] failed to build OutputFiles event agentId={} userId={} sessionId={}: {}",
                 agentId, userId, sessionId, err.getMessage());
-            return Mono.just("");
-        });
+            return "";
+        }
     }
 
     private String resolveEventRequestId(String agentId, String userId, String sessionId, JsonNode event) {
@@ -361,10 +346,15 @@ public class ReplyController {
     }
 
     private void scheduleFileSnapshotRemoval(String key, String sessionKey, String requestId) {
-        Mono.delay(Duration.ofMinutes(5)).doOnNext(ignored -> {
+        scheduledExecutorService.schedule(() -> {
             fileSnapshots.remove(key);
             pendingFileSnapshotRequests.remove(sessionKey, requestId);
-        }).subscribe();
+        }, 5, TimeUnit.MINUTES);
+    }
+
+    @PreDestroy
+    public void shutdown() {
+        scheduledExecutorService.shutdown();
     }
 
     private List<Map<String, Object>> snapshotFiles(Path workingDir) {
@@ -374,26 +364,6 @@ public class ReplyController {
         } catch (IllegalStateException e) {
             log.debug("[SESSION-REPLY] file snapshot failed (best-effort): {}", e.getMessage());
             return Collections.emptyList();
-        }
-    }
-
-    private Mono<Void> writeSessionError(ServerWebExchange exchange, Throwable err, String agentId, String userId,
-        String sessionId, String requestId, String fallbackCode, long requestStart) {
-        if (exchange.getResponse().isCommitted()) {
-            return Mono.error(err);
-        }
-
-        HttpStatus status = sessionErrorStatus(err);
-        Map<String, Object> body = sessionErrorBody(err, status, agentId, userId, sessionId, requestId, fallbackCode,
-            System.currentTimeMillis() - requestStart);
-        try {
-            byte[] bytes = MAPPER.writeValueAsBytes(body);
-            exchange.getResponse().setStatusCode(status);
-            exchange.getResponse().getHeaders().setContentType(MediaType.APPLICATION_JSON);
-            DataBuffer buffer = exchange.getResponse().bufferFactory().wrap(bytes);
-            return exchange.getResponse().writeWith(Mono.just(buffer));
-        } catch (JsonProcessingException writeErr) {
-            return Mono.error(writeErr);
         }
     }
 
@@ -574,42 +544,45 @@ public class ReplyController {
      * of sync. Treating resume as the standard precondition for session continuation
      * keeps "continue chatting" aligned with the explicit history/resume entrypoint.
      */
-    private Mono<Void> ensureSessionResumed(ManagedInstance instance, String sessionId) {
+    private void ensureSessionResumed(ManagedInstance instance, String sessionId) {
         if (sessionId == null) {
             log.debug("[REPLY] session id missing, skipping pre-reply resume");
-            return Mono.empty();
+            return;
         }
         String resumeBody = "{\"session_id\":\"" + sessionId + "\",\"load_model_and_extensions\":true}";
-        return resumeSession(instance, sessionId, resumeBody, "[REPLY]").onErrorResume(e -> {
+        try {
+            resumeSession(instance, sessionId, resumeBody, "[REPLY]");
+        } catch (WebClientResponseException | IllegalStateException e) {
             log.warn("[REPLY] session {} resume failed on instance {}:{}: {} (will retry next request)", sessionId,
                 instance.getAgentId(), instance.getUserId(), e.getMessage());
-            return Mono.empty();
-        }).then();
+        }
     }
 
-    private Mono<String> resumeSession(ManagedInstance instance, String sessionId, String body, String logPrefix) {
+    private String resumeSession(ManagedInstance instance, String sessionId, String body, String logPrefix) {
         if (sessionId == null || sessionId.isBlank()) {
             return goosedProxy.fetchJson(instance.getPort(), HttpMethod.POST, "/agent/resume", body, 120,
-                instance.getSecretKey());
+                instance.getSecretKey()).block();
         }
 
         String dedupeKey = instance.getKey() + ":" + sessionId;
-        return inFlightResumes.computeIfAbsent(dedupeKey, ignored -> {
-            long resumeStart = System.currentTimeMillis();
-            log.info("{} session {} not yet resumed on instance {}:{} (port={}), calling /agent/resume", logPrefix,
-                sessionId, instance.getAgentId(), instance.getUserId(), instance.getPort());
-            return goosedProxy
-                .fetchJson(instance.getPort(), HttpMethod.POST, "/agent/resume", body, 120, instance.getSecretKey())
-                .doOnNext(r -> {
-                    long resumeMs = System.currentTimeMillis() - resumeStart;
-                    instance.markSessionResumed(sessionId);
-                    log.info("{} session {} resumed in {}ms on instance {}:{}", logPrefix, sessionId, resumeMs,
-                        instance.getAgentId(), instance.getUserId());
-                })
-                .doOnSubscribe(sub -> log.debug("{} joining in-flight resume key={}", logPrefix, dedupeKey))
-                .doFinally(signalType -> inFlightResumes.remove(dedupeKey))
-                .cache();
-        });
+        String result = inFlightResumes.get(dedupeKey);
+        if (result != null) {
+            log.debug("{} joining in-flight resume key={}", logPrefix, dedupeKey);
+            return result;
+        }
+
+        long resumeStart = System.currentTimeMillis();
+        log.info("{} session {} not yet resumed on instance {}:{} (port={}), calling /agent/resume", logPrefix,
+            sessionId, instance.getAgentId(), instance.getUserId(), instance.getPort());
+        String json = goosedProxy
+            .fetchJson(instance.getPort(), HttpMethod.POST, "/agent/resume", body, 120, instance.getSecretKey())
+            .block();
+        long resumeMs = System.currentTimeMillis() - resumeStart;
+        instance.markSessionResumed(sessionId);
+        log.info("{} session {} resumed in {}ms on instance {}:{}", logPrefix, sessionId, resumeMs,
+            instance.getAgentId(), instance.getUserId());
+        inFlightResumes.put(dedupeKey, json);
+        return json;
     }
 
     /**
@@ -618,22 +591,23 @@ public class ReplyController {
      * @param agentId unique identifier of the target agent
      * @param body JSON request body containing the session ID and resume options
      * @param exchange reactive server exchange providing request attributes for user lookup
-     * @return a {@code Mono<String>} emitting the JSON response from the goosed resume endpoint
+     * @return a {@code String} emitting the JSON response from the goosed resume endpoint
      */
-    @PostMapping(value = {"/resume", "/agent/resume"}, produces = MediaType.APPLICATION_JSON_VALUE)
-    public Mono<String> resume(@PathVariable("agentId") String agentId, @RequestBody String body,
-        ServerWebExchange exchange) {
-        String userId = exchange.getAttribute(UserContextFilter.USER_ID_ATTR);
+    @PostMapping(value = "/agent/resume", produces = MediaType.APPLICATION_JSON_VALUE)
+    public String resume(@PathVariable("agentId") String agentId, @RequestBody String body, HttpServletRequest request) {
+        String userId = (String) request.getAttribute(UserContextFilter.USER_ID_ATTR);
         String sessionId = JsonUtil.extractSessionId(body);
-        return instanceManager.getOrSpawn(agentId, userId)
-            .flatMap(instance -> resumeSession(instance, sessionId, body, "[RESUME]"))
-            .doOnNext(json -> logResumeConversationDigest(agentId, userId, sessionId, json))
-            .onErrorResume(WebClientResponseException.class, e -> {
-                if (e.getStatusCode() == HttpStatus.NOT_FOUND) {
-                    return Mono.error(new ResponseStatusException(HttpStatus.NOT_FOUND, "Session not found"));
-                }
-                return Mono.error(e);
-            });
+        ManagedInstance instance = instanceManager.getOrSpawn(agentId, userId).block();
+        try {
+            String json = resumeSession(instance, sessionId, body, "[RESUME]");
+            logResumeConversationDigest(agentId, userId, sessionId, json);
+            return json;
+        } catch (WebClientResponseException e) {
+            if (e.getStatusCode() == HttpStatus.NOT_FOUND) {
+                throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Session not found");
+            }
+            throw e;
+        }
     }
 
     private void logResumeConversationDigest(String agentId, String userId, String sessionId, String json) {
@@ -738,12 +712,12 @@ public class ReplyController {
      * @param exchange reactive server exchange providing request attributes and the response sink
      * @return the restarts the agent instance with a fresh configuration
      */
-    @PostMapping({"/restart", "/agent/restart"})
-    public Mono<Void> restart(@PathVariable("agentId") String agentId, @RequestBody String body,
-        ServerWebExchange exchange) {
-        String userId = exchange.getAttribute(UserContextFilter.USER_ID_ATTR);
-        return instanceManager.getOrSpawn(agentId, userId)
-            .flatMap(instance -> goosedProxy.proxyWithBody(exchange.getResponse(), instance.getPort(), "/agent/restart",
-                HttpMethod.POST, body, instance.getSecretKey()));
+    @PostMapping(value = "/agent/restart", produces = MediaType.APPLICATION_JSON_VALUE)
+    public String restart(@PathVariable("agentId") String agentId, @RequestBody String body, HttpServletRequest request) {
+        String userId = (String) request.getAttribute(UserContextFilter.USER_ID_ATTR);
+        ManagedInstance instance = instanceManager.getOrSpawn(agentId, userId).block();
+        String result = goosedProxy.fetchJson(instance.getPort(), HttpMethod.POST, "/agent/restart",
+            body, 30, instance.getSecretKey()).block();
+        return result;
     }
 }

@@ -3,13 +3,12 @@
  */
 
 package com.huawei.opsfactory.gateway.controller;
+import org.apache.servicecomb.provider.rest.common.RestSchema;
+import jakarta.servlet.http.HttpServletRequest;
 
 import com.huawei.opsfactory.gateway.service.ClusterService;
 import com.huawei.opsfactory.gateway.service.HostGroupService;
 import com.huawei.opsfactory.gateway.service.HostService;
-
-import reactor.core.publisher.Mono;
-import reactor.core.scheduler.Schedulers;
 
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -22,7 +21,6 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
-import org.springframework.web.server.ServerWebExchange;
 
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -35,7 +33,9 @@ import java.util.Set;
  * @author x00000000
  * @since 2026-05-09
  */
+
 @RestController
+@RestSchema(schemaId = "clusterController")
 @RequestMapping("/gateway/clusters")
 public class ClusterController {
     private final ClusterService clusterService;
@@ -64,22 +64,20 @@ public class ClusterController {
      * @return the result
      */
     @GetMapping
-    public Mono<Map<String, Object>> listClusters(@RequestParam(value = "groupId", required = false) String groupId,
+    public Map<String, Object> listClusters(@RequestParam(value = "groupId", required = false) String groupId,
         @RequestParam(value = "type", required = false) String type,
         @RequestParam(value = "enabledOnly", required = false, defaultValue = "false") boolean enabledOnly,
-        ServerWebExchange exchange) {
-        return Mono.fromCallable(() -> {
-            List<Map<String, Object>> clusters = clusterService.listClusters(groupId, type);
-            if (enabledOnly) {
-                List<Map<String, Object>> allGroups = hostGroupService.listGroups();
-                Set<String> disabledGroupIds = hostGroupService.getDisabledGroupIds(allGroups);
-                clusters.removeIf(
-                    c -> Boolean.FALSE.equals(c.get("enabled")) || disabledGroupIds.contains(c.get("groupId")));
-            }
-            Map<String, Object> result = new LinkedHashMap<>();
-            result.put("clusters", clusters);
-            return result;
-        }).subscribeOn(Schedulers.boundedElastic());
+        HttpServletRequest request) {
+        List<Map<String, Object>> clusters = clusterService.listClusters(groupId, type);
+        if (enabledOnly) {
+            List<Map<String, Object>> allGroups = hostGroupService.listGroups();
+            Set<String> disabledGroupIds = hostGroupService.getDisabledGroupIds(allGroups);
+            clusters.removeIf(
+                c -> Boolean.FALSE.equals(c.get("enabled")) || disabledGroupIds.contains(c.get("groupId")));
+        }
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("clusters", clusters);
+        return result;
     }
 
     /**
@@ -90,25 +88,23 @@ public class ClusterController {
      * @return a cluster by ID with its associated hosts
      */
     @GetMapping("/{id}")
-    public Mono<ResponseEntity<Map<String, Object>>> getCluster(@PathVariable("id") String id,
-        ServerWebExchange exchange) {
-        return Mono.fromCallable(() -> {
-            try {
-                Map<String, Object> cluster = clusterService.getCluster(id);
-                // Attach hosts for this cluster
-                List<Map<String, Object>> hosts = hostService.listHostsByCluster(id);
-                Map<String, Object> body = new LinkedHashMap<>();
-                body.put("success", true);
-                body.put("cluster", cluster);
-                body.put("hosts", hosts);
-                return ResponseEntity.ok(body);
-            } catch (IllegalArgumentException e) {
-                Map<String, Object> body = new LinkedHashMap<>();
-                body.put("success", false);
-                body.put("error", "Cluster not found");
-                return ResponseEntity.status(HttpStatus.NOT_FOUND).body(body);
-            }
-        }).subscribeOn(Schedulers.boundedElastic());
+    public ResponseEntity<Map<String, Object>> getCluster(@PathVariable("id") String id,
+        HttpServletRequest request) {
+        try {
+            Map<String, Object> cluster = clusterService.getCluster(id);
+            // Attach hosts for this cluster
+            List<Map<String, Object>> hosts = hostService.listHostsByCluster(id);
+            Map<String, Object> body = new LinkedHashMap<>();
+            body.put("success", true);
+            body.put("cluster", cluster);
+            body.put("hosts", hosts);
+            return ResponseEntity.ok(body);
+        } catch (IllegalArgumentException e) {
+            Map<String, Object> body = new LinkedHashMap<>();
+            body.put("success", false);
+            body.put("error", "Cluster not found");
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(body);
+        }
     }
 
     /**
@@ -118,13 +114,11 @@ public class ClusterController {
      * @return all distinct cluster types
      */
     @GetMapping("/types")
-    public Mono<Map<String, Object>> getClusterTypes(ServerWebExchange exchange) {
-        return Mono.fromCallable(() -> {
-            List<String> types = clusterService.getClusterTypes();
-            Map<String, Object> result = new LinkedHashMap<>();
-            result.put("types", types);
-            return result;
-        }).subscribeOn(Schedulers.boundedElastic());
+    public Map<String, Object> getClusterTypes(HttpServletRequest request) {
+        List<String> types = clusterService.getClusterTypes();
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("types", types);
+        return result;
     }
 
     /**
@@ -135,13 +129,11 @@ public class ClusterController {
      * @return the result
      */
     @GetMapping("/{id}/hosts")
-    public Mono<Map<String, Object>> getClusterHosts(@PathVariable("id") String id, ServerWebExchange exchange) {
-        return Mono.fromCallable(() -> {
-            List<Map<String, Object>> hosts = hostService.listHostsByCluster(id);
-            Map<String, Object> result = new LinkedHashMap<>();
-            result.put("hosts", hosts);
-            return result;
-        }).subscribeOn(Schedulers.boundedElastic());
+    public Map<String, Object> getClusterHosts(@PathVariable("id") String id, HttpServletRequest request) {
+        List<Map<String, Object>> hosts = hostService.listHostsByCluster(id);
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("hosts", hosts);
+        return result;
     }
 
     /**
@@ -152,22 +144,20 @@ public class ClusterController {
      * @return the result
      */
     @PostMapping
-    public Mono<ResponseEntity<Map<String, Object>>> createCluster(@RequestBody Map<String, Object> request,
-        ServerWebExchange exchange) {
-        return Mono.fromCallable(() -> {
-            try {
-                Map<String, Object> cluster = clusterService.createCluster(request);
-                Map<String, Object> body = new LinkedHashMap<>();
-                body.put("success", true);
-                body.put("cluster", cluster);
-                return ResponseEntity.status(HttpStatus.CREATED).body(body);
-            } catch (IllegalArgumentException e) {
-                Map<String, Object> body = new LinkedHashMap<>();
-                body.put("success", false);
-                body.put("error", "Invalid cluster request");
-                return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(body);
-            }
-        }).subscribeOn(Schedulers.boundedElastic());
+    public ResponseEntity<Map<String, Object>> createCluster(@RequestBody Map<String, Object> request,
+        HttpServletRequest httpRequest) {
+        try {
+            Map<String, Object> cluster = clusterService.createCluster(request);
+            Map<String, Object> body = new LinkedHashMap<>();
+            body.put("success", true);
+            body.put("cluster", cluster);
+            return ResponseEntity.status(HttpStatus.CREATED).body(body);
+        } catch (IllegalArgumentException e) {
+            Map<String, Object> body = new LinkedHashMap<>();
+            body.put("success", false);
+            body.put("error", "Invalid cluster request");
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(body);
+        }
     }
 
     /**
@@ -179,22 +169,20 @@ public class ClusterController {
      * @return the result
      */
     @PutMapping("/{id}")
-    public Mono<ResponseEntity<Map<String, Object>>> updateCluster(@PathVariable("id") String id,
-        @RequestBody Map<String, Object> request, ServerWebExchange exchange) {
-        return Mono.fromCallable(() -> {
-            try {
-                Map<String, Object> cluster = clusterService.updateCluster(id, request);
-                Map<String, Object> body = new LinkedHashMap<>();
-                body.put("success", true);
-                body.put("cluster", cluster);
-                return ResponseEntity.ok(body);
-            } catch (IllegalArgumentException e) {
-                Map<String, Object> body = new LinkedHashMap<>();
-                body.put("success", false);
-                body.put("error", "Cluster not found");
-                return ResponseEntity.status(HttpStatus.NOT_FOUND).body(body);
-            }
-        }).subscribeOn(Schedulers.boundedElastic());
+    public ResponseEntity<Map<String, Object>> updateCluster(@PathVariable("id") String id,
+        @RequestBody Map<String, Object> request, HttpServletRequest httpRequest) {
+        try {
+            Map<String, Object> cluster = clusterService.updateCluster(id, request);
+            Map<String, Object> body = new LinkedHashMap<>();
+            body.put("success", true);
+            body.put("cluster", cluster);
+            return ResponseEntity.ok(body);
+        } catch (IllegalArgumentException e) {
+            Map<String, Object> body = new LinkedHashMap<>();
+            body.put("success", false);
+            body.put("error", "Cluster not found");
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(body);
+        }
     }
 
     /**
@@ -206,32 +194,30 @@ public class ClusterController {
      * @return the result
      */
     @DeleteMapping("/{id}")
-    public Mono<ResponseEntity<Map<String, Object>>> deleteCluster(@PathVariable("id") String id,
+    public ResponseEntity<Map<String, Object>> deleteCluster(@PathVariable("id") String id,
         @RequestParam(value = "force", required = false, defaultValue = "false") boolean force,
-        ServerWebExchange exchange) {
-        return Mono.fromCallable(() -> {
-            try {
-                boolean deleted;
-                if (force) {
-                    deleted = clusterService.forceDeleteCluster(id, hostService);
-                } else {
-                    deleted = clusterService.deleteCluster(id, hostService);
-                }
-                if (!deleted) {
-                    Map<String, Object> body = new LinkedHashMap<>();
-                    body.put("success", false);
-                    body.put("error", "Cluster not found: " + id);
-                    return ResponseEntity.status(HttpStatus.NOT_FOUND).body(body);
-                }
-                Map<String, Object> body = new LinkedHashMap<>();
-                body.put("success", true);
-                return ResponseEntity.ok(body);
-            } catch (IllegalStateException e) {
+        HttpServletRequest request) {
+        try {
+            boolean deleted;
+            if (force) {
+                deleted = clusterService.forceDeleteCluster(id, hostService);
+            } else {
+                deleted = clusterService.deleteCluster(id, hostService);
+            }
+            if (!deleted) {
                 Map<String, Object> body = new LinkedHashMap<>();
                 body.put("success", false);
-                body.put("error", "Cluster delete conflict");
-                return ResponseEntity.status(HttpStatus.CONFLICT).body(body);
+                body.put("error", "Cluster not found: " + id);
+                return ResponseEntity.status(HttpStatus.NOT_FOUND).body(body);
             }
-        }).subscribeOn(Schedulers.boundedElastic());
+            Map<String, Object> body = new LinkedHashMap<>();
+            body.put("success", true);
+            return ResponseEntity.ok(body);
+        } catch (IllegalStateException e) {
+            Map<String, Object> body = new LinkedHashMap<>();
+            body.put("success", false);
+            body.put("error", "Cluster delete conflict");
+            return ResponseEntity.status(HttpStatus.CONFLICT).body(body);
+        }
     }
 }

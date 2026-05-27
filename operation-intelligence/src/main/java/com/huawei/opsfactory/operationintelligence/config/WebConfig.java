@@ -6,12 +6,14 @@ package com.huawei.opsfactory.operationintelligence.config;
 
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.http.HttpMethod;
 import org.springframework.util.StringUtils;
 import org.springframework.web.cors.CorsConfiguration;
-import org.springframework.web.cors.reactive.CorsWebFilter;
-import org.springframework.web.cors.reactive.UrlBasedCorsConfigurationSource;
+import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
+import org.springframework.web.filter.CorsFilter;
 
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 
 /**
@@ -20,7 +22,7 @@ import java.util.List;
  * @author x00000000
  * @since 2026-05-11
  */
-@Configuration
+@Configuration("operationIntelligenceWebConfig")
 public class WebConfig {
 
     private final OperationIntelligenceProperties properties;
@@ -40,23 +42,25 @@ public class WebConfig {
      * @return the result
      */
     @Bean
-    public CorsWebFilter corsWebFilter() {
+    public CorsFilter corsFilter() {
         CorsConfiguration config = new CorsConfiguration();
         String corsOrigin = properties.getCorsOrigin();
         if (StringUtils.hasText(corsOrigin)) {
             String[] origins = StringUtils.commaDelimitedListToStringArray(corsOrigin);
             config.setAllowedOriginPatterns(Arrays.asList(origins));
+            config.setAllowedHeaders(Arrays.asList("Content-Type", "Authorization", "X-Secret-Key", "X-User-Id"));
             config.setAllowCredentials(true);
         } else {
-            config.setAllowedOriginPatterns(List.of("*"));
+            config.setAllowedOriginPatterns(Collections.emptyList());
+            config.setAllowedHeaders(Collections.emptyList());
             config.setAllowCredentials(false);
         }
-        config.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
-        config.setAllowedHeaders(List.of("*"));
+        config.setAllowedMethods(Arrays.asList(HttpMethod.GET.name(), HttpMethod.POST.name(), HttpMethod.PUT.name(),
+            HttpMethod.PATCH.name(), HttpMethod.DELETE.name(), HttpMethod.OPTIONS.name()));
         config.setMaxAge(3600L);
 
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
         source.registerCorsConfiguration("/**", config);
-        return new CorsWebFilter(source);
+        return new CorsFilter(source);
     }
 }

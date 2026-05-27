@@ -1,3 +1,7 @@
+/*
+ * Copyright (c) Huawei Technologies Co., Ltd. 2026-2026. All rights reserved.
+ */
+
 package com.huawei.opsfactory.skillmarket.api;
 
 import static org.mockito.ArgumentMatchers.any;
@@ -37,6 +41,12 @@ import org.springframework.test.web.servlet.MockMvc;
 
 @WebMvcTest({SkillController.class, SystemController.class})
 @Import({SkillMarketProperties.class, WebConfig.class})
+/**
+ * Skill Controller Test.
+ *
+ * @author x00000000
+ * @since 2026-05-27
+ */
 class SkillControllerTest {
 
     @Autowired

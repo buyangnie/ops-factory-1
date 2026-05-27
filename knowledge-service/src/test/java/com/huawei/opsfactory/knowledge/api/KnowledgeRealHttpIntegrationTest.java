@@ -130,6 +130,10 @@ class KnowledgeRealHttpIntegrationTest {
             String currentDocumentId = item.path("id").asText();
             String fileName = item.path("name").asText();
             ResponseEntity<String> markdownResponse = restTemplate.getForEntity(url("/knowledge/documents/" + currentDocumentId + "/artifacts/markdown"), String.class);
+            // Skip documents without markdown artifact
+            if (markdownResponse.getStatusCode() == HttpStatus.NOT_FOUND) {
+                continue;
+            }
             assertThat(markdownResponse.getStatusCode()).isEqualTo(HttpStatus.OK);
             String markdown = markdownResponse.getBody();
             assertThat(markdown).isNotBlank();

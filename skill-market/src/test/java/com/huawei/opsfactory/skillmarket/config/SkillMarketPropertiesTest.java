@@ -1,3 +1,7 @@
+/*
+ * Copyright (c) Huawei Technologies Co., Ltd. 2026-2026. All rights reserved.
+ */
+
 package com.huawei.opsfactory.skillmarket.config;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -8,6 +12,12 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 
+/**
+ * Skill Market Properties Test.
+ *
+ * @author x00000000
+ * @since 2026-05-27
+ */
 class SkillMarketPropertiesTest {
 
     @Test
@@ -38,6 +48,12 @@ class SkillMarketPropertiesTest {
     "skill-market.package.allow-scripts=false",
     "skill-market.logging.access-log-enabled=false"
 })
+/**
+ * Skill Market Properties Binding Test.
+ *
+ * @author x00000000
+ * @since 2026-05-27
+ */
 class SkillMarketPropertiesBindingTest {
 
     @Autowired

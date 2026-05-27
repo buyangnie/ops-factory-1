@@ -6,8 +6,6 @@ package com.huawei.opsfactory.gateway.service;
 
 import com.huawei.opsfactory.gateway.config.GatewayProperties;
 
-import reactor.core.publisher.Mono;
-
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -19,9 +17,11 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 import org.springframework.web.reactive.function.client.ExchangeStrategies;
 import org.springframework.web.reactive.function.client.WebClient;
-import org.springframework.web.server.ServerWebExchange;
 import org.springframework.web.util.UriComponentsBuilder;
 
+import jakarta.servlet.http.HttpServletRequest;
+
+import java.io.IOException;
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
@@ -61,14 +61,14 @@ public class OperationIntelligenceProxyService {
     /**
      * Proxies a request to operation-intelligence.
      *
-     * @param exchange the exchange
+     * @param request the request
      * @return the result
      */
-    public Mono<ResponseEntity<String>> proxy(ServerWebExchange exchange) {
-        String bodyPath = targetPath(exchange);
+    public ResponseEntity<String> proxy(HttpServletRequest request) {
+        String bodyPath = targetPath(request);
         if (!bodyPath.startsWith(OI_PATH_PREFIX)) {
-            return Mono.just(ResponseEntity.status(HttpStatus.BAD_REQUEST)
-                .body("{\"error\":\"Invalid proxy path\"}"));
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                .body("{\"error\":\"Invalid proxy path\"}");
         }
         String baseUrl = properties.getOperationIntelligence().getBaseUrl();
         if (!baseUrl.startsWith("https://") && !properties.getOperationIntelligence().getSecretKey().isEmpty()) {
@@ -76,26 +76,36 @@ public class OperationIntelligenceProxyService {
         }
         URI targetUri = UriComponentsBuilder.fromUriString(baseUrl)
             .path(bodyPath)
-            .query(exchange.getRequest().getURI().getRawQuery())
+            .query(request.getQueryString())
             .build(true)
             .toUri();
-        HttpMethod method = exchange.getRequest().getMethod();
+        HttpMethod method;
+        try {
+            method = HttpMethod.valueOf(request.getMethod());
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.status(HttpStatus.METHOD_NOT_ALLOWED)
+                .body("{\"error\":\"Unsupported method\"}");
+        }
+
         WebClient.RequestBodySpec spec = webClient.method(method)
             .uri(targetUri)
             .header("x-secret-key", properties.getOperationIntelligence().getSecretKey())
-            .headers(headers -> copyForwardHeaders(exchange, headers));
+            .headers(headers -> copyForwardHeaders(request, headers));
 
-        Mono<String> requestBody = exchange.getRequest().getBody().map(buffer -> {
-            byte[] bytes = new byte[buffer.readableByteCount()];
-            buffer.read(bytes);
-            return new String(bytes, StandardCharsets.UTF_8);
-        }).reduce(String::concat).defaultIfEmpty("");
+        byte[] bodyBytes;
+        try {
+            bodyBytes = request.getInputStream().readAllBytes();
+        } catch (IOException e) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                .body("{\"error\":\"Failed to read request body\"}");
+        }
 
-        return requestBody.flatMap(body -> send(spec, body))
-            .timeout(Duration.ofMillis(properties.getOperationIntelligence().getRequestTimeoutMs()));
+        String body = bodyBytes.length == 0 ? "" : new String(bodyBytes, StandardCharsets.UTF_8);
+        Duration timeout = Duration.ofMillis(properties.getOperationIntelligence().getRequestTimeoutMs());
+        return send(spec, body).timeout(timeout).block(timeout);
     }
 
-    private Mono<ResponseEntity<String>> send(WebClient.RequestBodySpec spec, String body) {
+    private reactor.core.publisher.Mono<ResponseEntity<String>> send(WebClient.RequestBodySpec spec, String body) {
         WebClient.RequestHeadersSpec<?> ready = body.isBlank() ? spec : spec.bodyValue(body);
         return ready.exchangeToMono(response -> response.bodyToMono(String.class)
             .defaultIfEmpty("")
@@ -104,20 +114,21 @@ public class OperationIntelligenceProxyService {
                 .body(responseBody)));
     }
 
-    String targetPath(ServerWebExchange exchange) {
-        String path = exchange.getRequest().getURI().getRawPath();
+    String targetPath(HttpServletRequest request) {
+        String path = request.getRequestURI();
         if (path.startsWith(GATEWAY_PREFIX)) {
             return path.substring(GATEWAY_PREFIX.length());
         }
         return path;
     }
 
-    private void copyForwardHeaders(ServerWebExchange exchange, HttpHeaders headers) {
-        String userId = exchange.getRequest().getHeaders().getFirst("x-user-id");
+    private void copyForwardHeaders(HttpServletRequest request, HttpHeaders headers) {
+        String userId = request.getHeader("x-user-id");
         if (userId != null && !userId.isBlank()) {
             headers.set("x-user-id", userId);
         }
-        MediaType contentType = exchange.getRequest().getHeaders().getContentType();
+        String contentTypeValue = request.getContentType();
+        MediaType contentType = contentTypeValue == null ? null : MediaType.parseMediaType(contentTypeValue);
         if (contentType != null) {
             headers.setContentType(contentType);
         }

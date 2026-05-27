@@ -1,3 +1,7 @@
+/*
+ * Copyright (c) Huawei Technologies Co., Ltd. 2026-2026. All rights reserved.
+ */
+
 package com.huawei.opsfactory.exporter;
 
 import java.io.IOException;
@@ -7,6 +11,12 @@ import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 
+/**
+ * Exporter Controller Test.
+ *
+ * @author x00000000
+ * @since 2026-05-27
+ */
 class ExporterControllerTest {
 
     @Test

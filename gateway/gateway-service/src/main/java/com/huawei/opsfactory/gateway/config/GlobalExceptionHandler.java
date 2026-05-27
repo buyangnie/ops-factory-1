@@ -6,14 +6,13 @@ package com.huawei.opsfactory.gateway.config;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.core.codec.DecodingException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
-import org.springframework.web.reactive.function.client.WebClientResponseException;
 import org.springframework.web.server.ResponseStatusException;
-import org.springframework.web.server.ServerWebInputException;
+import org.springframework.web.servlet.resource.NoResourceFoundException;
 
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -50,16 +49,12 @@ public class GlobalExceptionHandler {
      * @param ex ex
      * @return the handles request input errors such as invalid JSON body
      */
-    @ExceptionHandler(ServerWebInputException.class)
-    public ResponseEntity<Map<String, Object>> handleInputException(ServerWebInputException ex) {
+    @ExceptionHandler(HttpMessageNotReadableException.class)
+    public ResponseEntity<Map<String, Object>> handleInputException(HttpMessageNotReadableException ex) {
         log.warn("Request input error: {}", ex.getMessage());
         Map<String, Object> body = new LinkedHashMap<>();
         body.put("success", false);
-        if (ex.getCause() instanceof DecodingException) {
-            body.put("error", "Invalid JSON body");
-        } else {
-            body.put("error", ex.getReason() != null ? ex.getReason() : ex.getMessage());
-        }
+        body.put("error", ex.getMessage() != null ? ex.getMessage() : "Invalid request body");
         return ResponseEntity.badRequest().body(body);
     }
 
@@ -79,41 +74,19 @@ public class GlobalExceptionHandler {
     }
 
     /**
-     * Catch-all for goosed HTTP errors that controllers didn't handle.
-     * Forwards the upstream status code with a sanitized error message.
+     * Handles NoResourceFoundException and returns 404 with a clear error message.
      *
-     * @param ex catch-all for goosed HTTP errors that controllers didn't handle
-     * @return the catch-all for goosed HTTP errors that controllers didn't handle
+     * @param ex ex
+     * @return 404 response with error details
      */
-    @ExceptionHandler(WebClientResponseException.class)
-    public ResponseEntity<Map<String, Object>> handleWebClientResponse(WebClientResponseException ex) {
-        HttpStatus status = HttpStatus.resolve(ex.getRawStatusCode());
-        if (status == null) {
-            status = HttpStatus.BAD_GATEWAY;
-        }
-
-        String message;
-        if (status == HttpStatus.NOT_FOUND) {
-            message = "Requested resource not found";
-        } else if (status.series() == HttpStatus.Series.CLIENT_ERROR) {
-            message = "Agent request failed: " + ex.getStatusText();
-        } else {
-            message = "Agent internal error";
-        }
-
-        String path = ex.getRequest() != null ? ex.getRequest().getURI().getPath() : "unknown";
-        String responseBody = ex.getResponseBodyAsString();
-        if (properties.getLogging().isIncludeUpstreamErrorBody()) {
-            log.warn("Goosed returned {} for {} bodyLength={} body={}", ex.getRawStatusCode(), path,
-                responseBody.length(), truncate(responseBody, 500));
-        } else {
-            log.warn("Goosed returned {} for {} bodyLength={}", ex.getRawStatusCode(), path, responseBody.length());
-        }
-
+    @ExceptionHandler(NoResourceFoundException.class)
+    public ResponseEntity<Map<String, Object>> handleNoResourceFound(NoResourceFoundException ex) {
+        String resourceLocation = ex.getResourcePath();
+        log.warn("Resource not found: {}", resourceLocation);
         Map<String, Object> body = new LinkedHashMap<>();
         body.put("success", false);
-        body.put("error", message);
-        return ResponseEntity.status(status).body(body);
+        body.put("error", "Resource not found: " + resourceLocation);
+        return ResponseEntity.notFound().build();
     }
 
     /**

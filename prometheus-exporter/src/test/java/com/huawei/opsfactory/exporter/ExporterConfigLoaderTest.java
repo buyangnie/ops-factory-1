@@ -1,3 +1,7 @@
+/*
+ * Copyright (c) Huawei Technologies Co., Ltd. 2026-2026. All rights reserved.
+ */
+
 package com.huawei.opsfactory.exporter;
 
 import java.io.IOException;
@@ -7,6 +11,12 @@ import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
+/**
+ * Exporter Config Loader Test.
+ *
+ * @author x00000000
+ * @since 2026-05-27
+ */
 class ExporterConfigLoaderTest {
 
     @TempDir
@@ -112,7 +122,10 @@ class ExporterConfigLoaderTest {
      *
      * Since ExporterConfigLoader reads CONFIG_PATH from System.getenv() which
      * cannot be easily overridden, we use a subclass to inject the path.
-     */
+     *
+     * @author x00000000
+     * @since 2026-05-27
+    */
     private ExporterProperties loadWithConfig(Path configPath) {
         ExporterConfigLoader loader = new ExporterConfigLoader() {
             @Override

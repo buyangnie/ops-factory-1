@@ -7,9 +7,6 @@ package com.huawei.opsfactory.operationintelligence.controller;
 import com.huawei.opsfactory.operationintelligence.qos.model.ProductConfigRule;
 import com.huawei.opsfactory.operationintelligence.service.QosService;
 
-import reactor.core.publisher.Mono;
-import reactor.core.scheduler.Schedulers;
-
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
@@ -82,18 +79,16 @@ public class QosController {
      * @return the result
      */
     @PostMapping("/getHealthIndicator")
-    public Mono<Map<String, Object>> getHealthIndicator(@RequestBody Map<String, Object> req) {
-        return Mono.fromCallable(() -> {
-            String envCode = (String) req.get("envCode");
-            requireEnvCode(envCode);
-            long startTime = toLong(req.get("startTime"));
-            long endTime = toLong(req.get("endTime"));
-            validateTimeRange(startTime, endTime);
-            List<Map<String, Object>> results = qosService.getHealthIndicator(envCode, startTime, endTime);
-            Map<String, Object> response = new LinkedHashMap<>();
-            response.put("results", results);
-            return response;
-        }).subscribeOn(Schedulers.boundedElastic());
+    public Map<String, Object> getHealthIndicator(@RequestBody Map<String, Object> req) {
+        String envCode = (String) req.get("envCode");
+        requireEnvCode(envCode);
+        long startTime = toLong(req.get("startTime"));
+        long endTime = toLong(req.get("endTime"));
+        validateTimeRange(startTime, endTime);
+        List<Map<String, Object>> results = qosService.getHealthIndicator(envCode, startTime, endTime);
+        Map<String, Object> response = new LinkedHashMap<>();
+        response.put("results", results);
+        return response;
     }
 
     /**
@@ -103,7 +98,7 @@ public class QosController {
      * @return the result
      */
     @PostMapping("/getAvailableIndicatorDetail")
-    public Mono<Map<String, Object>> getAvailableIndicatorDetail(@RequestBody Map<String, Object> req) {
+    public Map<String, Object> getAvailableIndicatorDetail(@RequestBody Map<String, Object> req) {
         return getIndicatorDetail(req, "A");
     }
 
@@ -114,7 +109,7 @@ public class QosController {
      * @return the result
      */
     @PostMapping("/getPerformanceIndicatorDetail")
-    public Mono<Map<String, Object>> getPerformanceIndicatorDetail(@RequestBody Map<String, Object> req) {
+    public Map<String, Object> getPerformanceIndicatorDetail(@RequestBody Map<String, Object> req) {
         return getIndicatorDetail(req, "P");
     }
 
@@ -125,18 +120,16 @@ public class QosController {
      * @return the result
      */
     @PostMapping("/getResourceIndicatorDetail")
-    public Mono<Map<String, Object>> getResourceIndicatorDetail(@RequestBody Map<String, Object> req) {
-        return Mono.fromCallable(() -> {
-            String envCode = (String) req.get("envCode");
-            requireEnvCode(envCode);
-            long startTime = toLong(req.get("startTime"));
-            long endTime = toLong(req.get("endTime"));
-            validateTimeRange(startTime, endTime);
-            List<?> results = qosService.getResourceNormalize(envCode, startTime, endTime);
-            Map<String, Object> response = new LinkedHashMap<>();
-            response.put("results", results);
-            return response;
-        }).subscribeOn(Schedulers.boundedElastic());
+    public Map<String, Object> getResourceIndicatorDetail(@RequestBody Map<String, Object> req) {
+        String envCode = (String) req.get("envCode");
+        requireEnvCode(envCode);
+        long startTime = toLong(req.get("startTime"));
+        long endTime = toLong(req.get("endTime"));
+        validateTimeRange(startTime, endTime);
+        List<?> results = qosService.getResourceNormalize(envCode, startTime, endTime);
+        Map<String, Object> response = new LinkedHashMap<>();
+        response.put("results", results);
+        return response;
     }
 
     /**
@@ -146,18 +139,16 @@ public class QosController {
      * @return the result
      */
     @PostMapping("/getContributionData")
-    public Mono<Map<String, Object>> getContributionData(@RequestBody Map<String, Object> req) {
-        return Mono.fromCallable(() -> {
-            String envCode = (String) req.get("envCode");
-            requireEnvCode(envCode);
-            long startTime = toLong(req.get("startTime"));
-            long endTime = toLong(req.get("endTime"));
-            validateTimeRange(startTime, endTime);
-            List<Map<String, Object>> results = qosService.getContributionData(envCode, startTime, endTime);
-            Map<String, Object> response = new LinkedHashMap<>();
-            response.put("results", results);
-            return response;
-        }).subscribeOn(Schedulers.boundedElastic());
+    public Map<String, Object> getContributionData(@RequestBody Map<String, Object> req) {
+        String envCode = (String) req.get("envCode");
+        requireEnvCode(envCode);
+        long startTime = toLong(req.get("startTime"));
+        long endTime = toLong(req.get("endTime"));
+        validateTimeRange(startTime, endTime);
+        List<Map<String, Object>> results = qosService.getContributionData(envCode, startTime, endTime);
+        Map<String, Object> response = new LinkedHashMap<>();
+        response.put("results", results);
+        return response;
     }
 
     /**
@@ -167,17 +158,15 @@ public class QosController {
      * @return the result
      */
     @PostMapping("/getAlarmIndicatorDetail")
-    public Mono<Map<String, Object>> getAlarmIndicatorDetail(@RequestBody Map<String, Object> req) {
-        return Mono.fromCallable(() -> {
-            String envCode = (String) req.get("envCode");
-            requireEnvCode(envCode);
-            long startTime = toLong(req.get("startTime"));
-            long endTime = toLong(req.get("endTime"));
-            validateTimeRange(startTime, endTime);
-            int pageIndex = req.containsKey("pageIndex") ? toInt(req.get("pageIndex")) : 1;
-            int pageSize = req.containsKey("pageSize") ? toInt(req.get("pageSize")) : 10;
-            return qosService.getAlarmDetail(envCode, startTime, endTime, pageIndex, pageSize);
-        }).subscribeOn(Schedulers.boundedElastic());
+    public Map<String, Object> getAlarmIndicatorDetail(@RequestBody Map<String, Object> req) {
+        String envCode = (String) req.get("envCode");
+        requireEnvCode(envCode);
+        long startTime = toLong(req.get("startTime"));
+        long endTime = toLong(req.get("endTime"));
+        validateTimeRange(startTime, endTime);
+        int pageIndex = req.containsKey("pageIndex") ? toInt(req.get("pageIndex")) : 1;
+        int pageSize = req.containsKey("pageSize") ? toInt(req.get("pageSize")) : 10;
+        return qosService.getAlarmDetail(envCode, startTime, endTime, pageIndex, pageSize);
     }
 
     /**
@@ -187,17 +176,15 @@ public class QosController {
      * @return the result
      */
     @PostMapping("/getProductConfigRule")
-    public Mono<ResponseEntity<Map<String, Object>>> getProductConfigRule(@RequestBody Map<String, Object> req) {
-        return Mono.fromCallable(() -> {
-            String agentSolutionType = (String) req.get("agentSolutionType");
-            Optional<ProductConfigRule> rule = qosService.getProductConfigRule(agentSolutionType);
-            if (rule.isEmpty()) {
-                return ResponseEntity.status(HttpStatus.NOT_FOUND).body((Map<String, Object>) null);
-            }
-            Map<String, Object> body = new LinkedHashMap<>();
-            body.put("result", rule.get());
-            return ResponseEntity.ok(body);
-        }).subscribeOn(Schedulers.boundedElastic());
+    public ResponseEntity<Map<String, Object>> getProductConfigRule(@RequestBody Map<String, Object> req) {
+        String agentSolutionType = (String) req.get("agentSolutionType");
+        Optional<ProductConfigRule> rule = qosService.getProductConfigRule(agentSolutionType);
+        if (rule.isEmpty()) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body((Map<String, Object>) null);
+        }
+        Map<String, Object> body = new LinkedHashMap<>();
+        body.put("result", rule.get());
+        return ResponseEntity.ok(body);
     }
 
     /**
@@ -206,25 +193,21 @@ public class QosController {
      * @return the result
      */
     @GetMapping("/getEnvironments")
-    public Mono<Map<String, Object>> getEnvironments() {
-        return Mono.fromCallable(() -> {
-            Map<String, Object> response = new LinkedHashMap<>();
-            response.put("results", qosService.getEnvironments());
-            return response;
-        }).subscribeOn(Schedulers.boundedElastic());
+    public Map<String, Object> getEnvironments() {
+        Map<String, Object> response = new LinkedHashMap<>();
+        response.put("results", qosService.getEnvironments());
+        return response;
     }
 
-    private Mono<Map<String, Object>> getIndicatorDetail(Map<String, Object> req, String type) {
-        return Mono.fromCallable(() -> {
-            String envCode = (String) req.get("envCode");
-            requireEnvCode(envCode);
-            long startTime = toLong(req.get("startTime"));
-            long endTime = toLong(req.get("endTime"));
-            validateTimeRange(startTime, endTime);
-            int pageIndex = req.containsKey("pageIndex") ? toInt(req.get("pageIndex")) : 1;
-            int pageSize = req.containsKey("pageSize") ? toInt(req.get("pageSize")) : 10;
-            return qosService.getIndicatorDetail(envCode, type, startTime, endTime, pageIndex, pageSize);
-        }).subscribeOn(Schedulers.boundedElastic());
+    private Map<String, Object> getIndicatorDetail(Map<String, Object> req, String type) {
+        String envCode = (String) req.get("envCode");
+        requireEnvCode(envCode);
+        long startTime = toLong(req.get("startTime"));
+        long endTime = toLong(req.get("endTime"));
+        validateTimeRange(startTime, endTime);
+        int pageIndex = req.containsKey("pageIndex") ? toInt(req.get("pageIndex")) : 1;
+        int pageSize = req.containsKey("pageSize") ? toInt(req.get("pageSize")) : 10;
+        return qosService.getIndicatorDetail(envCode, type, startTime, endTime, pageIndex, pageSize);
     }
 
     private void validateTimeRange(long startTime, long endTime) {

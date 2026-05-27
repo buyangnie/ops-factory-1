@@ -10,8 +10,7 @@ import static org.junit.Assert.assertTrue;
 import com.huawei.opsfactory.gateway.config.GatewayProperties;
 
 import org.junit.Test;
-import org.springframework.mock.http.server.reactive.MockServerHttpRequest;
-import org.springframework.mock.web.server.MockServerWebExchange;
+import org.springframework.mock.web.MockHttpServletRequest;
 
 /**
  * Test coverage for operation intelligence proxy service.
@@ -25,12 +24,11 @@ public class OperationIntelligenceProxyServiceTest {
      */
     @Test
     public void testTargetPathStripsGatewayPrefix() {
-        MockServerHttpRequest request =
-            MockServerHttpRequest.get("/gateway/operation-intelligence/graph/resources/tree?envCode=prod").build();
-        MockServerWebExchange exchange = MockServerWebExchange.from(request);
+        MockHttpServletRequest request = new MockHttpServletRequest("GET",
+            "/gateway/operation-intelligence/graph/resources/tree");
         OperationIntelligenceProxyService service = new OperationIntelligenceProxyService(new GatewayProperties());
 
-        assertEquals("/operation-intelligence/graph/resources/tree", service.targetPath(exchange));
+        assertEquals("/operation-intelligence/graph/resources/tree", service.targetPath(request));
     }
 
     /**
@@ -38,12 +36,10 @@ public class OperationIntelligenceProxyServiceTest {
      */
     @Test
     public void testTargetPathPreservesBackendPath() {
-        MockServerHttpRequest request =
-            MockServerHttpRequest.get("/operation-intelligence/graph/resources/tree?envCode=prod").build();
-        MockServerWebExchange exchange = MockServerWebExchange.from(request);
+        MockHttpServletRequest request = new MockHttpServletRequest("GET", "/operation-intelligence/graph/resources/tree");
         OperationIntelligenceProxyService service = new OperationIntelligenceProxyService(new GatewayProperties());
 
-        assertEquals("/operation-intelligence/graph/resources/tree", service.targetPath(exchange));
+        assertEquals("/operation-intelligence/graph/resources/tree", service.targetPath(request));
     }
 
     /**

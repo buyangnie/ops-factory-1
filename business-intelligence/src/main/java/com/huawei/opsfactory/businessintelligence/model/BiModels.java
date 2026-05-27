@@ -1,9 +1,19 @@
+/*
+ * Copyright (c) Huawei Technologies Co., Ltd. 2026-2026. All rights reserved.
+ */
+
 package com.huawei.opsfactory.businessintelligence.model;
 
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 
+/**
+ * Bi Models.
+ *
+ * @author x00000000
+ * @since 2026-05-27
+ */
 public final class BiModels {
 
     private BiModels() {

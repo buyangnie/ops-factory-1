@@ -20,7 +20,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 /**
  * Trace Log Parser Test.
  *
- * @author call-chain
+ * @author x00000000
  * @since 2026-05-18
  */
 class TraceLogParserTest {

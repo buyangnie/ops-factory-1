@@ -13,7 +13,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 /**
  * Dv Environment Info Test.
  *
- * @author call-chain
+ * @author x00000000
  * @since 2026-05-18
  */
 class DvEnvironmentInfoTest {

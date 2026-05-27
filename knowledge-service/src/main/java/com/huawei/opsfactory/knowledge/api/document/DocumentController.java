@@ -12,6 +12,7 @@ import java.util.List;
 import org.springframework.core.io.ByteArrayResource;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -93,8 +94,12 @@ public class DocumentController {
     }
 
     @GetMapping("/documents/{documentId}/artifacts/markdown")
-    public String getMarkdownArtifact(@PathVariable("documentId") String documentId) {
-        return facade.readArtifact(documentId, "content.md");
+    public ResponseEntity<String> getMarkdownArtifact(@PathVariable("documentId") String documentId) {
+        String content = facade.readArtifact(documentId, "content.md");
+        if (content == null) {
+            return ResponseEntity.notFound().build();
+        }
+        return ResponseEntity.ok(content);
     }
 
     @GetMapping("/documents/{documentId}/original")

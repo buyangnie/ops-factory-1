@@ -1,3 +1,7 @@
+/*
+ * Copyright (c) Huawei Technologies Co., Ltd. 2026-2026. All rights reserved.
+ */
+
 package com.huawei.opsfactory.skillmarket.common.logging;
 
 import com.huawei.opsfactory.skillmarket.config.SkillMarketProperties;
@@ -15,7 +19,13 @@ import org.springframework.core.annotation.Order;
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 
-@Component
+/**
+ * Request logging filter for skill market module.
+ *
+ * @author x00000000
+ * @since 2026-05-27
+ */
+@Component("skillMarketRequestLoggingFilter")
 @Order(Ordered.HIGHEST_PRECEDENCE)
 public class RequestLoggingFilter extends OncePerRequestFilter {
 

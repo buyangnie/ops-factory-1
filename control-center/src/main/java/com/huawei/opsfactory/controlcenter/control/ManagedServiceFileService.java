@@ -1,3 +1,7 @@
+/*
+ * Copyright (c) Huawei Technologies Co., Ltd. 2026-2026. All rights reserved.
+ */
+
 package com.huawei.opsfactory.controlcenter.control;
 
 import com.huawei.opsfactory.controlcenter.config.ControlCenterProperties;
@@ -15,6 +19,12 @@ import java.util.Map;
 import java.util.stream.Stream;
 
 @Service
+/**
+ * Managed Service File Service.
+ *
+ * @author x00000000
+ * @since 2026-05-27
+ */
 public class ManagedServiceFileService {
 
     private final ManagedServiceRegistry registry;

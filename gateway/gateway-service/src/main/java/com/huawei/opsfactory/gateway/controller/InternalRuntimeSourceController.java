@@ -3,6 +3,8 @@
  */
 
 package com.huawei.opsfactory.gateway.controller;
+import org.apache.servicecomb.provider.rest.common.RestSchema;
+import jakarta.servlet.http.HttpServletRequest;
 
 import com.huawei.opsfactory.gateway.common.model.ManagedInstance;
 import com.huawei.opsfactory.gateway.config.GatewayProperties;
@@ -16,7 +18,6 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
-import org.springframework.web.server.ServerWebExchange;
 
 import java.lang.management.ManagementFactory;
 import java.util.ArrayList;
@@ -32,7 +33,9 @@ import java.util.stream.Collectors;
  * @author x00000000
  * @since 2026-05-09
  */
+
 @RestController
+@RestSchema(schemaId = "internalRuntimeSourceController")
 @RequestMapping("/gateway/runtime-source")
 public class InternalRuntimeSourceController {
     private final InstanceManager instanceManager;
@@ -85,7 +88,7 @@ public class InternalRuntimeSourceController {
      * @return system-level information including uptime, agent count, and configuration
      */
     @GetMapping("/system")
-    public Map<String, Object> system(ServerWebExchange exchange) {
+    public Map<String, Object> system(HttpServletRequest request) {
         long uptimeMs = ManagementFactory.getRuntimeMXBean().getUptime();
         long idleTimeoutMs = gatewayProperties.getIdle().getTimeoutMinutes() * 60_000L;
 
@@ -110,7 +113,7 @@ public class InternalRuntimeSourceController {
      * @return the current status of all managed goosed instances
      */
     @GetMapping("/instances")
-    public Map<String, Object> instances(ServerWebExchange exchange) {
+    public Map<String, Object> instances(HttpServletRequest request) {
         List<ManagedInstance> allInstances = new ArrayList<>(instanceManager.getAllInstances());
         Map<String, List<Map<String, Object>>> grouped = allInstances.stream()
             .collect(
@@ -153,7 +156,7 @@ public class InternalRuntimeSourceController {
      * @return aggregated metrics including request counts, latency, throughput, and time series data
      */
     @GetMapping("/metrics")
-    public Map<String, Object> metrics(ServerWebExchange exchange) {
+    public Map<String, Object> metrics(HttpServletRequest request) {
         List<MetricsSnapshot> snapshots = metricsBuffer.getSnapshots(120);
         Map<String, Object> result = new LinkedHashMap<>();
         result.put("collectionIntervalSec", 30);

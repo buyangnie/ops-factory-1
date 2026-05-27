@@ -96,10 +96,10 @@
     </dependencyManagement>
 
     <dependencies>
-        <!-- Web 层：WebMVC 或 WebFlux（二选一） -->
+        <!-- Web 层：Spring MVC (使用 spring-boot-starter-web) -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
-            <artifactId>spring-boot-starter-webflux</artifactId>
+            <artifactId>spring-boot-starter-web</artifactId>
             <exclusions>
                 <exclusion>
                     <groupId>org.springframework.boot</groupId>
@@ -162,14 +162,6 @@
     </build>
 </project>
 ```
-
-### 3.2 WebMVC vs WebFlux 选型
-
-| 场景 | 推荐 | 原因 |
-| --- | --- | --- |
-| 常规 CRUD / 表单处理 | WebMVC（`spring-boot-starter-web`） | 简单直接，同步编程模型 |
-| 需要 WebClient / Netty SSL / 流式响应 | WebFlux（`spring-boot-starter-webflux`） | 原生支持响应式，避免同时引入 servlet 和 reactive 栈 |
-| 与外部系统高频 HTTP 交互 | WebFlux | 非阻塞 IO，适合并发调用 |
 
 ## 4. Spring Boot 应用
 
@@ -306,40 +298,6 @@ public class RequestLoggingFilter extends OncePerRequestFilter {
                 MDC.remove("requestId");
             }
         }
-    }
-}
-```
-
-**WebFlux 版本**（使用 `spring-boot-starter-webflux` 的服务）：
-
-```java
-@Component
-@Order(Ordered.HIGHEST_PRECEDENCE)
-public class RequestLoggingFilter implements WebFilter {
-
-    private static final Logger log = LoggerFactory.getLogger(RequestLoggingFilter.class);
-    private final <ServiceName>Properties properties;
-
-    @Override
-    public Mono<Void> filter(ServerWebExchange exchange, WebFilterChain chain) {
-        String requestId = resolveRequestId(exchange);
-        exchange.getResponse().getHeaders().set("X-Request-Id", requestId);
-        long startedAt = System.currentTimeMillis();
-        MDC.put("requestId", requestId);
-        return chain.filter(exchange)
-                .doFinally(signalType -> {
-                    try {
-                        if (properties.getLogging().isAccessLogEnabled()) {
-                            log.info("HTTP {} {} completed status={} durationMs={}",
-                                    exchange.getRequest().getMethod(),
-                                    exchange.getRequest().getURI().getPath(),
-                                    exchange.getResponse().getStatusCode(),
-                                    System.currentTimeMillis() - startedAt);
-                        }
-                    } finally {
-                        MDC.remove("requestId");
-                    }
-                });
     }
 }
 ```
@@ -502,27 +460,6 @@ public class WebConfig {
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
         source.registerCorsConfiguration("/**", config);
         return new CorsFilter(source);
-    }
-}
-```
-
-### 11.2 WebFlux 版本（使用 `CorsWebFilter`）
-
-```java
-@Configuration
-public class WebConfig {
-
-    private final <ServiceName>Properties properties;
-
-    @Bean
-    public CorsWebFilter corsWebFilter() {
-        CorsConfiguration config = new CorsConfiguration();
-        // 与 WebMVC 版本相同的 CorsConfiguration 设置
-        // ...
-
-        UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
-        source.registerCorsConfiguration("/**", config);
-        return new CorsWebFilter(source);
     }
 }
 ```
@@ -746,7 +683,7 @@ cd web-app && npm run build               # 构建验证
 
 ### CORS 与配置
 
-- [ ] `WebConfig` CORS 配置正确（WebMVC 用 `CorsFilter`，WebFlux 用 `CorsWebFilter`）
+- [ ] `WebConfig` CORS 配置正确（使用 `CorsFilter`）
 - [ ] `config.yaml.example` 入库，配置项带注释
 - [ ] 环境变量覆盖路径正常工作
 

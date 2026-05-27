@@ -4,11 +4,11 @@
 
 package com.huawei.opsfactory.gateway.controller;
 
+import org.apache.servicecomb.provider.rest.common.RestSchema;
 import com.huawei.opsfactory.gateway.service.CommandWhitelistService;
 import com.huawei.opsfactory.gateway.service.RemoteExecutionService;
 
-import reactor.core.publisher.Mono;
-import reactor.core.scheduler.Schedulers;
+import jakarta.servlet.http.HttpServletRequest;
 
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -16,7 +16,6 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
-import org.springframework.web.server.ServerWebExchange;
 
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -28,6 +27,7 @@ import java.util.Map;
  * @since 2026-05-09
  */
 @RestController
+@RestSchema(schemaId = "remoteExecController")
 @RequestMapping("/gateway/remote")
 public class RemoteExecController {
     private final RemoteExecutionService remoteExecutionService;
@@ -38,7 +38,7 @@ public class RemoteExecController {
      * Creates the remote exec controller instance.
      */
     public RemoteExecController(RemoteExecutionService remoteExecutionService,
-        CommandWhitelistService commandWhitelistService) {
+            CommandWhitelistService commandWhitelistService) {
         this.remoteExecutionService = remoteExecutionService;
         this.commandWhitelistService = commandWhitelistService;
     }
@@ -47,12 +47,10 @@ public class RemoteExecController {
      * Executes a remote command on a managed host after whitelist validation.
      *
      * @param request HTTP request
-     * @param exchange server web exchange
-     * @return the result
+     * @return the execution result
      */
     @PostMapping("/execute")
-    public Mono<ResponseEntity<Map<String, Object>>> execute(@RequestBody Map<String, Object> request,
-        ServerWebExchange exchange) {
+    public ResponseEntity<Map<String, Object>> execute(@RequestBody Map<String, Object> request) {
 
         String hostId = (String) request.get("hostId");
         String command = (String) request.get("command");
@@ -63,67 +61,62 @@ public class RemoteExecController {
             Map<String, Object> body = new LinkedHashMap<>();
             body.put("success", false);
             body.put("error", "hostId is required");
-            return Mono.just(ResponseEntity.status(HttpStatus.BAD_REQUEST).body(body));
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(body);
         }
         if (command == null || command.isBlank()) {
             Map<String, Object> body = new LinkedHashMap<>();
             body.put("success", false);
             body.put("error", "command is required");
-            return Mono.just(ResponseEntity.status(HttpStatus.BAD_REQUEST).body(body));
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(body);
         }
 
-        final int finalTimeout = timeout;
-        return Mono.fromCallable(() -> {
-            Map<String, Object> result = remoteExecutionService.execute(hostId, command, finalTimeout);
+        Map<String, Object> result = remoteExecutionService.execute(hostId, command, timeout);
 
-            // Check for whitelist rejection
-            if (Boolean.FALSE.equals(result.get("success")) && result.containsKey("rejectedCommands")) {
-                Map<String, Object> body = new LinkedHashMap<>();
-                body.put("success", false);
-                body.put("error", "Command rejected by whitelist");
-                body.put("rejectedCommands", result.get("rejectedCommands"));
-                body.put("message", result.getOrDefault("message", ""));
-                return ResponseEntity.status(HttpStatus.FORBIDDEN).body(body);
-            }
-
+        // Check for whitelist rejection
+        if (Boolean.FALSE.equals(result.get("success")) && result.containsKey("rejectedCommands")) {
             Map<String, Object> body = new LinkedHashMap<>();
-            body.put("hostId", hostId);
-            body.put("hostIp", result.get("hostIp"));
-            body.put("username", result.get("username"));
-            body.put("hostName", result.get("hostName"));
-            body.put("command", result.get("command"));
-            body.put("effectiveCommand", result.get("effectiveCommand"));
-            body.put("exitCode", result.get("exitCode"));
-            body.put("output", result.get("output"));
-            body.put("error", result.getOrDefault("error", ""));
-            body.put("duration", result.get("duration"));
-            return ResponseEntity.ok(body);
-        }).subscribeOn(Schedulers.boundedElastic());
+            body.put("success", false);
+            body.put("error", "Command rejected by whitelist");
+            body.put("rejectedCommands", result.get("rejectedCommands"));
+            body.put("message", result.getOrDefault("message", ""));
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(body);
+        }
+
+        Map<String, Object> body = new LinkedHashMap<>();
+        body.put("hostId", hostId);
+        body.put("hostIp", result.get("hostIp"));
+        body.put("username", result.get("username"));
+        body.put("hostName", result.get("hostName"));
+        body.put("command", result.get("command"));
+        body.put("effectiveCommand", result.get("effectiveCommand"));
+        body.put("exitCode", result.get("exitCode"));
+        body.put("output", result.get("output"));
+        body.put("error", result.getOrDefault("error", ""));
+        body.put("duration", result.get("duration"));
+        return ResponseEntity.ok(body);
     }
 
     /**
      * Checks the risk level of a command against the whitelist.
      *
      * @param request HTTP request
-     * @param exchange server web exchange
-     * @return true if the risk level of a command against the whitelist
+     * @return the risk level check result
      */
     @PostMapping("/check-risk")
-    public Mono<ResponseEntity<Map<String, Object>>> checkRisk(@RequestBody Map<String, Object> request,
-        ServerWebExchange exchange) {
+    public ResponseEntity<Map<String, Object>> checkRisk(@RequestBody Map<String, Object> request) {
 
         String command = (String) request.get("command");
         if (command == null || command.isBlank()) {
             Map<String, Object> body = new LinkedHashMap<>();
             body.put("success", false);
             body.put("error", "command is required");
-            return Mono.just(ResponseEntity.status(HttpStatus.BAD_REQUEST).body(body));
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(body);
         }
 
         String riskLevel = commandWhitelistService.getRiskLevel(command);
         Map<String, Object> body = new LinkedHashMap<>();
         body.put("command", command);
         body.put("riskLevel", riskLevel);
-        return Mono.just(ResponseEntity.ok(body));
+        return ResponseEntity.ok(body);
     }
 }

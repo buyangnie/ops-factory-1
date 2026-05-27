@@ -15,14 +15,19 @@ import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.mockito.Mockito;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.autoconfigure.web.reactive.WebFluxTest;
+import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
 import org.springframework.test.context.junit4.SpringRunner;
-import org.springframework.test.web.reactive.server.WebTestClient;
+import org.springframework.test.web.servlet.MockMvc;
 
 import java.util.Map;
+
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 /**
  * Test coverage for Agent Skill Controller.
@@ -31,11 +36,17 @@ import java.util.Map;
  * @since 2026-05-09
  */
 @RunWith(SpringRunner.class)
-@WebFluxTest(AgentSkillController.class)
+@WebMvcTest(AgentSkillController.class)
 @Import({GatewayProperties.class, AuthWebFilter.class, UserContextFilter.class})
+/**
+ * Agent Skill Controller Test.
+ *
+ * @author x00000000
+ * @since 2026-05-27
+ */
 public class AgentSkillControllerTest {
     @Autowired
-    private WebTestClient webTestClient;
+    private MockMvc mockMvc;
 
     @MockBean
     private PrewarmService prewarmService;
@@ -53,22 +64,15 @@ public class AgentSkillControllerTest {
         Mockito.when(installService.install("agent1", "log-analysis"))
             .thenReturn(Map.of("success", true, "skill", Map.of("id", "log-analysis"), "restartRequired", true));
 
-        webTestClient.post()
-            .uri("/gateway/agents/agent1/skills/install")
-            .header("x-secret-key", "test")
-            .header("x-user-id", "admin")
-            .contentType(MediaType.APPLICATION_JSON)
-            .bodyValue("{\"skillId\":\"log-analysis\"}")
-            .exchange()
-            .expectStatus()
-            .isOk()
-            .expectBody()
-            .jsonPath("$.success")
-            .isEqualTo(true)
-            .jsonPath("$.skill.id")
-            .isEqualTo("log-analysis")
-            .jsonPath("$.restartRequired")
-            .isEqualTo(true);
+        mockMvc.perform(post("/gateway/agents/agent1/skills/install")
+                .header("x-secret-key", "test")
+                .header("x-user-id", "admin")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"skillId\":\"log-analysis\"}"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.success").value(true))
+            .andExpect(jsonPath("$.skill.id").value("log-analysis"))
+            .andExpect(jsonPath("$.restartRequired").value(true));
     }
 
     /**
@@ -81,22 +85,15 @@ public class AgentSkillControllerTest {
         Mockito.when(installService.install("agent1", "log-analysis"))
             .thenReturn(Map.of("success", true, "skill", Map.of("id", "log-analysis"), "restartRequired", true));
 
-        webTestClient.post()
-            .uri("/gateway/agents/agent1/skills/install")
-            .header("x-secret-key", "test")
-            .header("x-user-id", "regular-user")
-            .contentType(MediaType.APPLICATION_JSON)
-            .bodyValue("{\"skillId\":\"log-analysis\"}")
-            .exchange()
-            .expectStatus()
-            .isOk()
-            .expectBody()
-            .jsonPath("$.success")
-            .isEqualTo(true)
-            .jsonPath("$.skill.id")
-            .isEqualTo("log-analysis")
-            .jsonPath("$.restartRequired")
-            .isEqualTo(true);
+        mockMvc.perform(post("/gateway/agents/agent1/skills/install")
+                .header("x-secret-key", "test")
+                .header("x-user-id", "regular-user")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"skillId\":\"log-analysis\"}"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.success").value(true))
+            .andExpect(jsonPath("$.skill.id").value("log-analysis"))
+            .andExpect(jsonPath("$.restartRequired").value(true));
     }
 
     /**
@@ -109,18 +106,13 @@ public class AgentSkillControllerTest {
         Mockito.when(installService.install("agent1", "log-analysis"))
             .thenThrow(new SkillInstallConflictException("Skill already installed"));
 
-        webTestClient.post()
-            .uri("/gateway/agents/agent1/skills/install")
-            .header("x-secret-key", "test")
-            .header("x-user-id", "admin")
-            .contentType(MediaType.APPLICATION_JSON)
-            .bodyValue("{\"skillId\":\"log-analysis\"}")
-            .exchange()
-            .expectStatus()
-            .isEqualTo(409)
-            .expectBody()
-            .jsonPath("$.success")
-            .isEqualTo(false);
+        mockMvc.perform(post("/gateway/agents/agent1/skills/install")
+                .header("x-secret-key", "test")
+                .header("x-user-id", "admin")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"skillId\":\"log-analysis\"}"))
+            .andExpect(status().isConflict())
+            .andExpect(jsonPath("$.success").value(false));
     }
 
     /**
@@ -133,20 +125,13 @@ public class AgentSkillControllerTest {
         Mockito.when(installService.uninstall("agent1", "log-analysis"))
             .thenReturn(Map.of("success", true, "skillId", "log-analysis", "restartRequired", true));
 
-        webTestClient.delete()
-            .uri("/gateway/agents/agent1/skills/log-analysis")
-            .header("x-secret-key", "test")
-            .header("x-user-id", "admin")
-            .exchange()
-            .expectStatus()
-            .isOk()
-            .expectBody()
-            .jsonPath("$.success")
-            .isEqualTo(true)
-            .jsonPath("$.skillId")
-            .isEqualTo("log-analysis")
-            .jsonPath("$.restartRequired")
-            .isEqualTo(true);
+        mockMvc.perform(delete("/gateway/agents/agent1/skills/log-analysis")
+                .header("x-secret-key", "test")
+                .header("x-user-id", "admin"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.success").value(true))
+            .andExpect(jsonPath("$.skillId").value("log-analysis"))
+            .andExpect(jsonPath("$.restartRequired").value(true));
     }
 
     /**
@@ -159,19 +144,12 @@ public class AgentSkillControllerTest {
         Mockito.when(installService.uninstall("agent1", "log-analysis"))
             .thenReturn(Map.of("success", true, "skillId", "log-analysis", "restartRequired", true));
 
-        webTestClient.delete()
-            .uri("/gateway/agents/agent1/skills/log-analysis")
-            .header("x-secret-key", "test")
-            .header("x-user-id", "regular-user")
-            .exchange()
-            .expectStatus()
-            .isOk()
-            .expectBody()
-            .jsonPath("$.success")
-            .isEqualTo(true)
-            .jsonPath("$.skillId")
-            .isEqualTo("log-analysis")
-            .jsonPath("$.restartRequired")
-            .isEqualTo(true);
+        mockMvc.perform(delete("/gateway/agents/agent1/skills/log-analysis")
+                .header("x-secret-key", "test")
+                .header("x-user-id", "regular-user"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.success").value(true))
+            .andExpect(jsonPath("$.skillId").value("log-analysis"))
+            .andExpect(jsonPath("$.restartRequired").value(true));
     }
 }

@@ -16,8 +16,6 @@ import com.huawei.opsfactory.operationintelligence.qos.store.ChainTypeConfigStor
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
-import reactor.core.publisher.Mono;
-import reactor.core.scheduler.Schedulers;
 
 import java.time.Instant;
 import java.time.ZoneOffset;
@@ -81,12 +79,11 @@ public class CallChainService {
      * @param endTime the end time in milliseconds
      * @return the call chain tree
      */
-    public Mono<CallChainTree> queryCallChain(String solutionType,
-                                               List<Map<String, String>> conditions,
-                                               long startTime,
-                                               long endTime) {
-        return Mono.fromCallable(() -> doQueryCallChain(solutionType, conditions, startTime, endTime))
-            .subscribeOn(Schedulers.boundedElastic());
+    public CallChainTree queryCallChain(String solutionType,
+                                         List<Map<String, String>> conditions,
+                                         long startTime,
+                                         long endTime) {
+        return doQueryCallChain(solutionType, conditions, startTime, endTime);
     }
 
     /**

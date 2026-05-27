@@ -20,7 +20,7 @@ import java.util.List;
  * @since 2026-05-26
  */
 
-@Configuration
+@Configuration("knowledgeWebConfig")
 public class WebConfig {
 
     private final KnowledgeProperties properties;

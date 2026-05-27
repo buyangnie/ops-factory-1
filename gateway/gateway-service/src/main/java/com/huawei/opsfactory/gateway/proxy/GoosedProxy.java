@@ -34,9 +34,10 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.reactive.function.BodyInserters;
 import org.springframework.web.reactive.function.client.WebClient;
 import org.springframework.web.reactive.function.client.WebClientRequestException;
-import org.springframework.web.reactive.function.client.WebClientResponseException;
 import org.springframework.web.server.ResponseStatusException;
+import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
+import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.ArrayList;
@@ -82,6 +83,9 @@ public class GoosedProxy {
         HttpClient httpClient = HttpClient.newConnection().option(ChannelOption.CONNECT_TIMEOUT_MILLIS, 5000);
 
         if (properties.isGooseTls()) {
+            log.warn(
+                "INSECURE TLS CONFIGURATION: Using InsecureTrustManager for goosed proxy. "
+                    + "This is acceptable only for internal localhost communication.");
             try {
                 SslContext sslContext =
                     SslContextBuilder.forClient().trustManager(InsecureTrustManagerFactory.INSTANCE).build();
@@ -454,6 +458,61 @@ public class GoosedProxy {
         return webClient;
     }
 
+    /**
+     * Proxy goosed session events to Servlet SSE emitter.
+     *
+     * @param port port number of the target goosed instance
+     * @param path target SSE endpoint path
+     * @param secretKey secret key for authenticating with the goosed instance
+     * @param lastEventId Last-Event-ID header value for resuming the stream
+     * @param agentId agent instance identifier
+     * @param userId user identifier
+     * @param sessionId session identifier
+     * @return SseEmitter for streaming events
+     */
+    public SseEmitter proxySessionEventsToEmitter(int port, String path, String secretKey,
+        String lastEventId, String agentId, String userId, String sessionId) {
+        SseEmitter emitter = new SseEmitter(30 * 60 * 1000L); // 30 minutes timeout
+        String target = goosedBaseUrl(port) + path;
+        log.info("[GOOSED-PROXY] sse-connect port={} path={} agentId={} userId={} sessionId={} lastEventId={}", port,
+            path, agentId, userId, sessionId, lastEventId);
+
+        WebClient.RequestHeadersSpec<?> spec = webClient.get()
+            .uri(target)
+            .header(GatewayConstants.HEADER_SECRET_KEY, secretKey)
+            .accept(MediaType.TEXT_EVENT_STREAM);
+        if (lastEventId != null && !lastEventId.isBlank()) {
+            spec = spec.header("Last-Event-ID", lastEventId);
+        }
+
+        spec.retrieve()
+            .bodyToFlux(String.class)
+            .doOnSubscribe(s -> log.info("[GOOSED-PROXY] sse-subscribed agentId={} sessionId={}", agentId, sessionId))
+            .doOnComplete(() -> {
+                log.info("[GOOSED-PROXY] sse-complete agentId={} sessionId={}", agentId, sessionId);
+                emitter.complete();
+            })
+            .doOnError(err -> {
+                log.warn("[GOOSED-PROXY] sse-error agentId={} sessionId={} error={}", agentId, sessionId,
+                    err.getMessage());
+                emitter.completeWithError(err);
+            })
+            .subscribe(
+                event -> {
+                    try {
+                        emitter.send(SseEmitter.event().data(event));
+                    } catch (IOException e) {
+                        log.warn("[GOOSED-PROXY] sse-send-error agentId={} sessionId={}", agentId, sessionId);
+                        emitter.completeWithError(e);
+                    }
+                },
+                emitter::completeWithError,
+                emitter::complete
+            );
+
+        return emitter;
+    }
+
     private boolean isProxyError(Throwable e) {
         return e instanceof WebClientRequestException || e instanceof TimeoutException;
     }
@@ -472,12 +531,19 @@ public class GoosedProxy {
             "Agent temporarily unavailable: " + e.getMessage());
     }
 
-    private WebClientResponseException toUpstreamResponseException(int rawStatusCode, HttpHeaders headers,
+    private ResponseStatusException toUpstreamResponseException(int rawStatusCode, HttpHeaders headers,
         String body) {
         HttpStatus status = HttpStatus.resolve(rawStatusCode);
         String statusText = status != null ? status.getReasonPhrase() : "HTTP " + rawStatusCode;
-        return WebClientResponseException.create(rawStatusCode, statusText, headers,
-            body.getBytes(StandardCharsets.UTF_8), StandardCharsets.UTF_8);
+        String message;
+        if (status == HttpStatus.NOT_FOUND) {
+            message = "Agent resource not found";
+        } else if (status != null && status.is4xxClientError()) {
+            message = "Agent request failed: " + statusText;
+        } else {
+            message = "Agent internal error: " + statusText;
+        }
+        return new ResponseStatusException(status != null ? status : HttpStatus.INTERNAL_SERVER_ERROR, message);
     }
 
     private void copyHeaders(HttpHeaders source, HttpHeaders target, String secretKey) {

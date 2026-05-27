@@ -12,8 +12,10 @@ import com.huawei.opsfactory.gateway.service.channel.model.ChannelConnectionConf
 import com.huawei.opsfactory.gateway.service.channel.model.ChannelConnectivityResult;
 import com.huawei.opsfactory.gateway.service.channel.model.ChannelDetail;
 
+import jakarta.servlet.http.HttpServletRequest;
 import reactor.core.publisher.Mono;
 
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.web.server.ResponseStatusException;
 import org.springframework.web.server.ServerWebExchange;
@@ -70,6 +72,16 @@ public class WeChatAdapter implements ChannelAdapter {
     @Override
     public Mono<Void> handleWebhook(String channelId, String rawBody, ServerWebExchange exchange) {
         return Mono.error(new ResponseStatusException(BAD_REQUEST, "WeChat channel does not use webhooks"));
+    }
+
+    @Override
+    public String verifyWebhookServlet(String channelId, HttpServletRequest request) {
+        return "WeChat channel does not use webhooks";
+    }
+
+    @Override
+    public String handleWebhookServlet(String channelId, String rawBody, HttpServletRequest request) {
+        return "{\"error\":\"WeChat channel does not use webhooks\"}";
     }
 
     /**

@@ -4,10 +4,10 @@
 
 package com.huawei.opsfactory.gateway.controller;
 
+import org.apache.servicecomb.provider.rest.common.RestSchema;
 import com.huawei.opsfactory.gateway.service.CommandWhitelistService;
 
-import reactor.core.publisher.Mono;
-import reactor.core.scheduler.Schedulers;
+import jakarta.servlet.http.HttpServletRequest;
 
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -19,7 +19,6 @@ import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
-import org.springframework.web.server.ServerWebExchange;
 
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -31,6 +30,7 @@ import java.util.Map;
  * @since 2026-05-09
  */
 @RestController
+@RestSchema(schemaId = "commandWhitelistController")
 @RequestMapping("/gateway/command-whitelist")
 public class CommandWhitelistController {
     private final CommandWhitelistService commandWhitelistService;
@@ -47,92 +47,83 @@ public class CommandWhitelistController {
     /**
      * Returns the current command whitelist configuration.
      *
-     * @param exchange current HTTP exchange carrying user context
-     * @return Mono emitting the current whitelist configuration map
+     * @param request current HTTP request carrying user context
+     * @return the current whitelist configuration map
      */
-    @GetMapping({"", "/"})
-    public Mono<Map<String, Object>> getWhitelist(ServerWebExchange exchange) {
-        return Mono.fromCallable(() -> {
-            Map<String, Object> whitelist = commandWhitelistService.getWhitelist();
-            return whitelist;
-        }).subscribeOn(Schedulers.boundedElastic());
+    @GetMapping
+    public Map<String, Object> getWhitelist(HttpServletRequest request) {
+        return commandWhitelistService.getWhitelist();
     }
 
     /**
      * Adds a command pattern to the whitelist.
      *
      * @param request request body containing command pattern fields
-     * @param exchange current HTTP exchange carrying user context
-     * @return Mono emitting ResponseEntity with added command or 409
+     * @param httpRequest current HTTP request
+     * @return ResponseEntity with added command or 409
      */
-    @PostMapping({"", "/"})
-    public Mono<ResponseEntity<Map<String, Object>>> addCommand(@RequestBody Map<String, Object> request,
-        ServerWebExchange exchange) {
-        return Mono.fromCallable(() -> {
-            try {
-                commandWhitelistService.addCommand(request);
-                Map<String, Object> body = new LinkedHashMap<>();
-                body.put("success", true);
-                body.put("command", request);
-                return ResponseEntity.status(HttpStatus.CREATED).body(body);
-            } catch (IllegalArgumentException e) {
-                Map<String, Object> body = new LinkedHashMap<>();
-                body.put("success", false);
-                body.put("error", "Command whitelist entry conflict");
-                return ResponseEntity.status(HttpStatus.CONFLICT).body(body);
-            }
-        }).subscribeOn(Schedulers.boundedElastic());
+    @PostMapping
+    public ResponseEntity<Map<String, Object>> addCommand(@RequestBody Map<String, Object> request,
+            HttpServletRequest httpRequest) {
+        try {
+            commandWhitelistService.addCommand(request);
+            Map<String, Object> body = new LinkedHashMap<>();
+            body.put("success", true);
+            body.put("command", request);
+            return ResponseEntity.status(HttpStatus.CREATED).body(body);
+        } catch (IllegalArgumentException e) {
+            Map<String, Object> body = new LinkedHashMap<>();
+            body.put("success", false);
+            body.put("error", "Command whitelist entry conflict");
+            return ResponseEntity.status(HttpStatus.CONFLICT).body(body);
+        }
     }
 
     /**
      * Updates a command pattern in the whitelist.
      *
-     * @param pattern existing command pattern to update
-     * @param request request body containing updated fields
-     * @param exchange current HTTP exchange carrying user context
-     * @return Mono emitting ResponseEntity with updated command or 404
+     * @param pattern  existing command pattern to update
+     * @param request  request body containing updated fields
+     * @param httpRequest current HTTP request
+     * @return ResponseEntity with updated command or 404
      */
     @PutMapping("/{pattern}")
-    public Mono<ResponseEntity<Map<String, Object>>> updateCommand(@PathVariable("pattern") String pattern,
-        @RequestBody Map<String, Object> request, ServerWebExchange exchange) {
-        return Mono.fromCallable(() -> {
-            try {
-                commandWhitelistService.updateCommand(pattern, request);
-                Map<String, Object> body = new LinkedHashMap<>();
-                body.put("success", true);
-                body.put("command", request);
-                return ResponseEntity.ok(body);
-            } catch (IllegalArgumentException e) {
-                Map<String, Object> body = new LinkedHashMap<>();
-                body.put("success", false);
-                body.put("error", "Command not found: " + pattern);
-                return ResponseEntity.status(HttpStatus.NOT_FOUND).body(body);
-            }
-        }).subscribeOn(Schedulers.boundedElastic());
+    public ResponseEntity<Map<String, Object>> updateCommand(@PathVariable("pattern") String pattern,
+            @RequestBody Map<String, Object> request, HttpServletRequest httpRequest) {
+        try {
+            commandWhitelistService.updateCommand(pattern, request);
+            Map<String, Object> body = new LinkedHashMap<>();
+            body.put("success", true);
+            body.put("command", request);
+            return ResponseEntity.ok(body);
+        } catch (IllegalArgumentException e) {
+            Map<String, Object> body = new LinkedHashMap<>();
+            body.put("success", false);
+            body.put("error", "Command not found: " + pattern);
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(body);
+        }
     }
 
     /**
      * Deletes a command pattern from the whitelist.
      *
-     * @param pattern command pattern to remove
-     * @param exchange current HTTP exchange carrying user context
-     * @return Mono emitting ResponseEntity with success status or 404
+     * @param pattern     command pattern to remove
+     * @param httpRequest current HTTP request
+     * @return ResponseEntity with success status or 404
      */
     @DeleteMapping("/{pattern}")
-    public Mono<ResponseEntity<Map<String, Object>>> deleteCommand(@PathVariable("pattern") String pattern,
-        ServerWebExchange exchange) {
-        return Mono.fromCallable(() -> {
-            try {
-                commandWhitelistService.deleteCommand(pattern);
-                Map<String, Object> body = new LinkedHashMap<>();
-                body.put("success", true);
-                return ResponseEntity.ok(body);
-            } catch (IllegalArgumentException e) {
-                Map<String, Object> body = new LinkedHashMap<>();
-                body.put("success", false);
-                body.put("error", "Command not found: " + pattern);
-                return ResponseEntity.status(HttpStatus.NOT_FOUND).body(body);
-            }
-        }).subscribeOn(Schedulers.boundedElastic());
+    public ResponseEntity<Map<String, Object>> deleteCommand(@PathVariable("pattern") String pattern,
+            HttpServletRequest httpRequest) {
+        try {
+            commandWhitelistService.deleteCommand(pattern);
+            Map<String, Object> body = new LinkedHashMap<>();
+            body.put("success", true);
+            return ResponseEntity.ok(body);
+        } catch (IllegalArgumentException e) {
+            Map<String, Object> body = new LinkedHashMap<>();
+            body.put("success", false);
+            body.put("error", "Command not found: " + pattern);
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(body);
+        }
     }
 }

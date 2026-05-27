@@ -4,11 +4,11 @@
 
 package com.huawei.opsfactory.gateway.controller;
 
+import org.apache.servicecomb.provider.rest.common.RestSchema;
 import com.huawei.opsfactory.gateway.service.AgentConfigService;
 import com.huawei.opsfactory.gateway.service.FileService;
 
-import reactor.core.publisher.Mono;
-import reactor.core.scheduler.Schedulers;
+import jakarta.servlet.http.HttpServletRequest;
 
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
@@ -32,6 +32,7 @@ import java.nio.file.Path;
  * @since 2026-05-09
  */
 @RestController
+@RestSchema(schemaId = "fileCitationController")
 @RequestMapping("/gateway/agents/{agentId}/file-citations")
 public class FileCitationController {
     private final AgentConfigService agentConfigService;
@@ -42,7 +43,7 @@ public class FileCitationController {
      * Creates the file citation controller.
      *
      * @param agentConfigService service for resolving knowledge base root directories
-     * @param fileService service for MIME type detection
+     * @param fileService        service for MIME type detection
      */
     public FileCitationController(AgentConfigService agentConfigService, FileService fileService) {
         this.agentConfigService = agentConfigService;
@@ -52,14 +53,14 @@ public class FileCitationController {
     /**
      * Returns the content of a knowledge-base citation file for inline preview.
      *
-     * @param agentId agent instance identifier
+     * @param agentId       agent instance identifier
      * @param requestedPath absolute path of the citation file to preview
-     * @return Mono emitting ResponseEntity with file content and appropriate content type
+     * @return ResponseEntity with file content and appropriate content type
      */
     @GetMapping("/content")
-    public Mono<ResponseEntity<?>> getCitationFile(@PathVariable("agentId") String agentId,
-        @RequestParam("path") String requestedPath) {
-        return Mono.<ResponseEntity<?>> fromCallable(() -> {
+    public ResponseEntity<?> getCitationFile(@PathVariable("agentId") String agentId,
+            @RequestParam("path") String requestedPath, HttpServletRequest request) {
+        try {
             Path realRoot = agentConfigService.getKnowledgeCliRootDir(agentId).toRealPath();
             Path candidate = Path.of(requestedPath).normalize();
             if (!candidate.isAbsolute()) {
@@ -79,9 +80,8 @@ public class FileCitationController {
                 .contentType(MediaType.parseMediaType(mimeType))
                 .header(HttpHeaders.CONTENT_DISPOSITION, "inline; filename=\"" + filename + "\"")
                 .body(content);
-        })
-            .subscribeOn(Schedulers.boundedElastic())
-            .onErrorMap(IOException.class,
-                e -> new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "Failed to read citation file"));
+        } catch (IOException e) {
+            throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "Failed to read citation file", e);
+        }
     }
 }

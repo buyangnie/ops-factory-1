@@ -8,112 +8,150 @@ import static org.junit.Assert.assertEquals;
 
 import com.huawei.opsfactory.gateway.config.GatewayProperties;
 
-import reactor.core.publisher.Mono;
-import reactor.test.StepVerifier;
-
 import org.junit.Before;
 import org.junit.Test;
 import org.springframework.http.HttpStatus;
-import org.springframework.mock.http.server.reactive.MockServerHttpRequest;
-import org.springframework.mock.web.server.MockServerWebExchange;
-import org.springframework.web.server.WebFilterChain;
+import org.springframework.mock.web.MockHttpServletRequest;
+import org.springframework.mock.web.MockHttpServletResponse;
+import org.springframework.mock.web.MockFilterChain;
 
 /**
  * Test coverage for Auth Web Filter.
  *
  * @author x00000000
- * @since 2026-05-09
+ * @since 2026-05-26
  */
 public class AuthWebFilterTest {
+    private static final String STATUS_ENDPOINT = "/status";
+
+    private static final String AGENTS_ENDPOINT = "/agents";
+
+    private static final String SECRET_KEY = "test-secret";
+
+    private static final String WRONG_KEY = "wrong-key";
+
+    private static final String HEADER_SECRET_KEY = "x-secret-key";
+
+    private static final String QUERY_PARAM_KEY = "key";
+
     private AuthWebFilter filter;
 
     private GatewayProperties properties;
 
     /**
-     * Sets the up.
+     * Initializes the test fixture before each test method.
+     * Creates filter instance with test secret key.
      */
     @Before
     public void setUp() {
         properties = new GatewayProperties();
-        properties.setSecretKey("test-secret");
+        properties.setSecretKey(SECRET_KEY);
         filter = new AuthWebFilter(properties);
     }
 
     /**
-     * Tests status endpoint is public.
+     * Tests that status endpoint is public and accessible.
+     * Verifies status endpoint requires no authentication.
+     *
+     * @throws Exception if filter chain processing fails
      */
     @Test
-    public void testStatusEndpointIsPublic() {
-        MockServerHttpRequest request = MockServerHttpRequest.get("/status").build();
-        MockServerWebExchange exchange = MockServerWebExchange.from(request);
+    public void testStatusEndpointIsPublic() throws Exception {
+        MockHttpServletRequest request = new MockHttpServletRequest("GET", STATUS_ENDPOINT);
+        request.addHeader(HEADER_SECRET_KEY, SECRET_KEY);
+        MockHttpServletResponse response = new MockHttpServletResponse();
+        MockFilterChain chain = new MockFilterChain();
 
-        WebFilterChain chain = ex -> Mono.empty();
-        StepVerifier.create(filter.filter(exchange, chain)).verifyComplete();
+        filter.doFilter(request, response, chain);
+
+        assertEquals(HttpStatus.OK.value(), response.getStatus());
     }
 
     /**
-     * Tests options passes through.
+     * Tests that OPTIONS preflight requests pass through.
+     * Verifies CORS preflight is allowed without authentication.
+     *
+     * @throws Exception if filter chain processing fails
      */
     @Test
-    public void testOptionsPassesThrough() {
-        MockServerHttpRequest request = MockServerHttpRequest.options("/agents").build();
-        MockServerWebExchange exchange = MockServerWebExchange.from(request);
+    public void testOptionsPassesThrough() throws Exception {
+        MockHttpServletRequest request = new MockHttpServletRequest("OPTIONS", AGENTS_ENDPOINT);
+        MockHttpServletResponse response = new MockHttpServletResponse();
+        MockFilterChain chain = new MockFilterChain();
 
-        WebFilterChain chain = ex -> Mono.empty();
-        StepVerifier.create(filter.filter(exchange, chain)).verifyComplete();
+        filter.doFilter(request, response, chain);
+
+        assertEquals(HttpStatus.OK.value(), response.getStatus());
     }
 
     /**
-     * Tests valid secret key in header.
+     * Tests that valid secret key in header is accepted.
+     * Verifies authentication succeeds with correct header.
+     *
+     * @throws Exception if filter chain processing fails
      */
     @Test
-    public void testValidSecretKeyInHeader() {
-        MockServerHttpRequest request =
-            MockServerHttpRequest.get("/agents").header("x-secret-key", "test-secret").build();
-        MockServerWebExchange exchange = MockServerWebExchange.from(request);
+    public void testValidSecretKeyInHeader() throws Exception {
+        MockHttpServletRequest request = new MockHttpServletRequest("GET", AGENTS_ENDPOINT);
+        request.addHeader(HEADER_SECRET_KEY, SECRET_KEY);
+        MockHttpServletResponse response = new MockHttpServletResponse();
+        MockFilterChain chain = new MockFilterChain();
 
-        WebFilterChain chain = ex -> Mono.empty();
-        StepVerifier.create(filter.filter(exchange, chain)).verifyComplete();
+        filter.doFilter(request, response, chain);
+
+        assertEquals(HttpStatus.OK.value(), response.getStatus());
     }
 
     /**
-     * Tests valid secret key in query param.
+     * Tests that valid secret key in query parameter is accepted.
+     * Verifies authentication succeeds with correct query param.
+     *
+     * @throws Exception if filter chain processing fails
      */
     @Test
-    public void testValidSecretKeyInQueryParam() {
-        MockServerHttpRequest request = MockServerHttpRequest.get("/agents?key=test-secret").build();
-        MockServerWebExchange exchange = MockServerWebExchange.from(request);
+    public void testValidSecretKeyInQueryParam() throws Exception {
+        MockHttpServletRequest request = new MockHttpServletRequest("GET", AGENTS_ENDPOINT);
+        request.addParameter(QUERY_PARAM_KEY, SECRET_KEY);
+        MockHttpServletResponse response = new MockHttpServletResponse();
+        MockFilterChain chain = new MockFilterChain();
 
-        WebFilterChain chain = ex -> Mono.empty();
-        StepVerifier.create(filter.filter(exchange, chain)).verifyComplete();
+        filter.doFilter(request, response, chain);
+
+        assertEquals(HttpStatus.OK.value(), response.getStatus());
     }
 
     /**
-     * Tests invalid secret key returns401.
+     * Tests that invalid secret key returns 401 status.
+     * Verifies authentication fails with incorrect header.
+     *
+     * @throws Exception if filter chain processing fails
      */
     @Test
-    public void testInvalidSecretKeyReturns401() {
-        MockServerHttpRequest request =
-            MockServerHttpRequest.get("/agents").header("x-secret-key", "wrong-key").build();
-        MockServerWebExchange exchange = MockServerWebExchange.from(request);
+    public void testInvalidSecretKeyReturns401() throws Exception {
+        MockHttpServletRequest request = new MockHttpServletRequest("GET", AGENTS_ENDPOINT);
+        request.addHeader(HEADER_SECRET_KEY, WRONG_KEY);
+        MockHttpServletResponse response = new MockHttpServletResponse();
+        MockFilterChain chain = new MockFilterChain();
 
-        WebFilterChain chain = ex -> Mono.empty();
-        StepVerifier.create(filter.filter(exchange, chain)).verifyComplete();
+        filter.doFilter(request, response, chain);
 
-        assertEquals(HttpStatus.UNAUTHORIZED, exchange.getResponse().getStatusCode());
+        assertEquals(HttpStatus.UNAUTHORIZED.value(), response.getStatus());
     }
 
     /**
-     * Tests missing secret key returns401.
+     * Tests that missing secret key returns 401 status.
+     * Verifies authentication fails when no credentials provided.
+     *
+     * @throws Exception if filter chain processing fails
      */
     @Test
-    public void testMissingSecretKeyReturns401() {
-        MockServerHttpRequest request = MockServerHttpRequest.get("/agents").build();
-        MockServerWebExchange exchange = MockServerWebExchange.from(request);
+    public void testMissingSecretKeyReturns401() throws Exception {
+        MockHttpServletRequest request = new MockHttpServletRequest("GET", AGENTS_ENDPOINT);
+        MockHttpServletResponse response = new MockHttpServletResponse();
+        MockFilterChain chain = new MockFilterChain();
 
-        WebFilterChain chain = ex -> Mono.empty();
-        StepVerifier.create(filter.filter(exchange, chain)).verifyComplete();
+        filter.doFilter(request, response, chain);
 
-        assertEquals(HttpStatus.UNAUTHORIZED, exchange.getResponse().getStatusCode());
+        assertEquals(HttpStatus.UNAUTHORIZED.value(), response.getStatus());
     }
 }

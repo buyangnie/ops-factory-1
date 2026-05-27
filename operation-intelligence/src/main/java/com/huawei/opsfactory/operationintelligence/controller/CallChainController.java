@@ -17,7 +17,6 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.server.ResponseStatusException;
-import reactor.core.publisher.Mono;
 
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -59,29 +58,27 @@ public class CallChainController {
      * @return the call chain tree
      */
     @PostMapping("/query")
-    public Mono<ResponseEntity<Map<String, Object>>> queryCallChain(@RequestBody QueryCallChainRequest request) {
-        // 验证在响应式流外部完成（快速同步操作）
+    public ResponseEntity<Map<String, Object>> queryCallChain(@RequestBody QueryCallChainRequest request) {
         if (request.getSolutionType() == null || request.getSolutionType().isBlank()) {
-            return Mono.error(new ResponseStatusException(HttpStatus.BAD_REQUEST, "solutionType is required"));
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "solutionType is required");
         }
 
         if (request.getCondition() == null || request.getCondition().isEmpty()) {
-            return Mono.error(new ResponseStatusException(HttpStatus.BAD_REQUEST, "condition is required and must not be empty"));
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "condition is required and must not be empty");
         }
 
         for (QueryCallChainRequest.Condition condition : request.getCondition()) {
             if (condition.getConditionKey() == null || condition.getConditionValue() == null) {
-                return Mono.error(new ResponseStatusException(HttpStatus.BAD_REQUEST,
-                    "Each condition must have conditionKey and conditionValue"));
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "Each condition must have conditionKey and conditionValue");
             }
         }
 
         ResponseStatusException validationError = validateTimeRange(request.getStartTime(), request.getEndTime());
         if (validationError != null) {
-            return Mono.error(validationError);
+            throw validationError;
         }
 
-        // 转换为内部格式
         List<Map<String, String>> conditions = request.getCondition().stream()
             .map(c -> {
                 Map<String, String> map = new LinkedHashMap<>();
@@ -91,18 +88,15 @@ public class CallChainController {
             })
             .toList();
 
-        // 响应式链式调用：查询 -> 转换 -> 返回
-        return callChainService.queryCallChain(request.getSolutionType(), conditions,
-                request.getStartTime(), request.getEndTime())
-            .map(tree -> {
-                Map<String, Object> response = new LinkedHashMap<>();
-                response.put("chainType", tree.getChainType());
-                response.put("conditions", tree.getConditions());
-                response.put("totalCount", tree.getTotalCount());
-                response.put("queryTimeRange", tree.getQueryTimeRange());
-                response.put("flows", tree.getFlows());
-                return ResponseEntity.ok(response);
-            });
+        CallChainTree tree = callChainService.queryCallChain(request.getSolutionType(), conditions,
+                request.getStartTime(), request.getEndTime());
+        Map<String, Object> response = new LinkedHashMap<>();
+        response.put("chainType", tree.getChainType());
+        response.put("conditions", tree.getConditions());
+        response.put("totalCount", tree.getTotalCount());
+        response.put("queryTimeRange", tree.getQueryTimeRange());
+        response.put("flows", tree.getFlows());
+        return ResponseEntity.ok(response);
     }
 
     /**
