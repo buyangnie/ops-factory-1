@@ -121,14 +121,11 @@ class ExporterConfigLoaderTest {
      * package-private-friendly approach, and invokes the bean method.
      *
      * Since ExporterConfigLoader reads CONFIG_PATH from System.getenv() which
-/**
-      * to.
-      *
-      * @author x00000000
-      * @since 2026-05-27
-      */
      * cannot be easily overridden, we use a subclass to inject the path.
-     */
+     *
+     * @author x00000000
+     * @since 2026-05-27
+    */
     private ExporterProperties loadWithConfig(Path configPath) {
         ExporterConfigLoader loader = new ExporterConfigLoader() {
             @Override
