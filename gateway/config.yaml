@@ -6,7 +6,7 @@ server:
 gateway:
   secret-key: test
   cors-origin: '*'
-  goosed-bin: "/Users/zlj/Downloads/Goose.app/Contents/Resources/bin/goosed"
+  goosed-bin: goosed
   goose-tls: true
   paths: { project-root: .., agents-dir: agents, users-dir: users }
   idle: { timeout-minutes: 15, check-interval-ms: 60000 }
