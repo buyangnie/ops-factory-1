@@ -1,3 +1,7 @@
+/*
+ * Copyright (c) Huawei Technologies Co., Ltd. 2026-2026. All rights reserved.
+ */
+
 package com.huawei.opsfactory.businessintelligence.common.logging;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -22,6 +26,12 @@ import org.springframework.test.web.servlet.MvcResult;
 
 @SpringBootTest
 @AutoConfigureMockMvc
+/**
+ * Request Logging Filter Integration Test.
+ *
+ * @author x00000000
+ * @since 2026-05-27
+ */
 class RequestLoggingFilterIntegrationTest {
 
     @Autowired
@@ -47,8 +57,8 @@ class RequestLoggingFilterIntegrationTest {
             assertThat(requestId).isNotBlank();
             assertThat(appender.events())
                 .anySatisfy(event -> {
-                    String loggedRequestId = Objects.toString(event.getContextData().getValue(LoggingKeys.REQUEST_ID), null);
-                    assertThat(event.getMessage().getFormattedMessage())
+                    String loggedRequestId = event.getMDCPropertyMap().get(LoggingKeys.REQUEST_ID);
+                    assertThat(event.getFormattedMessage())
                         .contains("HTTP GET /business-intelligence/overview completed status=200");
                     assertThat(loggedRequestId).isEqualTo(requestId);
                 });
@@ -68,7 +78,7 @@ class RequestLoggingFilterIntegrationTest {
             assertThat(result.getResponse().getHeader(LoggingKeys.REQUEST_ID_HEADER)).isEqualTo(requestId);
             assertThat(appender.events())
                 .anySatisfy(event -> {
-                    String loggedRequestId = Objects.toString(event.getContextData().getValue(LoggingKeys.REQUEST_ID), null);
+                    String loggedRequestId = event.getMDCPropertyMap().get(LoggingKeys.REQUEST_ID);
                     assertThat(loggedRequestId).isEqualTo(requestId);
                 });
         }

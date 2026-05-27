@@ -12,11 +12,16 @@ import com.huawei.opsfactory.gateway.process.PrewarmService;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.autoconfigure.web.reactive.WebFluxTest;
+import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.context.annotation.Import;
 import org.springframework.test.context.junit4.SpringRunner;
-import org.springframework.test.web.reactive.server.WebTestClient;
+import org.springframework.test.web.servlet.MockMvc;
+
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 /**
  * Test coverage for Status Controller.
@@ -25,11 +30,17 @@ import org.springframework.test.web.reactive.server.WebTestClient;
  * @since 2026-05-09
  */
 @RunWith(SpringRunner.class)
-@WebFluxTest(StatusController.class)
+@WebMvcTest(StatusController.class)
 @Import({GatewayProperties.class, AuthWebFilter.class, UserContextFilter.class})
+/**
+ * Status Controller Test.
+ *
+ * @author x00000000
+ * @since 2026-05-27
+ */
 public class StatusControllerTest {
     @Autowired
-    private WebTestClient webTestClient;
+    private MockMvc mockMvc;
 
     @MockBean
     private PrewarmService prewarmService;
@@ -38,76 +49,55 @@ public class StatusControllerTest {
      * Tests status.
      */
     @Test
-    public void testStatus() {
-        webTestClient.get()
-            .uri("/gateway/status")
-            .header("x-secret-key", "test")
-            .exchange()
-            .expectStatus()
-            .isOk()
-            .expectBody(String.class)
-            .isEqualTo("ok");
+    public void testStatus() throws Exception {
+        mockMvc.perform(get("/gateway/status")
+                .header("x-secret-key", "test"))
+            .andExpect(status().isOk())
+            .andExpect(content().string("ok"));
     }
 
     /**
      * Tests me no user id header returns unknown.
      */
     @Test
-    public void testMe_noUserIdHeader_returnsUnknown() {
-        // /me is excluded from UserContextFilter, so no user attributes are set.
-        webTestClient.get()
-            .uri("/gateway/me")
-            .header("x-secret-key", "test")
-            .exchange()
-            .expectStatus()
-            .isOk()
-            .expectBody()
-            .jsonPath("$.userId")
-            .isEqualTo("unknown")
-            .jsonPath("$.role")
-            .isEqualTo("user");
+    public void testMe_noUserIdHeader_returnsUnknown() throws Exception {
+        mockMvc.perform(get("/gateway/me")
+                .header("x-secret-key", "test"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.userId").value("unknown"))
+            .andExpect(jsonPath("$.role").value("user"));
     }
 
     /**
      * Tests me with user id header returns user.
      */
     @Test
-    public void testMe_withUserIdHeader_returnsUser() {
-        webTestClient.get()
-            .uri("/gateway/me")
-            .header("x-secret-key", "test")
-            .header("x-user-id", "user123")
-            .exchange()
-            .expectStatus()
-            .isOk()
-            .expectBody()
-            .jsonPath("$.userId")
-            .isEqualTo("user123")
-            .jsonPath("$.role")
-            .isEqualTo("user");
+    public void testMe_withUserIdHeader_returnsUser() throws Exception {
+        mockMvc.perform(get("/gateway/me")
+                .header("x-secret-key", "test")
+                .header("x-user-id", "user123"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.userId").value("user123"))
+            .andExpect(jsonPath("$.role").value("user"));
     }
 
     /**
      * Tests config.
      */
     @Test
-    public void testConfig() {
-        webTestClient.get()
-            .uri("/gateway/config")
-            .header("x-secret-key", "test")
-            .exchange()
-            .expectStatus()
-            .isOk()
-            .expectBody()
-            .jsonPath("$.officePreview.enabled")
-            .isEqualTo(false);
+    public void testConfig() throws Exception {
+        mockMvc.perform(get("/gateway/config")
+                .header("x-secret-key", "test"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.officePreview.enabled").value(false));
     }
 
     /**
      * Tests unauthorized no key.
      */
     @Test
-    public void testUnauthorized_noKey() {
-        webTestClient.get().uri("/gateway/me").exchange().expectStatus().isUnauthorized();
+    public void testUnauthorized_noKey() throws Exception {
+        mockMvc.perform(get("/gateway/me"))
+            .andExpect(status().isUnauthorized());
     }
 }

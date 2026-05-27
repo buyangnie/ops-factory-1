@@ -1,3 +1,7 @@
+/*
+ * Copyright (c) Huawei Technologies Co., Ltd. 2026-2026. All rights reserved.
+ */
+
 package com.huawei.opsfactory.knowledge.api.document;
 
 import com.huawei.opsfactory.knowledge.common.model.PageResponse;
@@ -8,6 +12,7 @@ import java.util.List;
 import org.springframework.core.io.ByteArrayResource;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -20,6 +25,12 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestPart;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
+
+/**
+ * The DocumentController.
+ * @author x00000000
+ * @since 2026-05-26
+ */
 
 @RestController
 @RequestMapping("/knowledge")
@@ -83,8 +94,12 @@ public class DocumentController {
     }
 
     @GetMapping("/documents/{documentId}/artifacts/markdown")
-    public String getMarkdownArtifact(@PathVariable("documentId") String documentId) {
-        return facade.readArtifact(documentId, "content.md");
+    public ResponseEntity<String> getMarkdownArtifact(@PathVariable("documentId") String documentId) {
+        String content = facade.readArtifact(documentId, "content.md");
+        if (content == null) {
+            return ResponseEntity.notFound().build();
+        }
+        return ResponseEntity.ok(content);
     }
 
     @GetMapping("/documents/{documentId}/original")

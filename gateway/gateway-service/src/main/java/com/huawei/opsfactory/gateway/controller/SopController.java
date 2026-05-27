@@ -4,10 +4,10 @@
 
 package com.huawei.opsfactory.gateway.controller;
 
+import org.apache.servicecomb.provider.rest.common.RestSchema;
 import com.huawei.opsfactory.gateway.service.SopService;
 
-import reactor.core.publisher.Mono;
-import reactor.core.scheduler.Schedulers;
+import jakarta.servlet.http.HttpServletRequest;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -21,7 +21,6 @@ import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
-import org.springframework.web.server.ServerWebExchange;
 
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -34,6 +33,7 @@ import java.util.Map;
  * @since 2026-05-09
  */
 @RestController
+@RestSchema(schemaId = "sopController")
 @RequestMapping("/gateway/sops")
 public class SopController {
     private static final Logger log = LoggerFactory.getLogger(SopController.class);
@@ -52,30 +52,80 @@ public class SopController {
     /**
      * Lists all SOP definitions.
      *
-     * @param exchange the current server web exchange, used for admin role verification
-     * @return a mono wrapping a map containing the list of all SOP definitions under the {@code sops} key
+     * @param request the current HTTP request
+     * @return a map containing the list of all SOP definitions under the {@code sops} key
      */
-    @GetMapping({"", "/"})
-    public Mono<Map<String, Object>> listSops(ServerWebExchange exchange) {
-        return Mono.fromCallable(() -> {
-            List<Map<String, Object>> sops = sopService.listSops();
-            Map<String, Object> result = new LinkedHashMap<>();
-            result.put("sops", sops);
-            return result;
-        }).subscribeOn(Schedulers.boundedElastic());
+    @GetMapping
+    public Map<String, Object> listSops(HttpServletRequest request) {
+        List<Map<String, Object>> sops = sopService.listSops();
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("sops", sops);
+        return result;
     }
 
     /**
      * Gets an SOP by ID.
      *
-     * @param id the unique identifier of the SOP to retrieve
-     * @param exchange the current server web exchange, used for admin role verification
-     * @return a mono wrapping a response entity with the SOP details, or 404 if not found
+     * @param id      the unique identifier of the SOP to retrieve
+     * @param request the current HTTP request
+     * @return a response entity with the SOP details, or 404 if not found
      */
     @GetMapping("/{id}")
-    public Mono<ResponseEntity<Map<String, Object>>> getSop(@PathVariable("id") String id, ServerWebExchange exchange) {
-        return Mono.fromCallable(() -> {
-            Map<String, Object> sop = sopService.getSop(id);
+    public ResponseEntity<Map<String, Object>> getSop(@PathVariable("id") String id,
+            HttpServletRequest request) {
+        Map<String, Object> sop = sopService.getSop(id);
+        if (sop == null) {
+            Map<String, Object> body = new LinkedHashMap<>();
+            body.put("success", false);
+            body.put("error", "SOP not found: " + id);
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(body);
+        }
+        Map<String, Object> body = new LinkedHashMap<>();
+        body.put("success", true);
+        body.put("sop", sop);
+        return ResponseEntity.ok(body);
+    }
+
+    /**
+     * Creates a new SOP definition.
+     *
+     * @param request     the SOP definition fields to create, provided as a JSON request body
+     * @param httpRequest the current HTTP request
+     * @return a response entity with the created SOP and 201 status,
+     *         or 409 if a duplicate name already exists
+     */
+    @PostMapping
+    public ResponseEntity<Map<String, Object>> createSop(@RequestBody Map<String, Object> request,
+            HttpServletRequest httpRequest) {
+        try {
+            Map<String, Object> sop = sopService.createSop(request);
+            Map<String, Object> body = new LinkedHashMap<>();
+            body.put("success", true);
+            body.put("sop", sop);
+            return ResponseEntity.status(HttpStatus.CREATED).body(body);
+        } catch (IllegalArgumentException e) {
+            log.warn("Duplicate SOP name: {}", e.getMessage());
+            Map<String, Object> body = new LinkedHashMap<>();
+            body.put("success", false);
+            body.put("error", "SOP name already exists");
+            return ResponseEntity.status(HttpStatus.CONFLICT).body(body);
+        }
+    }
+
+    /**
+     * Updates an SOP by ID.
+     *
+     * @param id          the unique identifier of the SOP to update
+     * @param request     the SOP fields to modify, provided as a JSON request body
+     * @param httpRequest the current HTTP request
+     * @return a response entity with the updated SOP, 404 if not found,
+     *         or 409 if the update causes a name conflict
+     */
+    @PutMapping("/{id}")
+    public ResponseEntity<Map<String, Object>> updateSop(@PathVariable("id") String id,
+            @RequestBody Map<String, Object> request, HttpServletRequest httpRequest) {
+        try {
+            Map<String, Object> sop = sopService.updateSop(id, request);
             if (sop == null) {
                 Map<String, Object> body = new LinkedHashMap<>();
                 body.put("success", false);
@@ -86,92 +136,34 @@ public class SopController {
             body.put("success", true);
             body.put("sop", sop);
             return ResponseEntity.ok(body);
-        }).subscribeOn(Schedulers.boundedElastic());
-    }
-
-    /**
-     * Creates a new SOP definition.
-     *
-     * @param request the SOP definition fields to create, provided as a JSON request body
-     * @param exchange the current server web exchange, used for admin role verification
-     * @return a mono wrapping a response entity with the created SOP and 201 status,
-     *         or 409 if a duplicate name already exists
-     */
-    @PostMapping({"", "/"})
-    public Mono<ResponseEntity<Map<String, Object>>> createSop(@RequestBody Map<String, Object> request,
-        ServerWebExchange exchange) {
-        return Mono.fromCallable(() -> {
-            try {
-                Map<String, Object> sop = sopService.createSop(request);
-                Map<String, Object> body = new LinkedHashMap<>();
-                body.put("success", true);
-                body.put("sop", sop);
-                return ResponseEntity.status(HttpStatus.CREATED).body(body);
-            } catch (IllegalArgumentException e) {
-                log.warn("Duplicate SOP name: {}", e.getMessage());
-                Map<String, Object> body = new LinkedHashMap<>();
-                body.put("success", false);
-                body.put("error", "SOP name already exists");
-                return ResponseEntity.status(HttpStatus.CONFLICT).body(body);
-            }
-        }).subscribeOn(Schedulers.boundedElastic());
-    }
-
-    /**
-     * Updates an SOP by ID.
-     *
-     * @param id the unique identifier of the SOP to update
-     * @param request the SOP fields to modify, provided as a JSON request body
-     * @param exchange the current server web exchange, used for admin role verification
-     * @return a mono wrapping a response entity with the updated SOP, 404 if not found,
-     *         or 409 if the update causes a name conflict
-     */
-    @PutMapping("/{id}")
-    public Mono<ResponseEntity<Map<String, Object>>> updateSop(@PathVariable("id") String id,
-        @RequestBody Map<String, Object> request, ServerWebExchange exchange) {
-        return Mono.fromCallable(() -> {
-            try {
-                Map<String, Object> sop = sopService.updateSop(id, request);
-                if (sop == null) {
-                    Map<String, Object> body = new LinkedHashMap<>();
-                    body.put("success", false);
-                    body.put("error", "SOP not found: " + id);
-                    return ResponseEntity.status(HttpStatus.NOT_FOUND).body(body);
-                }
-                Map<String, Object> body = new LinkedHashMap<>();
-                body.put("success", true);
-                body.put("sop", sop);
-                return ResponseEntity.ok(body);
-            } catch (IllegalArgumentException e) {
-                log.warn("SOP update conflict: {}", e.getMessage());
-                Map<String, Object> body = new LinkedHashMap<>();
-                body.put("success", false);
-                body.put("error", "SOP update conflict");
-                return ResponseEntity.status(HttpStatus.CONFLICT).body(body);
-            }
-        }).subscribeOn(Schedulers.boundedElastic());
+        } catch (IllegalArgumentException e) {
+            log.warn("SOP update conflict: {}", e.getMessage());
+            Map<String, Object> body = new LinkedHashMap<>();
+            body.put("success", false);
+            body.put("error", "SOP update conflict");
+            return ResponseEntity.status(HttpStatus.CONFLICT).body(body);
+        }
     }
 
     /**
      * Deletes an SOP by ID.
      *
-     * @param id the unique identifier of the SOP to delete
-     * @param exchange the current server web exchange, used for admin role verification
-     * @return a mono wrapping a response entity with a success flag, or 404 if the SOP does not exist
+     * @param id      the unique identifier of the SOP to delete
+     * @param request the current HTTP request
+     * @return a response entity with a success flag, or 404 if the SOP does not exist
      */
     @DeleteMapping("/{id}")
-    public Mono<ResponseEntity<Map<String, Object>>> deleteSop(@PathVariable("id") String id, ServerWebExchange exchange) {
-        return Mono.fromCallable(() -> {
-            boolean deleted = sopService.deleteSop(id);
-            if (!deleted) {
-                Map<String, Object> body = new LinkedHashMap<>();
-                body.put("success", false);
-                body.put("error", "SOP not found: " + id);
-                return ResponseEntity.status(HttpStatus.NOT_FOUND).body(body);
-            }
+    public ResponseEntity<Map<String, Object>> deleteSop(@PathVariable("id") String id,
+            HttpServletRequest request) {
+        boolean deleted = sopService.deleteSop(id);
+        if (!deleted) {
             Map<String, Object> body = new LinkedHashMap<>();
-            body.put("success", true);
-            return ResponseEntity.ok(body);
-        }).subscribeOn(Schedulers.boundedElastic());
+            body.put("success", false);
+            body.put("error", "SOP not found: " + id);
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(body);
+        }
+        Map<String, Object> body = new LinkedHashMap<>();
+        body.put("success", true);
+        return ResponseEntity.ok(body);
     }
 }

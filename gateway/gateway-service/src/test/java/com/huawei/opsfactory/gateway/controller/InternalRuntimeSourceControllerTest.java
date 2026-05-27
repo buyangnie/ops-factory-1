@@ -5,6 +5,9 @@
 package com.huawei.opsfactory.gateway.controller;
 
 import static org.mockito.Mockito.when;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.huawei.opsfactory.gateway.common.model.ManagedInstance;
 import com.huawei.opsfactory.gateway.config.GatewayProperties;
@@ -20,11 +23,11 @@ import com.huawei.opsfactory.gateway.service.LangfuseService;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.autoconfigure.web.reactive.WebFluxTest;
+import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.context.annotation.Import;
 import org.springframework.test.context.junit4.SpringRunner;
-import org.springframework.test.web.reactive.server.WebTestClient;
+import org.springframework.test.web.servlet.MockMvc;
 
 import java.util.List;
 import java.util.Map;
@@ -36,11 +39,17 @@ import java.util.Map;
  * @since 2026-05-09
  */
 @RunWith(SpringRunner.class)
-@WebFluxTest(InternalRuntimeSourceController.class)
+@WebMvcTest(InternalRuntimeSourceController.class)
 @Import({GatewayProperties.class, AuthWebFilter.class, UserContextFilter.class})
+/**
+ * Internal Runtime Source Controller Test.
+ *
+ * @author x00000000
+ * @since 2026-05-27
+ */
 public class InternalRuntimeSourceControllerTest {
     @Autowired
-    private WebTestClient webTestClient;
+    private MockMvc mockMvc;
 
     @MockBean
     private PrewarmService prewarmService;
@@ -61,140 +70,101 @@ public class InternalRuntimeSourceControllerTest {
      * Tests system as admin.
      */
     @Test
-    public void testSystem_asAdmin() {
+    public void testSystem_asAdmin() throws Exception {
         when(agentConfigService.getRegistry()).thenReturn(List.of());
         when(instanceManager.getAllInstances()).thenReturn(List.of());
         when(langfuseService.isConfigured()).thenReturn(false);
 
-        webTestClient.get()
-            .uri("/gateway/runtime-source/system")
-            .header("x-secret-key", "test")
-            .header("x-user-id", "admin")
-            .exchange()
-            .expectStatus()
-            .isOk()
-            .expectBody()
-            .jsonPath("$.gateway.uptimeMs")
-            .isNumber()
-            .jsonPath("$.gateway.host")
-            .isNotEmpty()
-            .jsonPath("$.gateway.port")
-            .isNumber()
-            .jsonPath("$.agents.configured")
-            .isEqualTo(0)
-            .jsonPath("$.idle.timeoutMs")
-            .isNumber()
-            .jsonPath("$.langfuse.configured")
-            .isEqualTo(false);
+        mockMvc.perform(get("/gateway/runtime-source/system")
+                .header("x-secret-key", "test")
+                .header("x-user-id", "admin"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.gateway.uptimeMs").exists())
+            .andExpect(jsonPath("$.gateway.host").exists())
+            .andExpect(jsonPath("$.gateway.port").exists())
+            .andExpect(jsonPath("$.agents.configured").value(0))
+            .andExpect(jsonPath("$.idle.timeoutMs").exists())
+            .andExpect(jsonPath("$.langfuse.configured").value(false));
     }
 
     /**
      * Tests system succeeds for any authenticated user.
      */
     @Test
-    public void testSystem_succeeds_forAnyUser() {
+    public void testSystem_succeeds_forAnyUser() throws Exception {
         when(agentConfigService.getRegistry()).thenReturn(List.of());
         when(instanceManager.getAllInstances()).thenReturn(List.of());
         when(langfuseService.isConfigured()).thenReturn(false);
 
-        webTestClient.get()
-            .uri("/gateway/runtime-source/system")
-            .header("x-secret-key", "test")
-            .header("x-user-id", "regular-user")
-            .exchange()
-            .expectStatus()
-            .isOk();
+        mockMvc.perform(get("/gateway/runtime-source/system")
+                .header("x-secret-key", "test")
+                .header("x-user-id", "regular-user"))
+            .andExpect(status().isOk());
     }
 
     /**
      * Tests instances.
      */
     @Test
-    public void testInstances() {
+    public void testInstances() throws Exception {
         ManagedInstance inst = new ManagedInstance("agent1", "user1", 9090, 5678L, null, "test-secret");
         inst.setStatus(ManagedInstance.Status.RUNNING);
         when(instanceManager.getAllInstances()).thenReturn(List.of(inst));
         when(agentConfigService.findAgent("agent1"))
             .thenReturn(new com.huawei.opsfactory.gateway.common.model.AgentRegistryEntry("agent1", "Agent One"));
 
-        webTestClient.get()
-            .uri("/gateway/runtime-source/instances")
-            .header("x-secret-key", "test")
-            .header("x-user-id", "admin")
-            .exchange()
-            .expectStatus()
-            .isOk()
-            .expectBody()
-            .jsonPath("$.totalInstances")
-            .isEqualTo(1)
-            .jsonPath("$.runningInstances")
-            .isEqualTo(1)
-            .jsonPath("$.byAgent[0].agentId")
-            .isEqualTo("agent1")
-            .jsonPath("$.byAgent[0].agentName")
-            .isEqualTo("Agent One")
-            .jsonPath("$.byAgent[0].instances[0].userId")
-            .isEqualTo("user1")
-            .jsonPath("$.byAgent[0].instances[0].port")
-            .isEqualTo(9090)
-            .jsonPath("$.byAgent[0].instances[0].status")
-            .isEqualTo("running")
-            .jsonPath("$.byAgent[0].instances[0].idleSinceMs")
-            .isNumber();
+        mockMvc.perform(get("/gateway/runtime-source/instances")
+                .header("x-secret-key", "test")
+                .header("x-user-id", "admin"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.totalInstances").value(1))
+            .andExpect(jsonPath("$.runningInstances").value(1))
+            .andExpect(jsonPath("$.byAgent[0].agentId").value("agent1"))
+            .andExpect(jsonPath("$.byAgent[0].agentName").value("Agent One"))
+            .andExpect(jsonPath("$.byAgent[0].instances[0].userId").value("user1"))
+            .andExpect(jsonPath("$.byAgent[0].instances[0].port").value(9090))
+            .andExpect(jsonPath("$.byAgent[0].instances[0].status").value("running"))
+            .andExpect(jsonPath("$.byAgent[0].instances[0].idleSinceMs").exists());
     }
 
     /**
      * Tests instances succeeds for any authenticated user.
      */
     @Test
-    public void testInstances_succeeds_forAnyUser() {
+    public void testInstances_succeeds_forAnyUser() throws Exception {
         when(instanceManager.getAllInstances()).thenReturn(List.of());
 
-        webTestClient.get()
-            .uri("/gateway/runtime-source/instances")
-            .header("x-secret-key", "test")
-            .header("x-user-id", "regular-user")
-            .exchange()
-            .expectStatus()
-            .isOk();
+        mockMvc.perform(get("/gateway/runtime-source/instances")
+                .header("x-secret-key", "test")
+                .header("x-user-id", "regular-user"))
+            .andExpect(status().isOk());
     }
 
     /**
      * Tests metrics empty.
      */
     @Test
-    public void testMetrics_empty() {
+    public void testMetrics_empty() throws Exception {
         when(metricsBuffer.getSnapshots(120)).thenReturn(List.of());
 
-        webTestClient.get()
-            .uri("/gateway/runtime-source/metrics")
-            .header("x-secret-key", "test")
-            .header("x-user-id", "admin")
-            .exchange()
-            .expectStatus()
-            .isOk()
-            .expectBody()
-            .jsonPath("$.collectionIntervalSec")
-            .isEqualTo(30)
-            .jsonPath("$.maxSlots")
-            .isEqualTo(120)
-            .jsonPath("$.returnedSlots")
-            .isEqualTo(0)
-            .jsonPath("$.current")
-            .isEmpty()
-            .jsonPath("$.aggregate.totalRequests")
-            .isEqualTo(0)
-            .jsonPath("$.aggregate.totalErrors")
-            .isEqualTo(0)
-            .jsonPath("$.series.length()")
-            .isEqualTo(0);
+        mockMvc.perform(get("/gateway/runtime-source/metrics")
+                .header("x-secret-key", "test")
+                .header("x-user-id", "admin"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.collectionIntervalSec").value(30))
+            .andExpect(jsonPath("$.maxSlots").value(120))
+            .andExpect(jsonPath("$.returnedSlots").value(0))
+            .andExpect(jsonPath("$.current").exists())
+            .andExpect(jsonPath("$.aggregate.totalRequests").value(0))
+            .andExpect(jsonPath("$.aggregate.totalErrors").value(0))
+            .andExpect(jsonPath("$.series.length()").value(0));
     }
 
     /**
      * Tests metrics with snapshots.
      */
     @Test
-    public void testMetrics_withSnapshots() {
+    public void testMetrics_withSnapshots() throws Exception {
         MetricsSnapshot s1 = new MetricsSnapshot();
         s1.setTimestamp(1000L);
         s1.setActiveInstances(2);
@@ -224,49 +194,32 @@ public class InternalRuntimeSourceControllerTest {
         when(metricsBuffer.getSnapshots(120)).thenReturn(List.of(s1, s2));
         when(metricsBuffer.getAgentStats()).thenReturn(Map.of());
 
-        webTestClient.get()
-            .uri("/gateway/runtime-source/metrics")
-            .header("x-secret-key", "test")
-            .header("x-user-id", "admin")
-            .exchange()
-            .expectStatus()
-            .isOk()
-            .expectBody()
-            .jsonPath("$.returnedSlots")
-            .isEqualTo(2)
-            .jsonPath("$.current.activeInstances")
-            .isEqualTo(3)
-            .jsonPath("$.current.totalTokens")
-            .isEqualTo(8000)
-            .jsonPath("$.current.totalSessions")
-            .isEqualTo(5)
-            .jsonPath("$.aggregate.totalRequests")
-            .isEqualTo(10)
-            .jsonPath("$.aggregate.totalErrors")
-            .isEqualTo(1)
-            .jsonPath("$.aggregate.avgLatencyMs")
-            .isEqualTo(2600.0)
-            .jsonPath("$.series.length()")
-            .isEqualTo(2)
-            .jsonPath("$.series[0].t")
-            .isEqualTo(1000)
-            .jsonPath("$.series[1].t")
-            .isEqualTo(2000);
+        mockMvc.perform(get("/gateway/runtime-source/metrics")
+                .header("x-secret-key", "test")
+                .header("x-user-id", "admin"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.returnedSlots").value(2))
+            .andExpect(jsonPath("$.current.activeInstances").value(3))
+            .andExpect(jsonPath("$.current.totalTokens").value(8000))
+            .andExpect(jsonPath("$.current.totalSessions").value(5))
+            .andExpect(jsonPath("$.aggregate.totalRequests").value(10))
+            .andExpect(jsonPath("$.aggregate.totalErrors").value(1))
+            .andExpect(jsonPath("$.aggregate.avgLatencyMs").value(2600.0))
+            .andExpect(jsonPath("$.series.length()").value(2))
+            .andExpect(jsonPath("$.series[0].t").value(1000))
+            .andExpect(jsonPath("$.series[1].t").value(2000));
     }
 
     /**
      * Tests metrics succeeds for any authenticated user.
      */
     @Test
-    public void testMetrics_succeeds_forAnyUser() {
+    public void testMetrics_succeeds_forAnyUser() throws Exception {
         when(metricsBuffer.getSnapshots(120)).thenReturn(List.of());
 
-        webTestClient.get()
-            .uri("/gateway/runtime-source/metrics")
-            .header("x-secret-key", "test")
-            .header("x-user-id", "regular-user")
-            .exchange()
-            .expectStatus()
-            .isOk();
+        mockMvc.perform(get("/gateway/runtime-source/metrics")
+                .header("x-secret-key", "test")
+                .header("x-user-id", "regular-user"))
+            .andExpect(status().isOk());
     }
 }

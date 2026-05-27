@@ -1,5 +1,11 @@
+/*
+ * Copyright (c) Huawei Technologies Co., Ltd. 2026-2026. All rights reserved.
+ */
+
 package com.huawei.opsfactory.controlcenter.config;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.web.servlet.config.annotation.CorsRegistry;
 import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
@@ -8,8 +14,16 @@ import java.net.URI;
 import java.util.LinkedHashSet;
 import java.util.Set;
 
-@Configuration
+@Configuration("controlCenterWebConfig")
+/**
+ * Web Config.
+ *
+ * @author x00000000
+ * @since 2026-05-27
+ */
 public class WebConfig implements WebMvcConfigurer {
+
+    private static final Logger log = LoggerFactory.getLogger(WebConfig.class);
 
     private final ControlCenterProperties properties;
 
@@ -41,7 +55,8 @@ public class WebConfig implements WebMvcConfigurer {
                 origins.add(buildOrigin(scheme, "127.0.0.1", port));
                 origins.add(buildOrigin(scheme, "localhost", port));
             }
-        } catch (Exception ignored) {
+        } catch (IllegalArgumentException e) {
+            log.warn("Invalid CORS origin format: {}, skipping localhost aliases", configuredOrigin);
         }
         return origins.toArray(String[]::new);
     }

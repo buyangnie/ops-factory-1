@@ -18,6 +18,12 @@ import java.util.List;
  * @since 2026-05-11
  */
 @ConfigurationProperties(prefix = "operation-intelligence")
+/**
+ * Operation Intelligence Properties.
+ *
+ * @author x00000000
+ * @since 2026-05-27
+ */
 public class OperationIntelligenceProperties {
 
     private static final Logger log = LoggerFactory.getLogger(OperationIntelligenceProperties.class);
@@ -206,6 +212,9 @@ public class OperationIntelligenceProperties {
         return (configuredPath == null || configuredPath.isBlank()) ? null : configuredPath;
     }
 
+    /**
+     * QoS configuration properties for data collection and metrics.
+     */
     public static class Qos {
         private boolean enabled = true;
 
@@ -387,6 +396,12 @@ public class OperationIntelligenceProperties {
             this.dvEnvironments = dvEnvironments;
         }
 
+/**
+         * Weights.
+         *
+         * @author x00000000
+         * @since 2026-05-27
+         */
         public static class Weights {
             private double availability = 0.4;
 
@@ -449,6 +464,12 @@ public class OperationIntelligenceProperties {
             }
         }
 
+/**
+         * Thresholds.
+         *
+         * @author x00000000
+         * @since 2026-05-27
+         */
         public static class Thresholds {
             private double good = 0.9;
 
@@ -511,6 +532,12 @@ public class OperationIntelligenceProperties {
             }
         }
 
+/**
+         * Dv Environment.
+         *
+         * @author x00000000
+         * @since 2026-05-27
+         */
         public static class DvEnvironment {
             private String envCode;
 
@@ -735,6 +762,11 @@ public class OperationIntelligenceProperties {
         }
     }
 
+    /**
+     * Logging configuration properties.
+         * @author x00000000
+         * @since 2026-05-27
+     */
     public static class Logging {
         private boolean accessLogEnabled = true;
 
@@ -757,6 +789,11 @@ public class OperationIntelligenceProperties {
         }
     }
 
+    /**
+     * Call chain configuration properties for tracing and log analysis.
+         * @author x00000000
+         * @since 2026-05-27
+     */
     public static class CallChain {
         private boolean enabled = true;
         private int querySize = 100;
@@ -765,6 +802,7 @@ public class OperationIntelligenceProperties {
         private long maxTimeRangeMs = 1800000;
         private long rotationIntervalMs = 3600000;
         private long normalizeDataRetentionDays = 90;
+        private double minCallRatio = 3.0;
         private TimeSplit timeSplit = new TimeSplit();
 
         /**
@@ -894,6 +932,24 @@ public class OperationIntelligenceProperties {
         }
 
         /**
+         * Gets the min call ratio.
+         *
+         * @return the min call ratio
+         */
+        public double getMinCallRatio() {
+            return minCallRatio;
+        }
+
+        /**
+         * Sets the min call ratio.
+         *
+         * @param minCallRatio the minCallRatio
+         */
+        public void setMinCallRatio(double minCallRatio) {
+            this.minCallRatio = minCallRatio;
+        }
+
+        /**
          * Gets the time split.
          *
          * @return the time split
@@ -911,6 +967,12 @@ public class OperationIntelligenceProperties {
             this.timeSplit = timeSplit;
         }
 
+/**
+         * Time Split.
+         *
+         * @author x00000000
+         * @since 2026-05-27
+         */
         public static class TimeSplit {
             private long initialMinutes = 15;
             private List<Long> degradeMinutes = List.of(10L, 5L);

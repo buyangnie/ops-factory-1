@@ -30,6 +30,22 @@
     padding: var(--spacing-3) var(--spacing-4);
 }
 
+.memory-delete-confirm {
+    padding: var(--spacing-2) var(--spacing-3);
+    background: rgba(245, 158, 11, 0.1);
+    font-size: var(--font-size-sm);
+    color: #b45309;
+}
+
+.memory-delete-confirm-name {
+    display: inline-block;
+    max-width: 200px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    vertical-align: bottom;
+}
+
 .memory-file-title {
     display: flex;
     align-items: baseline;
@@ -90,6 +106,25 @@
     line-height: 1.5;
 }
 
+.memory-editor-footer {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: var(--spacing-2);
+    margin-top: var(--spacing-2);
+}
+
+.memory-char-count {
+    font-size: var(--font-size-xs);
+    color: var(--color-text-muted);
+    flex-shrink: 0;
+}
+
+.memory-char-count-error {
+    color: var(--color-error);
+    font-weight: 600;
+}
+
 .memory-entries {
     padding: var(--spacing-1) var(--spacing-4) var(--spacing-4);
     display: flex;
@@ -137,6 +172,35 @@
     color: var(--color-text-primary);
     line-height: 1.6;
     white-space: pre-wrap;
+    word-break: break-word;
+    overflow-wrap: break-word;
+}
+
+.memory-entry-content-truncated {
+    max-height: 4.8em;
+    overflow: hidden;
+    display: -webkit-box;
+    -webkit-line-clamp: 3;
+    -webkit-box-orient: vertical;
+    position: relative;
+}
+
+.memory-expand-button {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--spacing-1);
+    margin-top: var(--spacing-2);
+    padding: var(--spacing-1) var(--spacing-2);
+    font-size: var(--font-size-xs);
+    color: var(--color-link);
+    background: none;
+    border: none;
+    cursor: pointer;
+    transition: color var(--transition-fast);
+}
+
+.memory-expand-button:hover {
+    color: var(--color-link-hover);
 }
 
 .memory-entry-empty {

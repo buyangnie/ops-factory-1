@@ -43,6 +43,11 @@ export default function CreateProviderModal({ mode, provider, onClose, onCreate,
     const [isSaving, setIsSaving] = useState(false)
     const [error, setError] = useState<string | null>(null)
 
+    const handleContextLimitChange = (value: string) => {
+        const filtered = value.replace(/\D/g, '')
+        setContextLimit(filtered)
+    }
+
     const validationErrors = useMemo(() => {
         const errors: Record<string, string> = {}
         const trimmedBaseUrl = baseUrl.trim()
@@ -160,11 +165,11 @@ export default function CreateProviderModal({ mode, provider, onClose, onCreate,
                             <span className="form-label">{t('agentConfigure.contextLimit')}</span>
                             <input
                                 className="form-input"
-                                type="number"
-                                min="1"
-                                pattern="\d*"
+                                type="text"
+                                inputMode="numeric"
                                 value={contextLimit}
-                                onChange={event => setContextLimit(event.target.value)}
+                                onChange={event => handleContextLimitChange(event.target.value)}
+                                placeholder="200000"
                             />
                             {validationErrors.contextLimit && <span className="form-error">{validationErrors.contextLimit}</span>}
                         </label>

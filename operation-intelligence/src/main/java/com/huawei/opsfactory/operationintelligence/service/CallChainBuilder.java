@@ -4,6 +4,7 @@
 
 package com.huawei.opsfactory.operationintelligence.service;
 
+import com.huawei.opsfactory.operationintelligence.config.OperationIntelligenceProperties;
 import com.huawei.opsfactory.operationintelligence.qos.model.CallChainTree;
 import com.huawei.opsfactory.operationintelligence.qos.model.CallFlow;
 import com.huawei.opsfactory.operationintelligence.qos.model.FlowNode;
@@ -35,13 +36,17 @@ public class CallChainBuilder {
 
     private final CallChainStatistics statisticsCalculator;
 
+    private final OperationIntelligenceProperties properties;
+
     /**
      * Call Chain Builder.
      *
      * @param statisticsCalculator the statistics calculator
+     * @param properties the properties
      */
-    public CallChainBuilder(CallChainStatistics statisticsCalculator) {
+    public CallChainBuilder(CallChainStatistics statisticsCalculator, OperationIntelligenceProperties properties) {
         this.statisticsCalculator = statisticsCalculator;
+        this.properties = properties;
     }
 
     /**
@@ -257,8 +262,8 @@ public class CallChainBuilder {
      * @return true if valid
      */
     private boolean isValidFlow(CallFlow flow) {
-        // Filter low frequency flows (< 3%)
-        if (flow.getCallRatio() != null && flow.getCallRatio() < 3.0) {
+        // Filter low frequency flows
+        if (flow.getCallRatio() != null && flow.getCallRatio() < properties.getCallChain().getMinCallRatio()) {
             return false;
         }
         return flow.getCallCount() != null && flow.getCallCount() > 0;

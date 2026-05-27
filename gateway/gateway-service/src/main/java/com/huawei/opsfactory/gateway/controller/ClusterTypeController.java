@@ -4,10 +4,10 @@
 
 package com.huawei.opsfactory.gateway.controller;
 
+import org.apache.servicecomb.provider.rest.common.RestSchema;
 import com.huawei.opsfactory.gateway.service.ClusterTypeService;
 
-import reactor.core.publisher.Mono;
-import reactor.core.scheduler.Schedulers;
+import jakarta.servlet.http.HttpServletRequest;
 
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -19,7 +19,6 @@ import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
-import org.springframework.web.server.ServerWebExchange;
 
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -32,6 +31,7 @@ import java.util.Map;
  * @since 2026-05-09
  */
 @RestController
+@RestSchema(schemaId = "clusterTypeController")
 @RequestMapping("/gateway/cluster-types")
 public class ClusterTypeController {
     private final ClusterTypeService clusterTypeService;
@@ -48,119 +48,109 @@ public class ClusterTypeController {
     /**
      * Lists all cluster type definitions.
      *
-     * @param exchange current HTTP exchange carrying user context
-     * @return Mono emitting a map with "clusterTypes" list
+     * @param request current HTTP request
+     * @return a map with "clusterTypes" list
      */
     @GetMapping
-    public Mono<Map<String, Object>> listClusterTypes(ServerWebExchange exchange) {
-        return Mono.fromCallable(() -> {
-            List<Map<String, Object>> types = clusterTypeService.listClusterTypes();
-            Map<String, Object> result = new LinkedHashMap<>();
-            result.put("clusterTypes", types);
-            return result;
-        }).subscribeOn(Schedulers.boundedElastic());
+    public Map<String, Object> listClusterTypes(HttpServletRequest request) {
+        List<Map<String, Object>> types = clusterTypeService.listClusterTypes();
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("clusterTypes", types);
+        return result;
     }
 
     /**
      * Gets a cluster type by ID.
      *
-     * @param id cluster type identifier
-     * @param exchange current HTTP exchange carrying user context
-     * @return Mono emitting ResponseEntity containing the cluster type or 404
+     * @param id      cluster type identifier
+     * @param request current HTTP request
+     * @return ResponseEntity containing the cluster type or 404
      */
     @GetMapping("/{id}")
-    public Mono<ResponseEntity<Map<String, Object>>> getClusterType(@PathVariable("id") String id,
-        ServerWebExchange exchange) {
-        return Mono.fromCallable(() -> {
-            try {
-                Map<String, Object> ct = clusterTypeService.getClusterType(id);
-                Map<String, Object> body = new LinkedHashMap<>();
-                body.put("success", true);
-                body.put("clusterType", ct);
-                return ResponseEntity.ok(body);
-            } catch (IllegalArgumentException e) {
-                Map<String, Object> body = new LinkedHashMap<>();
-                body.put("success", false);
-                body.put("error", "Cluster type not found");
-                return ResponseEntity.status(HttpStatus.NOT_FOUND).body(body);
-            }
-        }).subscribeOn(Schedulers.boundedElastic());
+    public ResponseEntity<Map<String, Object>> getClusterType(@PathVariable("id") String id,
+            HttpServletRequest request) {
+        try {
+            Map<String, Object> ct = clusterTypeService.getClusterType(id);
+            Map<String, Object> body = new LinkedHashMap<>();
+            body.put("success", true);
+            body.put("clusterType", ct);
+            return ResponseEntity.ok(body);
+        } catch (IllegalArgumentException e) {
+            Map<String, Object> body = new LinkedHashMap<>();
+            body.put("success", false);
+            body.put("error", "Cluster type not found");
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(body);
+        }
     }
 
     /**
      * Creates a new cluster type.
      *
-     * @param request request body containing cluster type fields
-     * @param exchange current HTTP exchange carrying user context
-     * @return Mono emitting ResponseEntity with created cluster type or 400
+     * @param request     request body containing cluster type fields
+     * @param httpRequest current HTTP request
+     * @return ResponseEntity with created cluster type or 400
      */
     @PostMapping
-    public Mono<ResponseEntity<Map<String, Object>>> createClusterType(@RequestBody Map<String, Object> request,
-        ServerWebExchange exchange) {
-        return Mono.fromCallable(() -> {
-            try {
-                Map<String, Object> ct = clusterTypeService.createClusterType(request);
-                Map<String, Object> body = new LinkedHashMap<>();
-                body.put("success", true);
-                body.put("clusterType", ct);
-                return ResponseEntity.status(HttpStatus.CREATED).body(body);
-            } catch (IllegalArgumentException e) {
-                Map<String, Object> body = new LinkedHashMap<>();
-                body.put("success", false);
-                body.put("error", "Invalid cluster type request");
-                return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(body);
-            }
-        }).subscribeOn(Schedulers.boundedElastic());
+    public ResponseEntity<Map<String, Object>> createClusterType(@RequestBody Map<String, Object> request,
+            HttpServletRequest httpRequest) {
+        try {
+            Map<String, Object> ct = clusterTypeService.createClusterType(request);
+            Map<String, Object> body = new LinkedHashMap<>();
+            body.put("success", true);
+            body.put("clusterType", ct);
+            return ResponseEntity.status(HttpStatus.CREATED).body(body);
+        } catch (IllegalArgumentException e) {
+            Map<String, Object> body = new LinkedHashMap<>();
+            body.put("success", false);
+            body.put("error", "Invalid cluster type request");
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(body);
+        }
     }
 
     /**
      * Updates a cluster type by ID.
      *
-     * @param id cluster type identifier
-     * @param request request body containing updated fields
-     * @param exchange current HTTP exchange carrying user context
-     * @return Mono emitting ResponseEntity with updated cluster type or 404
+     * @param id          cluster type identifier
+     * @param request     request body containing updated fields
+     * @param httpRequest current HTTP request
+     * @return ResponseEntity with updated cluster type or 404
      */
     @PutMapping("/{id}")
-    public Mono<ResponseEntity<Map<String, Object>>> updateClusterType(@PathVariable("id") String id,
-        @RequestBody Map<String, Object> request, ServerWebExchange exchange) {
-        return Mono.fromCallable(() -> {
-            try {
-                Map<String, Object> ct = clusterTypeService.updateClusterType(id, request);
-                Map<String, Object> body = new LinkedHashMap<>();
-                body.put("success", true);
-                body.put("clusterType", ct);
-                return ResponseEntity.ok(body);
-            } catch (IllegalArgumentException e) {
-                Map<String, Object> body = new LinkedHashMap<>();
-                body.put("success", false);
-                body.put("error", "Cluster type not found");
-                return ResponseEntity.status(HttpStatus.NOT_FOUND).body(body);
-            }
-        }).subscribeOn(Schedulers.boundedElastic());
+    public ResponseEntity<Map<String, Object>> updateClusterType(@PathVariable("id") String id,
+            @RequestBody Map<String, Object> request, HttpServletRequest httpRequest) {
+        try {
+            Map<String, Object> ct = clusterTypeService.updateClusterType(id, request);
+            Map<String, Object> body = new LinkedHashMap<>();
+            body.put("success", true);
+            body.put("clusterType", ct);
+            return ResponseEntity.ok(body);
+        } catch (IllegalArgumentException e) {
+            Map<String, Object> body = new LinkedHashMap<>();
+            body.put("success", false);
+            body.put("error", "Cluster type not found");
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(body);
+        }
     }
 
     /**
      * Deletes a cluster type by ID.
      *
-     * @param id cluster type identifier
-     * @param exchange current HTTP exchange carrying user context
-     * @return Mono emitting ResponseEntity with success status or 404
+     * @param id      cluster type identifier
+     * @param request current HTTP request
+     * @return ResponseEntity with success status or 404
      */
     @DeleteMapping("/{id}")
-    public Mono<ResponseEntity<Map<String, Object>>> deleteClusterType(@PathVariable("id") String id,
-        ServerWebExchange exchange) {
-        return Mono.fromCallable(() -> {
-            boolean deleted = clusterTypeService.deleteClusterType(id);
-            if (!deleted) {
-                Map<String, Object> body = new LinkedHashMap<>();
-                body.put("success", false);
-                body.put("error", "Cluster type not found: " + id);
-                return ResponseEntity.status(HttpStatus.NOT_FOUND).body(body);
-            }
+    public ResponseEntity<Map<String, Object>> deleteClusterType(@PathVariable("id") String id,
+            HttpServletRequest request) {
+        boolean deleted = clusterTypeService.deleteClusterType(id);
+        if (!deleted) {
             Map<String, Object> body = new LinkedHashMap<>();
-            body.put("success", true);
-            return ResponseEntity.ok(body);
-        }).subscribeOn(Schedulers.boundedElastic());
+            body.put("success", false);
+            body.put("error", "Cluster type not found: " + id);
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(body);
+        }
+        Map<String, Object> body = new LinkedHashMap<>();
+        body.put("success", true);
+        return ResponseEntity.ok(body);
     }
 }

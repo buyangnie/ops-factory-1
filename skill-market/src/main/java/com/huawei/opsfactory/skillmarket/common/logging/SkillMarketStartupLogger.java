@@ -1,3 +1,7 @@
+/*
+ * Copyright (c) Huawei Technologies Co., Ltd. 2026-2026. All rights reserved.
+ */
+
 package com.huawei.opsfactory.skillmarket.common.logging;
 
 import com.huawei.opsfactory.skillmarket.config.SkillMarketProperties;
@@ -8,6 +12,12 @@ import org.springframework.boot.ApplicationRunner;
 import org.springframework.stereotype.Component;
 
 @Component
+/**
+ * Skill Market Startup Logger.
+ *
+ * @author x00000000
+ * @since 2026-05-27
+ */
 public class SkillMarketStartupLogger implements ApplicationRunner {
 
     private static final Logger log = LoggerFactory.getLogger(SkillMarketStartupLogger.class);

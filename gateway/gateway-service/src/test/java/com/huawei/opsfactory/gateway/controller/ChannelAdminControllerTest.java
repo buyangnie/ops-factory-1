@@ -9,6 +9,10 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.huawei.opsfactory.gateway.config.GatewayProperties;
 import com.huawei.opsfactory.gateway.filter.AuthWebFilter;
@@ -26,18 +30,30 @@ import com.huawei.opsfactory.gateway.service.channel.model.ChannelDetail;
 import com.huawei.opsfactory.gateway.service.channel.model.ChannelLoginState;
 import com.huawei.opsfactory.gateway.service.channel.model.ChannelVerificationResult;
 
+import org.junit.Test;
+import org.junit.runner.RunWith;
+import org.mockito.Mockito;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
+import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.context.annotation.Import;
+import org.springframework.http.MediaType;
+import org.springframework.test.context.junit4.SpringRunner;
+import org.springframework.test.web.servlet.MockMvc;
+
+import java.util.List;
 import reactor.core.publisher.Mono;
 
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.mockito.Mockito;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.autoconfigure.web.reactive.WebFluxTest;
+import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
 import org.springframework.test.context.junit4.SpringRunner;
-import org.springframework.test.web.reactive.server.WebTestClient;
+import org.springframework.test.web.servlet.MockMvc;
 
 import java.util.List;
 
@@ -48,11 +64,17 @@ import java.util.List;
  * @since 2026-05-09
  */
 @RunWith(SpringRunner.class)
-@WebFluxTest(ChannelAdminController.class)
+@WebMvcTest(ChannelAdminController.class)
 @Import({GatewayProperties.class, AuthWebFilter.class, UserContextFilter.class})
+/**
+ * Channel Admin Controller Test.
+ *
+ * @author x00000000
+ * @since 2026-05-27
+ */
 public class ChannelAdminControllerTest {
     @Autowired
-    private WebTestClient webTestClient;
+    private MockMvc mockMvc;
 
     @MockBean
     private ChannelConfigService channelConfigService;
@@ -76,23 +98,17 @@ public class ChannelAdminControllerTest {
      * Tests get login state dispatches to we chat service.
      */
     @Test
-    public void testGetLoginStateDispatchesToWeChatService() {
+    public void testGetLoginStateDispatchesToWeChatService() throws Exception {
         when(channelConfigService.getChannel("wechat-main", "admin")).thenReturn(channelDetail("wechat"));
         when(weChatLoginService.getLoginState("wechat-main", "admin")).thenReturn(new ChannelLoginState("wechat-main",
             "connected", "WeChat session connected", "auth", "wxid_123", "", "", "", null));
 
-        webTestClient.get()
-            .uri("/gateway/channels/wechat-main/login-state")
-            .header("x-secret-key", "test")
-            .header("x-user-id", "admin")
-            .exchange()
-            .expectStatus()
-            .isOk()
-            .expectBody()
-            .jsonPath("$.state.status")
-            .isEqualTo("connected")
-            .jsonPath("$.state.message")
-            .isEqualTo("WeChat session connected");
+        mockMvc.perform(get("/gateway/channels/wechat-main/login-state")
+                .header("x-secret-key", "test")
+                .header("x-user-id", "admin"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.state.status").value("connected"))
+            .andExpect(jsonPath("$.state.message").value("WeChat session connected"));
 
         verify(weChatLoginService).getLoginState("wechat-main", "admin");
         verify(whatsAppWebLoginService, never()).getLoginState(Mockito.anyString(), Mockito.anyString());
@@ -102,23 +118,17 @@ public class ChannelAdminControllerTest {
      * Tests start login dispatches to we chat service.
      */
     @Test
-    public void testStartLoginDispatchesToWeChatService() {
+    public void testStartLoginDispatchesToWeChatService() throws Exception {
         when(channelConfigService.getChannel("wechat-main", "admin")).thenReturn(channelDetail("wechat"));
         when(weChatLoginService.startLogin("wechat-main", "admin")).thenReturn(new ChannelLoginState("wechat-main",
             "pending", "WeChat QR login is pending", "auth", "wxid_123", "", "", "", "https://example.com/qr.png"));
 
-        webTestClient.post()
-            .uri("/gateway/channels/wechat-main/login")
-            .header("x-secret-key", "test")
-            .header("x-user-id", "admin")
-            .exchange()
-            .expectStatus()
-            .isOk()
-            .expectBody()
-            .jsonPath("$.success")
-            .isEqualTo(true)
-            .jsonPath("$.state.status")
-            .isEqualTo("pending");
+        mockMvc.perform(post("/gateway/channels/wechat-main/login")
+                .header("x-secret-key", "test")
+                .header("x-user-id", "admin"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.success").value(true))
+            .andExpect(jsonPath("$.state.status").value("pending"));
 
         verify(weChatLoginService).startLogin("wechat-main", "admin");
         verify(whatsAppWebLoginService, never()).startLogin(eq("wechat-main"), eq("admin"));
@@ -128,25 +138,19 @@ public class ChannelAdminControllerTest {
      * Tests probe passes current user to adapter.
      */
     @Test
-    public void testProbePassesCurrentUserToAdapter() {
+    public void testProbePassesCurrentUserToAdapter() throws Exception {
         ChannelAdapter adapter = Mockito.mock(ChannelAdapter.class);
         when(channelConfigService.getChannel("wechat-main", "admin")).thenReturn(channelDetail("wechat"));
         when(channelAdapterRegistry.require("wechat")).thenReturn(adapter);
         when(adapter.testConnectivity("wechat-main", "admin"))
             .thenReturn(Mono.just(new ChannelConnectivityResult(true, "connected")));
 
-        webTestClient.post()
-            .uri("/gateway/channels/wechat-main/probe")
-            .header("x-secret-key", "test")
-            .header("x-user-id", "admin")
-            .exchange()
-            .expectStatus()
-            .isOk()
-            .expectBody()
-            .jsonPath("$.success")
-            .isEqualTo(true)
-            .jsonPath("$.connectivity.ok")
-            .isEqualTo(true);
+        mockMvc.perform(post("/gateway/channels/wechat-main/probe")
+                .header("x-secret-key", "test")
+                .header("x-user-id", "admin"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.success").value(true))
+            .andExpect(jsonPath("$.connectivity.ok").value(true));
 
         verify(adapter).testConnectivity("wechat-main", "admin");
     }
@@ -155,59 +159,46 @@ public class ChannelAdminControllerTest {
      * Tests create channel unexpected failure is sanitized.
      */
     @Test
-    public void testCreateChannel_unexpectedFailureIsSanitized() {
+    public void testCreateChannel_unexpectedFailureIsSanitized() throws Exception {
         when(channelConfigService.createChannel(any(), eq("admin"))).thenThrow(new IllegalStateException("disk full"));
 
-        webTestClient.post()
-            .uri("/gateway/channels")
-            .header("x-secret-key", "test")
-            .header("x-user-id", "admin")
-            .contentType(MediaType.APPLICATION_JSON)
-            .bodyValue("""
-                {
-                  "id": "wechat-main",
-                  "name": "WeChat Main",
-                  "type": "wechat",
-                  "defaultAgentId": "fo-copilot",
-                  "config": {
-                    "authStateDir": "auth"
-                  }
-                }
-                """)
-            .exchange()
-            .expectStatus()
-            .is5xxServerError()
-            .expectBody()
-            .jsonPath("$.success")
-            .isEqualTo(false)
-            .jsonPath("$.error")
-            .isEqualTo("Internal server error");
+        mockMvc.perform(post("/gateway/channels")
+                .header("x-secret-key", "test")
+                .header("x-user-id", "admin")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {
+                      "id": "wechat-main",
+                      "name": "WeChat Main",
+                      "type": "wechat",
+                      "defaultAgentId": "fo-copilot",
+                      "config": {
+                        "authStateDir": "auth"
+                      }
+                    }
+                    """))
+            .andExpect(status().is5xxServerError())
+            .andExpect(jsonPath("$.success").value(false))
+            .andExpect(jsonPath("$.error").value("Internal server error"));
     }
 
     /**
      * Tests logout falls back to disconnected state when helper cleanup fails.
      */
     @Test
-    public void testLogout_fallsBackToDisconnectedStateWhenHelperCleanupFails() {
+    public void testLogout_fallsBackToDisconnectedStateWhenHelperCleanupFails() throws Exception {
         when(channelConfigService.getChannel("wechat-main", "admin")).thenReturn(channelDetail("wechat"));
         when(channelConfigService.resetChannelRuntimeState("wechat-main", "admin")).thenReturn(channelDetail("wechat"));
         when(weChatLoginService.logout("wechat-main", "admin"))
             .thenThrow(new IllegalStateException("helper process still running"));
 
-        webTestClient.post()
-            .uri("/gateway/channels/wechat-main/logout")
-            .header("x-secret-key", "test")
-            .header("x-user-id", "admin")
-            .exchange()
-            .expectStatus()
-            .isOk()
-            .expectBody()
-            .jsonPath("$.success")
-            .isEqualTo(true)
-            .jsonPath("$.state.status")
-            .isEqualTo("disconnected")
-            .jsonPath("$.state.message")
-            .isEqualTo("WeChat login required");
+        mockMvc.perform(post("/gateway/channels/wechat-main/logout")
+                .header("x-secret-key", "test")
+                .header("x-user-id", "admin"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.success").value(true))
+            .andExpect(jsonPath("$.state.status").value("disconnected"))
+            .andExpect(jsonPath("$.state.message").value("WeChat login required"));
     }
 
     private ChannelDetail channelDetail(String type) {

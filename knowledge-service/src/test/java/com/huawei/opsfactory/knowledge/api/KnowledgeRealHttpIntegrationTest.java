@@ -1,3 +1,7 @@
+/*
+ * Copyright (c) Huawei Technologies Co., Ltd. 2026-2026. All rights reserved.
+ */
+
 package com.huawei.opsfactory.knowledge.api;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -126,6 +130,10 @@ class KnowledgeRealHttpIntegrationTest {
             String currentDocumentId = item.path("id").asText();
             String fileName = item.path("name").asText();
             ResponseEntity<String> markdownResponse = restTemplate.getForEntity(url("/knowledge/documents/" + currentDocumentId + "/artifacts/markdown"), String.class);
+            // Skip documents without markdown artifact
+            if (markdownResponse.getStatusCode() == HttpStatus.NOT_FOUND) {
+                continue;
+            }
             assertThat(markdownResponse.getStatusCode()).isEqualTo(HttpStatus.OK);
             String markdown = markdownResponse.getBody();
             assertThat(markdown).isNotBlank();

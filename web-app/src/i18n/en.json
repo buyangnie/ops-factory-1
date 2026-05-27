@@ -729,6 +729,8 @@
     "configurePlaceholder": "Document import, preprocessing, indexing, and retrieval testing will be completed here next.",
     "backToList": "Back to Knowledge",
     "loadFailedTitle": "Failed to load knowledge base",
+    "loadFailed": "Unable to load knowledge base list. Please check your network connection and try again.",
+    "connectionError": "Cannot connect to knowledge service. Please check if the service is running.",
     "supportingDataWarning": "Some supporting configuration data could not be loaded. Basic source settings are still available.",
     "tabBasicInfo": "Overview",
     "tabDocuments": "Documents",
@@ -1865,7 +1867,10 @@
     "formatHint": "Separate entries with blank lines. Lines starting with # are parsed as tags.",
     "entryCount": "{{count}} entry",
     "entryCount_other": "{{count}} entries",
-    "untagged": "untagged"
+    "untagged": "untagged",
+    "expand": "Show more",
+    "collapse": "Show less",
+    "contentTooLong": "Content exceeds limit (max {{max}} characters). Please shorten and try again."
   },
   "channels": {
     "title": "Channels",

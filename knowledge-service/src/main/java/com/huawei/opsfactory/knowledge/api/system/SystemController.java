@@ -1,3 +1,7 @@
+/*
+ * Copyright (c) Huawei Technologies Co., Ltd. 2026-2026. All rights reserved.
+ */
+
 package com.huawei.opsfactory.knowledge.api.system;
 
 import com.huawei.opsfactory.knowledge.config.KnowledgeProperties;
@@ -6,7 +10,13 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
-@RestController
+/**
+ * The SystemController.
+ * @author x00000000
+ * @since 2026-05-26
+ */
+
+@RestController("knowledgeSystemController")
 @RequestMapping("/knowledge")
 public class SystemController {
 

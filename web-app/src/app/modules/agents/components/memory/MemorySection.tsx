@@ -111,11 +111,6 @@ export default function MemorySection({ agentId }: MemorySectionProps) {
                 <div className="prompts-empty">{t('memory.noFiles')}</div>
             ) : (
                 <>
-                    {deleteConfirm && (
-                        <div style={{ marginTop: 'var(--spacing-2)', padding: 'var(--spacing-2) var(--spacing-3)', background: 'rgba(245, 158, 11, 0.1)', borderRadius: 'var(--radius-md)', fontSize: 'var(--font-size-sm)', color: '#b45309' }}>
-                            {t('memory.deleteConfirm')} <span style={{ display: 'inline-block', maxWidth: '200px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', verticalAlign: 'bottom' }} title={deleteConfirm}>「{deleteConfirm}」</span>
-                        </div>
-                    )}
                     <div className="memory-file-list">
                         {files.map(file => (
                             <MemoryFileCard
@@ -125,6 +120,7 @@ export default function MemorySection({ agentId }: MemorySectionProps) {
                                 onSave={(content) => handleSave(file.category, content)}
                                 onDelete={() => handleDelete(file.category)}
                                 autoEdit={recentlyCreated === file.category}
+                                isDeleting={deleteConfirm === file.category}
                             />
                         ))}
                     </div>

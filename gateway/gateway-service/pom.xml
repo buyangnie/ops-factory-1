@@ -80,10 +80,17 @@
             <artifactId>gateway-common</artifactId>
         </dependency>
 
-        <!-- ========== Spring Boot WebFlux ========== -->
+        <!-- ========== Spring Boot Servlet ========== -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
-            <artifactId>spring-boot-starter-webflux</artifactId>
+            <artifactId>spring-boot-starter-web</artifactId>
+        </dependency>
+
+        <!-- ========== CSE ServiceComb ========== -->
+        <dependency>
+            <groupId>org.apache.servicecomb</groupId>
+            <artifactId>provider-springmvc</artifactId>
+            <version>3.3.0</version>
         </dependency>
 
         <!-- AOP (auth interceptor, logging aspects) -->
@@ -99,20 +106,30 @@
             <version>0.2.16</version>
         </dependency>
 
-        <!-- Log4j2 (replace default Logback) -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter</artifactId>
-            <exclusions>
-                <exclusion>
-                    <groupId>org.springframework.boot</groupId>
-                    <artifactId>spring-boot-starter-logging</artifactId>
-                </exclusion>
-            </exclusions>
+        </dependency>
+
+        <!-- Reactor Context Propagation for MDC support -->
+        <dependency>
+            <groupId>io.micrometer</groupId>
+            <artifactId>context-propagation</artifactId>
+        </dependency>
+
+        <!-- WebClient for GoosedProxy (client-side reactive support) -->
+        <dependency>
+            <groupId>org.springframework</groupId>
+            <artifactId>spring-webflux</artifactId>
         </dependency>
         <dependency>
-            <groupId>org.springframework.boot</groupId>
-            <artifactId>spring-boot-starter-log4j2</artifactId>
+            <groupId>io.projectreactor</groupId>
+            <artifactId>reactor-core</artifactId>
+        </dependency>
+        <!-- Reactor Netty for WebClient -->
+        <dependency>
+            <groupId>io.projectreactor.netty</groupId>
+            <artifactId>reactor-netty</artifactId>
         </dependency>
 
         <!-- DevTools: auto-restart on class change (dev only, excluded from packaged jar) -->
@@ -139,4 +156,11 @@
             <scope>test</scope>
         </dependency>
     </dependencies>
+
+    <repositories>
+        <repository>
+            <id>huawei-cloud</id>
+            <url>https://repo.huaweicloud.com/artifactory/sdk_public/</url>
+        </repository>
+    </repositories>
 </project>

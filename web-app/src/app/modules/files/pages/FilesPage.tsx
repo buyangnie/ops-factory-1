@@ -224,7 +224,7 @@ function getFileVisual(type: string | undefined): { icon: FileIconComponent; ton
 }
 
 function getDownloadUrl(file: AgentFile, userId?: string | null): string {
-    let url = `${runtime.GATEWAY_URL}/agents/${file.agentId}/files/${encodeURIComponent(file.path)}?key=${runtime.GATEWAY_SECRET_KEY}`
+    let url = `${runtime.GATEWAY_URL}/agents/${file.agentId}/files/get?path=${encodeURIComponent(file.path)}&key=${runtime.GATEWAY_SECRET_KEY}`
     if (file.rootId) url += `&rootId=${encodeURIComponent(file.rootId)}`
     if (userId) url += `&uid=${encodeURIComponent(userId)}`
     return url
@@ -263,7 +263,7 @@ export default function FilesPage() {
             const allFiles: AgentFile[] = []
             const results = await Promise.allSettled(
                 agents.map(async (agent) => {
-                    const response = await fetch(`${runtime.GATEWAY_URL}/agents/${agent.id}/files`, {
+                    const response = await fetch(`${runtime.GATEWAY_URL}/agents/${agent.id}/files/list`, {
                         headers: gatewayHeaders(userId),
                     })
                     if (!response.ok) return []
@@ -360,8 +360,8 @@ export default function FilesPage() {
         const fileKey = getFileKey(file)
         setDeletingKey(fileKey)
         try {
-            const rootQuery = file.rootId ? `?rootId=${encodeURIComponent(file.rootId)}` : ''
-            const response = await fetch(`${runtime.GATEWAY_URL}/agents/${file.agentId}/files/${encodeURIComponent(file.path)}${rootQuery}`, {
+            const rootQuery = file.rootId ? `&rootId=${encodeURIComponent(file.rootId)}` : ''
+            const response = await fetch(`${runtime.GATEWAY_URL}/agents/${file.agentId}/files/delete?path=${encodeURIComponent(file.path)}${rootQuery}`, {
                 method: 'DELETE',
                 headers: gatewayHeaders(userId),
             })

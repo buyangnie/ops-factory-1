@@ -7,28 +7,29 @@ package com.huawei.opsfactory.gateway.filter;
 import com.huawei.opsfactory.gateway.common.constants.GatewayConstants;
 import com.huawei.opsfactory.gateway.process.PrewarmService;
 
-import reactor.core.publisher.Mono;
+import jakarta.servlet.FilterChain;
+import jakarta.servlet.ServletException;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
 
-import org.apache.logging.log4j.ThreadContext;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.slf4j.MDC;
 import org.springframework.core.annotation.Order;
 import org.springframework.http.HttpStatus;
-import org.springframework.http.server.reactive.ServerHttpRequest;
 import org.springframework.stereotype.Component;
-import org.springframework.web.server.ServerWebExchange;
-import org.springframework.web.server.WebFilter;
-import org.springframework.web.server.WebFilterChain;
+
+import java.io.IOException;
 
 /**
- * Web filter that resolves the authenticated user identity from request headers.
+ * Servlet filter that resolves the authenticated user identity from request headers.
  *
  * @author x00000000
  * @since 2026-05-09
  */
 @Component
 @Order(3)
-public class UserContextFilter implements WebFilter {
+public class UserContextFilter implements jakarta.servlet.Filter {
     private static final Logger log = LoggerFactory.getLogger(UserContextFilter.class);
 
     private static final String CHANNEL_WEBHOOK_PREFIX = "/gateway/channels/webhooks/";
@@ -52,6 +53,9 @@ public class UserContextFilter implements WebFilter {
     }
 
     private static boolean isTraceEndpoint(String path) {
+        if (path == null) {
+            return false;
+        }
         if (path.startsWith("/gateway/session-traces/")) {
             return true;
         }
@@ -64,41 +68,59 @@ public class UserContextFilter implements WebFilter {
     /**
      * Resolves the authenticated user identity from request headers.
      *
-     * @param exchange current HTTP exchange
-     * @param chain filter chain to continue processing
-     * @return Mono that completes when filtering is done
+     * @param servletRequest  the servlet request
+     * @param servletResponse the servlet response
+     * @param filterChain     the filter chain
+     * @throws IOException      if an I/O error occurs
+     * @throws ServletException if a servlet error occurs
      */
     @Override
-    public Mono<Void> filter(ServerWebExchange exchange, WebFilterChain chain) {
-        ServerHttpRequest request = exchange.getRequest();
-        String path = request.getPath().value();
+    public void doFilter(jakarta.servlet.ServletRequest servletRequest, jakarta.servlet.ServletResponse servletResponse,
+            FilterChain filterChain) throws IOException, ServletException {
+        HttpServletRequest request = (HttpServletRequest) servletRequest;
+        HttpServletResponse response = (HttpServletResponse) servletResponse;
+
+        String path = request.getRequestURI();
 
         if (path.startsWith(CHANNEL_WEBHOOK_PREFIX)) {
-            return chain.filter(exchange);
+            filterChain.doFilter(request, response);
+            return;
         }
 
-        String userId = request.getHeaders().getFirst(GatewayConstants.HEADER_USER_ID);
-        if (userId == null || userId.isBlank()) {
-            userId = request.getQueryParams().getFirst(GatewayConstants.QUERY_UID);
+        // CORS preflight passes through without user context
+        if ("OPTIONS".equalsIgnoreCase(request.getMethod())) {
+            filterChain.doFilter(request, response);
+            return;
         }
+
+        String userId = request.getHeader(GatewayConstants.HEADER_USER_ID);
+        if (userId == null || userId.isBlank()) {
+            userId = request.getParameter(GatewayConstants.QUERY_UID);
+        }
+
         if (userId == null || userId.isBlank()) {
             // System endpoints don't require user context
             if (isSystemEndpoint(path)) {
-                return chain.filter(exchange);
+                filterChain.doFilter(request, response);
+                return;
             }
             log.warn("Rejecting request path={} reason=missing-user-id", path);
-            exchange.getResponse().setStatusCode(HttpStatus.BAD_REQUEST);
-            return exchange.getResponse().setComplete();
+            response.setStatus(HttpStatus.BAD_REQUEST.value());
+            return;
         }
 
-        exchange.getAttributes().put(USER_ID_ATTR, userId);
-        ThreadContext.put("userId", userId);
+        request.setAttribute(USER_ID_ATTR, userId);
+        MDC.put("userId", userId);
 
         // Trigger pre-warm for authenticated users, except diagnostics that must not mutate runtime state.
         if (!isTraceEndpoint(path)) {
             prewarmService.onUserActivity(userId);
         }
 
-        return chain.filter(exchange);
+        try {
+            filterChain.doFilter(request, response);
+        } finally {
+            MDC.remove("userId");
+        }
     }
 }

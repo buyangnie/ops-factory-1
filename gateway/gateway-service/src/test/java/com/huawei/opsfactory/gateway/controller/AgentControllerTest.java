@@ -6,6 +6,12 @@ package com.huawei.opsfactory.gateway.controller;
 
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.huawei.opsfactory.gateway.common.model.AgentRegistryEntry;
 import com.huawei.opsfactory.gateway.config.GatewayProperties;
@@ -19,14 +25,14 @@ import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.mockito.Mockito;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.autoconfigure.web.reactive.WebFluxTest;
+import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
 import org.springframework.test.context.junit4.SpringRunner;
-import org.springframework.test.web.reactive.server.WebTestClient;
+import org.springframework.test.web.servlet.MockMvc;
 
-import java.io.IOException;
+import java.nio.file.Path;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
@@ -39,11 +45,17 @@ import java.util.Map;
  * @since 2026-05-09
  */
 @RunWith(SpringRunner.class)
-@WebFluxTest(AgentController.class)
+@WebMvcTest(AgentController.class)
 @Import({GatewayProperties.class, AuthWebFilter.class, UserContextFilter.class})
+/**
+ * Agent Controller Test.
+ *
+ * @author x00000000
+ * @since 2026-05-27
+ */
 public class AgentControllerTest {
     @Autowired
-    private WebTestClient webTestClient;
+    private MockMvc mockMvc;
 
     @MockBean
     private PrewarmService prewarmService;
@@ -58,7 +70,7 @@ public class AgentControllerTest {
      * Tests list agents.
      */
     @Test
-    public void testListAgents() {
+    public void testListAgents() throws Exception {
         when(agentConfigService.getRegistry()).thenReturn(
             List.of(new AgentRegistryEntry("agent1", "Agent One"), new AgentRegistryEntry("agent2", "Agent Two")));
         when(agentConfigService.loadAgentConfigYaml("agent1"))
@@ -69,49 +81,32 @@ public class AgentControllerTest {
             .of(Map.of("name", "brainstorming", "description", "Brainstorm ideas", "path", "skills/brainstorming")));
         when(agentConfigService.listSkills("agent2")).thenReturn(Collections.emptyList());
 
-        webTestClient.get()
-            .uri("/gateway/agents")
-            .header("x-secret-key", "test")
-            .header("x-user-id", "alice")
-            .exchange()
-            .expectStatus()
-            .isOk()
-            .expectBody()
-            .jsonPath("$.agents[0].id")
-            .isEqualTo("agent1")
-            .jsonPath("$.agents[0].name")
-            .isEqualTo("Agent One")
-            .jsonPath("$.agents[0].sysOnly")
-            .doesNotExist()
-            .jsonPath("$.agents[0].provider")
-            .isEqualTo("openai")
-            .jsonPath("$.agents[0].skills.length()")
-            .isEqualTo(1)
-            .jsonPath("$.agents[0].skills[0].name")
-            .isEqualTo("brainstorming")
-            .jsonPath("$.agents[0].skills[0].description")
-            .isEqualTo("Brainstorm ideas")
-            .jsonPath("$.agents[1].id")
-            .isEqualTo("agent2");
+        mockMvc.perform(get("/gateway/agents")
+                .header("x-secret-key", "test")
+                .header("x-user-id", "alice"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.agents[0].id").value("agent1"))
+            .andExpect(jsonPath("$.agents[0].name").value("Agent One"))
+            .andExpect(jsonPath("$.agents[0].sysOnly").doesNotExist())
+            .andExpect(jsonPath("$.agents[0].provider").value("openai"))
+            .andExpect(jsonPath("$.agents[0].skills.length()").value(1))
+            .andExpect(jsonPath("$.agents[0].skills[0].name").value("brainstorming"))
+            .andExpect(jsonPath("$.agents[0].skills[0].description").value("Brainstorm ideas"))
+            .andExpect(jsonPath("$.agents[1].id").value("agent2"));
     }
 
     /**
      * Tests list agents empty.
      */
     @Test
-    public void testListAgents_empty() {
+    public void testListAgents_empty() throws Exception {
         when(agentConfigService.getRegistry()).thenReturn(List.of());
 
-        webTestClient.get()
-            .uri("/gateway/agents")
-            .header("x-secret-key", "test")
-            .header("x-user-id", "alice")
-            .exchange()
-            .expectStatus()
-            .isOk()
-            .expectBody()
-            .jsonPath("$.agents.length()")
-            .isEqualTo(0);
+        mockMvc.perform(get("/gateway/agents")
+                .header("x-secret-key", "test")
+                .header("x-user-id", "alice"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.agents.length()").value(0));
     }
 
     /**
@@ -128,20 +123,14 @@ public class AgentControllerTest {
         agent.put("model", "gpt-4o");
         when(agentConfigService.createAgent(eq("new-agent"), eq("New Agent"))).thenReturn(agent);
 
-        webTestClient.post()
-            .uri("/gateway/agents")
-            .header("x-secret-key", "test")
-            .header("x-user-id", "admin")
-            .contentType(MediaType.APPLICATION_JSON)
-            .bodyValue("{\"id\": \"new-agent\", \"name\": \"New Agent\"}")
-            .exchange()
-            .expectStatus()
-            .isCreated()
-            .expectBody()
-            .jsonPath("$.success")
-            .isEqualTo(true)
-            .jsonPath("$.agent.id")
-            .isEqualTo("new-agent");
+        mockMvc.perform(post("/gateway/agents")
+                .header("x-secret-key", "test")
+                .header("x-user-id", "admin")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"id\": \"new-agent\", \"name\": \"New Agent\"}"))
+            .andExpect(status().isCreated())
+            .andExpect(jsonPath("$.success").value(true))
+            .andExpect(jsonPath("$.agent.id").value("new-agent"));
     }
 
     /**
@@ -158,36 +147,27 @@ public class AgentControllerTest {
         agent.put("model", "gpt-4o");
         when(agentConfigService.createAgent(eq("new-agent"), eq("New Agent"))).thenReturn(agent);
 
-        webTestClient.post()
-            .uri("/gateway/agents")
-            .header("x-secret-key", "test")
-            .header("x-user-id", "regular-user")
-            .contentType(MediaType.APPLICATION_JSON)
-            .bodyValue("{\"id\": \"new-agent\", \"name\": \"New Agent\"}")
-            .exchange()
-            .expectStatus()
-            .isCreated()
-            .expectBody()
-            .jsonPath("$.success")
-            .isEqualTo(true)
-            .jsonPath("$.agent.id")
-            .isEqualTo("new-agent");
+        mockMvc.perform(post("/gateway/agents")
+                .header("x-secret-key", "test")
+                .header("x-user-id", "regular-user")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"id\": \"new-agent\", \"name\": \"New Agent\"}"))
+            .andExpect(status().isCreated())
+            .andExpect(jsonPath("$.success").value(true))
+            .andExpect(jsonPath("$.agent.id").value("new-agent"));
     }
 
     /**
      * Tests create agent missing id.
      */
     @Test
-    public void testCreateAgent_missingId() {
-        webTestClient.post()
-            .uri("/gateway/agents")
-            .header("x-secret-key", "test")
-            .header("x-user-id", "admin")
-            .contentType(MediaType.APPLICATION_JSON)
-            .bodyValue("{\"name\": \"New Agent\"}")
-            .exchange()
-            .expectStatus()
-            .isBadRequest();
+    public void testCreateAgent_missingId() throws Exception {
+        mockMvc.perform(post("/gateway/agents")
+                .header("x-secret-key", "test")
+                .header("x-user-id", "admin")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"name\": \"New Agent\"}"))
+            .andExpect(status().isBadRequest());
     }
 
     /**
@@ -200,92 +180,67 @@ public class AgentControllerTest {
         Mockito.doNothing().when(instanceManager).stopAllForAgent("agent1");
         Mockito.doNothing().when(agentConfigService).deleteAgent("agent1");
 
-        webTestClient.delete()
-            .uri("/gateway/agents/agent1")
-            .header("x-secret-key", "test")
-            .header("x-user-id", "admin")
-            .exchange()
-            .expectStatus()
-            .isOk()
-            .expectBody()
-            .jsonPath("$.success")
-            .isEqualTo(true);
+        mockMvc.perform(delete("/gateway/agents/agent1")
+                .header("x-secret-key", "test")
+                .header("x-user-id", "admin"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.success").value(true));
     }
 
     /**
      * Tests delete agent succeeds for any authenticated user.
      */
     @Test
-    public void testDeleteAgent_succeeds_forAnyUser() {
+    public void testDeleteAgent_succeeds_forAnyUser() throws Exception {
         Mockito.doNothing().when(instanceManager).stopAllForAgent("agent1");
         Mockito.doNothing().when(agentConfigService).deleteAgent("agent1");
 
-        webTestClient.delete()
-            .uri("/gateway/agents/agent1")
-            .header("x-secret-key", "test")
-            .header("x-user-id", "regular-user")
-            .exchange()
-            .expectStatus()
-            .isOk()
-            .expectBody()
-            .jsonPath("$.success")
-            .isEqualTo(true);
+        mockMvc.perform(delete("/gateway/agents/agent1")
+                .header("x-secret-key", "test")
+                .header("x-user-id", "regular-user"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.success").value(true));
     }
 
     /**
      * Tests get skills as admin.
      */
     @Test
-    public void testGetSkills_asAdmin() {
+    public void testGetSkills_asAdmin() throws Exception {
         when(agentConfigService.listSkills("agent1")).thenReturn(
             List.of(Map.of("name", "brainstorming", "description", "Brainstorm ideas", "path", "skills/brainstorming"),
                 Map.of("name", "analysis", "description", "Analyze data", "path", "skills/analysis")));
 
-        webTestClient.get()
-            .uri("/gateway/agents/agent1/skills")
-            .header("x-secret-key", "test")
-            .header("x-user-id", "admin")
-            .exchange()
-            .expectStatus()
-            .isOk()
-            .expectBody()
-            .jsonPath("$.skills[0].name")
-            .isEqualTo("brainstorming")
-            .jsonPath("$.skills[0].description")
-            .isEqualTo("Brainstorm ideas")
-            .jsonPath("$.skills[1].name")
-            .isEqualTo("analysis")
-            .jsonPath("$.skills[1].description")
-            .isEqualTo("Analyze data");
+        mockMvc.perform(get("/gateway/agents/agent1/skills")
+                .header("x-secret-key", "test")
+                .header("x-user-id", "admin"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.skills[0].name").value("brainstorming"))
+            .andExpect(jsonPath("$.skills[0].description").value("Brainstorm ideas"))
+            .andExpect(jsonPath("$.skills[1].name").value("analysis"))
+            .andExpect(jsonPath("$.skills[1].description").value("Analyze data"));
     }
 
     /**
      * Tests get config as admin.
      */
     @Test
-    public void testGetConfig_asAdmin() {
+    public void testGetConfig_asAdmin() throws Exception {
         when(agentConfigService.findAgent("agent1")).thenReturn(new AgentRegistryEntry("agent1", "Agent One"));
         when(agentConfigService.readAgentsMd("agent1")).thenReturn("# Agent One\n");
         Map<String, Object> config = new HashMap<>();
         config.put("GOOSE_PROVIDER", "anthropic");
         config.put("GOOSE_MODEL", "claude-3");
         when(agentConfigService.loadAgentConfigYaml("agent1")).thenReturn(config);
-        when(agentConfigService.getAgentsDir()).thenReturn(java.nio.file.Path.of("/tmp/agents"));
+        when(agentConfigService.getAgentsDir()).thenReturn(Path.of("/tmp/agents"));
 
-        webTestClient.get()
-            .uri("/gateway/agents/agent1/config")
-            .header("x-secret-key", "test")
-            .header("x-user-id", "admin")
-            .exchange()
-            .expectStatus()
-            .isOk()
-            .expectBody()
-            .jsonPath("$.agentsMd")
-            .isEqualTo("# Agent One\n")
-            .jsonPath("$.provider")
-            .isEqualTo("anthropic")
-            .jsonPath("$.model")
-            .isEqualTo("claude-3");
+        mockMvc.perform(get("/gateway/agents/agent1/config")
+                .header("x-secret-key", "test")
+                .header("x-user-id", "admin"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.agentsMd").value("# Agent One\n"))
+            .andExpect(jsonPath("$.provider").value("anthropic"))
+            .andExpect(jsonPath("$.model").value("claude-3"));
     }
 
     /**
@@ -298,72 +253,56 @@ public class AgentControllerTest {
         when(agentConfigService.findAgent("agent1")).thenReturn(new AgentRegistryEntry("agent1", "Agent One"));
         Mockito.doNothing().when(agentConfigService).writeAgentsMd("agent1", "# Updated\n");
 
-        webTestClient.put()
-            .uri("/gateway/agents/agent1/config")
-            .header("x-secret-key", "test")
-            .header("x-user-id", "admin")
-            .contentType(MediaType.APPLICATION_JSON)
-            .bodyValue("{\"agentsMd\": \"# Updated\\n\"}")
-            .exchange()
-            .expectStatus()
-            .isOk()
-            .expectBody()
-            .jsonPath("$.success")
-            .isEqualTo(true);
+        mockMvc.perform(put("/gateway/agents/agent1/config")
+                .header("x-secret-key", "test")
+                .header("x-user-id", "admin")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"agentsMd\": \"# Updated\\n\"}"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.success").value(true));
     }
 
     /**
      * Tests update config succeeds for any authenticated user.
      */
     @Test
-    public void testUpdateConfig_succeeds_forAnyUser() {
+    public void testUpdateConfig_succeeds_forAnyUser() throws Exception {
         when(agentConfigService.findAgent("agent1")).thenReturn(new AgentRegistryEntry("agent1", "Agent One"));
         Mockito.doNothing().when(agentConfigService).writeAgentsMd("agent1", "# Updated\n");
 
-        webTestClient.put()
-            .uri("/gateway/agents/agent1/config")
-            .header("x-secret-key", "test")
-            .header("x-user-id", "regular-user")
-            .contentType(MediaType.APPLICATION_JSON)
-            .bodyValue("{\"agentsMd\": \"# Updated\\n\"}")
-            .exchange()
-            .expectStatus()
-            .isOk()
-            .expectBody()
-            .jsonPath("$.success")
-            .isEqualTo(true);
+        mockMvc.perform(put("/gateway/agents/agent1/config")
+                .header("x-secret-key", "test")
+                .header("x-user-id", "regular-user")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"agentsMd\": \"# Updated\\n\"}"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.success").value(true));
     }
 
     /**
      * Tests create agent missing name.
      */
     @Test
-    public void testCreateAgent_missingName() {
-        webTestClient.post()
-            .uri("/gateway/agents")
-            .header("x-secret-key", "test")
-            .header("x-user-id", "admin")
-            .contentType(MediaType.APPLICATION_JSON)
-            .bodyValue("{\"id\": \"new-agent\"}")
-            .exchange()
-            .expectStatus()
-            .isBadRequest();
+    public void testCreateAgent_missingName() throws Exception {
+        mockMvc.perform(post("/gateway/agents")
+                .header("x-secret-key", "test")
+                .header("x-user-id", "admin")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"id\": \"new-agent\"}"))
+            .andExpect(status().isBadRequest());
     }
 
     /**
      * Tests create agent blank id.
      */
     @Test
-    public void testCreateAgent_blankId() {
-        webTestClient.post()
-            .uri("/gateway/agents")
-            .header("x-secret-key", "test")
-            .header("x-user-id", "admin")
-            .contentType(MediaType.APPLICATION_JSON)
-            .bodyValue("{\"id\": \"   \", \"name\": \"New Agent\"}")
-            .exchange()
-            .expectStatus()
-            .isBadRequest();
+    public void testCreateAgent_blankId() throws Exception {
+        mockMvc.perform(post("/gateway/agents")
+                .header("x-secret-key", "test")
+                .header("x-user-id", "admin")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"id\": \"   \", \"name\": \"New Agent\"}"))
+            .andExpect(status().isBadRequest());
     }
 
     /**
@@ -376,15 +315,12 @@ public class AgentControllerTest {
         when(agentConfigService.createAgent(eq("dup-agent"), eq("Dup Agent")))
             .thenThrow(new IllegalArgumentException("Agent already exists"));
 
-        webTestClient.post()
-            .uri("/gateway/agents")
-            .header("x-secret-key", "test")
-            .header("x-user-id", "admin")
-            .contentType(MediaType.APPLICATION_JSON)
-            .bodyValue("{\"id\": \"dup-agent\", \"name\": \"Dup Agent\"}")
-            .exchange()
-            .expectStatus()
-            .isBadRequest();
+        mockMvc.perform(post("/gateway/agents")
+                .header("x-secret-key", "test")
+                .header("x-user-id", "admin")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"id\": \"dup-agent\", \"name\": \"Dup Agent\"}"))
+            .andExpect(status().isBadRequest());
     }
 
     /**
@@ -397,95 +333,69 @@ public class AgentControllerTest {
         when(agentConfigService.createAgent(eq("io-agent"), eq("IO Agent")))
             .thenThrow(new IllegalStateException("disk full"));
 
-        webTestClient.post()
-            .uri("/gateway/agents")
-            .header("x-secret-key", "test")
-            .header("x-user-id", "admin")
-            .contentType(MediaType.APPLICATION_JSON)
-            .bodyValue("{\"id\": \"io-agent\", \"name\": \"IO Agent\"}")
-            .exchange()
-            .expectStatus()
-            .is5xxServerError()
-            .expectBody()
-            .jsonPath("$.success")
-            .isEqualTo(false)
-            .jsonPath("$.error")
-            .isEqualTo("Failed to create agent");
+        mockMvc.perform(post("/gateway/agents")
+                .header("x-secret-key", "test")
+                .header("x-user-id", "admin")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"id\": \"io-agent\", \"name\": \"IO Agent\"}"))
+            .andExpect(status().is5xxServerError())
+            .andExpect(jsonPath("$.success").value(false))
+            .andExpect(jsonPath("$.error").value("Failed to create agent"));
     }
 
     /**
      * Tests get skills succeeds for any authenticated user.
      */
     @Test
-    public void testGetSkills_succeeds_forAnyUser() {
+    public void testGetSkills_succeeds_forAnyUser() throws Exception {
         when(agentConfigService.listSkills("agent1")).thenReturn(
             List.of(Map.of("name", "brainstorming", "description", "Brainstorm ideas", "path", "skills/brainstorming"),
                 Map.of("name", "analysis", "description", "Analyze data", "path", "skills/analysis")));
 
-        webTestClient.get()
-            .uri("/gateway/agents/agent1/skills")
-            .header("x-secret-key", "test")
-            .header("x-user-id", "regular-user")
-            .exchange()
-            .expectStatus()
-            .isOk()
-            .expectBody()
-            .jsonPath("$.skills[0].name")
-            .isEqualTo("brainstorming")
-            .jsonPath("$.skills[0].description")
-            .isEqualTo("Brainstorm ideas")
-            .jsonPath("$.skills[1].name")
-            .isEqualTo("analysis")
-            .jsonPath("$.skills[1].description")
-            .isEqualTo("Analyze data");
+        mockMvc.perform(get("/gateway/agents/agent1/skills")
+                .header("x-secret-key", "test")
+                .header("x-user-id", "regular-user"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.skills[0].name").value("brainstorming"))
+            .andExpect(jsonPath("$.skills[0].description").value("Brainstorm ideas"))
+            .andExpect(jsonPath("$.skills[1].name").value("analysis"))
+            .andExpect(jsonPath("$.skills[1].description").value("Analyze data"));
     }
 
     /**
      * Tests get config succeeds for any authenticated user.
      */
     @Test
-    public void testGetConfig_succeeds_forAnyUser() {
+    public void testGetConfig_succeeds_forAnyUser() throws Exception {
         when(agentConfigService.findAgent("agent1")).thenReturn(new AgentRegistryEntry("agent1", "Agent One"));
         when(agentConfigService.readAgentsMd("agent1")).thenReturn("# Agent One\n");
         Map<String, Object> config = new HashMap<>();
         config.put("GOOSE_PROVIDER", "anthropic");
         config.put("GOOSE_MODEL", "claude-3");
         when(agentConfigService.loadAgentConfigYaml("agent1")).thenReturn(config);
-        when(agentConfigService.getAgentsDir()).thenReturn(java.nio.file.Path.of("/tmp/agents"));
+        when(agentConfigService.getAgentsDir()).thenReturn(Path.of("/tmp/agents"));
 
-        webTestClient.get()
-            .uri("/gateway/agents/agent1/config")
-            .header("x-secret-key", "test")
-            .header("x-user-id", "regular-user")
-            .exchange()
-            .expectStatus()
-            .isOk()
-            .expectBody()
-            .jsonPath("$.agentsMd")
-            .isEqualTo("# Agent One\n")
-            .jsonPath("$.provider")
-            .isEqualTo("anthropic")
-            .jsonPath("$.model")
-            .isEqualTo("claude-3");
+        mockMvc.perform(get("/gateway/agents/agent1/config")
+                .header("x-secret-key", "test")
+                .header("x-user-id", "regular-user"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.agentsMd").value("# Agent One\n"))
+            .andExpect(jsonPath("$.provider").value("anthropic"))
+            .andExpect(jsonPath("$.model").value("claude-3"));
     }
 
     /**
      * Tests list agents no auth required.
      */
     @Test
-    public void testListAgents_noAuthRequired() {
+    public void testListAgents_noAuthRequired() throws Exception {
         // listAgents does not require admin, just auth
         when(agentConfigService.getRegistry()).thenReturn(List.of());
 
-        webTestClient.get()
-            .uri("/gateway/agents")
-            .header("x-secret-key", "test")
-            .header("x-user-id", "regular-user")
-            .exchange()
-            .expectStatus()
-            .isOk()
-            .expectBody()
-            .jsonPath("$.agents")
-            .isArray();
+        mockMvc.perform(get("/gateway/agents")
+                .header("x-secret-key", "test")
+                .header("x-user-id", "regular-user"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.agents").isArray());
     }
 }

@@ -1,3 +1,7 @@
+/*
+ * Copyright (c) Huawei Technologies Co., Ltd. 2026-2026. All rights reserved.
+ */
+
 package com.huawei.opsfactory.exporter;
 
 import java.io.IOException;
@@ -11,6 +15,12 @@ import org.springframework.context.annotation.Configuration;
 import org.yaml.snakeyaml.Yaml;
 
 @Configuration
+/**
+ * Exporter Config Loader.
+ *
+ * @author x00000000
+ * @since 2026-05-27
+ */
 public class ExporterConfigLoader {
 
     @Bean

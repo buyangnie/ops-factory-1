@@ -4,11 +4,11 @@
 
 package com.huawei.opsfactory.gateway.controller;
 
+import org.apache.servicecomb.provider.rest.common.RestSchema;
 import com.huawei.opsfactory.gateway.service.AgentSkillInstallService;
 import com.huawei.opsfactory.gateway.service.SkillInstallConflictException;
 
-import reactor.core.publisher.Mono;
-import reactor.core.scheduler.Schedulers;
+import jakarta.servlet.http.HttpServletRequest;
 
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -19,7 +19,6 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.server.ResponseStatusException;
-import org.springframework.web.server.ServerWebExchange;
 
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -31,6 +30,7 @@ import java.util.Map;
  * @since 2026-05-09
  */
 @RestController
+@RestSchema(schemaId = "agentSkillController")
 @RequestMapping("/gateway/agents")
 public class AgentSkillController {
     private final AgentSkillInstallService installService;
@@ -47,41 +47,46 @@ public class AgentSkillController {
     /**
      * Installs a skill on the specified agent instance.
      *
-     * @param agentId agent instance identifier
-     * @param body request body containing "skillId"
-     * @param exchange current HTTP exchange carrying user context
-     * @return Mono emitting ResponseEntity with installation result
+     * @param agentId   agent instance identifier
+     * @param body      request body containing "skillId"
+     * @param request   current HTTP request
+     * @return ResponseEntity with installation result
      */
     @PostMapping("/{agentId}/skills/install")
-    public Mono<ResponseEntity<Map<String, Object>>> installSkill(@PathVariable("agentId") String agentId,
-        @RequestBody Map<String, String> body, ServerWebExchange exchange) {
+    public ResponseEntity<Map<String, Object>> installSkill(@PathVariable("agentId") String agentId,
+            @RequestBody Map<String, String> body, HttpServletRequest request) {
         String skillId = body.get("skillId");
-        return Mono.fromCallable(() -> ResponseEntity.ok(installService.install(agentId, skillId)))
-            .onErrorResume(SkillInstallConflictException.class, e -> Mono.just(conflict(e.getMessage())))
-            .onErrorResume(IllegalArgumentException.class, e -> Mono.just(badRequest(e.getMessage())))
-            .onErrorMap(Exception.class,
-                e -> new ResponseStatusException(HttpStatus.BAD_GATEWAY,
-                    e.getMessage() == null ? "Failed to install skill" : e.getMessage(), e))
-            .subscribeOn(Schedulers.boundedElastic());
+        try {
+            return ResponseEntity.ok(installService.install(agentId, skillId));
+        } catch (SkillInstallConflictException e) {
+            return conflict(e.getMessage());
+        } catch (IllegalArgumentException e) {
+            return badRequest(e.getMessage());
+        } catch (ResponseStatusException | IllegalStateException e) {
+            throw new ResponseStatusException(HttpStatus.BAD_GATEWAY,
+                e.getMessage() == null ? "Failed to install skill" : e.getMessage(), e);
+        }
     }
 
     /**
      * Uninstalls a skill from the specified agent instance.
      *
-     * @param agentId agent instance identifier
-     * @param skillId skill identifier to remove
-     * @param exchange current HTTP exchange carrying user context
-     * @return Mono emitting ResponseEntity with uninstallation result
+     * @param agentId   agent instance identifier
+     * @param skillId   skill identifier to remove
+     * @param request   current HTTP request
+     * @return ResponseEntity with uninstallation result
      */
     @DeleteMapping("/{agentId}/skills/{skillId}")
-    public Mono<ResponseEntity<Map<String, Object>>> uninstallSkill(@PathVariable("agentId") String agentId,
-        @PathVariable("skillId") String skillId, ServerWebExchange exchange) {
-        return Mono.fromCallable(() -> ResponseEntity.ok(installService.uninstall(agentId, skillId)))
-            .onErrorResume(IllegalArgumentException.class, e -> Mono.just(badRequest(e.getMessage())))
-            .onErrorMap(Exception.class,
-                e -> new ResponseStatusException(HttpStatus.BAD_GATEWAY,
-                    e.getMessage() == null ? "Failed to uninstall skill" : e.getMessage(), e))
-            .subscribeOn(Schedulers.boundedElastic());
+    public ResponseEntity<Map<String, Object>> uninstallSkill(@PathVariable("agentId") String agentId,
+            @PathVariable("skillId") String skillId, HttpServletRequest request) {
+        try {
+            return ResponseEntity.ok(installService.uninstall(agentId, skillId));
+        } catch (IllegalArgumentException e) {
+            return badRequest(e.getMessage());
+        } catch (ResponseStatusException | IllegalStateException e) {
+            throw new ResponseStatusException(HttpStatus.BAD_GATEWAY,
+                e.getMessage() == null ? "Failed to uninstall skill" : e.getMessage(), e);
+        }
     }
 
     private ResponseEntity<Map<String, Object>> badRequest(String message) {

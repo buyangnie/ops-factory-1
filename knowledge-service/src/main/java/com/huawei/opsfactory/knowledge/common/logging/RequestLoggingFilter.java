@@ -1,3 +1,7 @@
+/*
+ * Copyright (c) Huawei Technologies Co., Ltd. 2026-2026. All rights reserved.
+ */
+
 package com.huawei.opsfactory.knowledge.common.logging;
 
 import jakarta.servlet.FilterChain;
@@ -14,7 +18,13 @@ import org.springframework.core.annotation.Order;
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 
-@Component
+/**
+ * The RequestLoggingFilter.
+ * @author x00000000
+ * @since 2026-05-26
+ */
+
+@Component("knowledgeRequestLoggingFilter")
 @Order(Ordered.HIGHEST_PRECEDENCE)
 public class RequestLoggingFilter extends OncePerRequestFilter {
 

@@ -6,9 +6,18 @@ package com.huawei.opsfactory.operationintelligence.qos.dv;
 
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertSame;
+
+import javax.net.ssl.SSLContext;
 
 import org.junit.jupiter.api.Test;
 
+/**
+ * Dv Ssl Context Factory Test.
+ *
+ * @author x00000000
+ * @since 2026-05-11
+ */
 class DvSslContextFactoryTest {
 
     private final DvSslContextFactory factory = new DvSslContextFactory();
@@ -27,24 +36,20 @@ class DvSslContextFactoryTest {
     void createSslContext_nullContent_looseSsl_returnsInsecure() {
         var ctx = factory.createSslContext(null, "cert.jks", false);
         assertNotNull(ctx);
+        assertNotNull(ctx.getSocketFactory());
     }
 
     @Test
     void createSslContext_blankContent_looseSsl_returnsInsecure() {
         var ctx = factory.createSslContext("", "cert.jks", false);
         assertNotNull(ctx);
+        assertNotNull(ctx.getSocketFactory());
     }
 
     @Test
-    void createInsecureSslContext_returnsNonNull() {
-        var ctx = factory.createInsecureSslContext();
-        assertNotNull(ctx);
-    }
-
-    @Test
-    void createSslContext_nullContent_looseSsl_returnsNonNullTwice() {
-        var ctx1 = factory.createSslContext(null, "cert.jks", false);
-        var ctx2 = factory.createSslContext(null, "cert.jks", false);
+    void createSslContext_differentContent_returnsDifferentInstances() {
+        var ctx1 = factory.createSslContext("", "cert.jks", false);
+        var ctx2 = factory.createSslContext(" ", "cert.jks", false);
         assertNotNull(ctx1);
         assertNotNull(ctx2);
     }

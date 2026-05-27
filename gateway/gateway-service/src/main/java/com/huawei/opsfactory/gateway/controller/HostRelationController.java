@@ -3,12 +3,11 @@
  */
 
 package com.huawei.opsfactory.gateway.controller;
+import org.apache.servicecomb.provider.rest.common.RestSchema;
+import jakarta.servlet.http.HttpServletRequest;
 
 import com.huawei.opsfactory.gateway.service.BusinessServiceService;
 import com.huawei.opsfactory.gateway.service.HostRelationService;
-
-import reactor.core.publisher.Mono;
-import reactor.core.scheduler.Schedulers;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -23,7 +22,6 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
-import org.springframework.web.server.ServerWebExchange;
 
 import java.util.Collections;
 import java.util.HashSet;
@@ -37,7 +35,9 @@ import java.util.Set;
  *             relations.
  */
 @Deprecated
+
 @RestController
+@RestSchema(schemaId = "hostRelationController")
 @RequestMapping("/gateway/host-relations")
 public class HostRelationController {
     private static final Logger log = LoggerFactory.getLogger(HostRelationController.class);
@@ -67,18 +67,16 @@ public class HostRelationController {
      * @return the result
      */
     @GetMapping
-    public Mono<Map<String, Object>> listRelations(@RequestParam(value = "hostId", required = false) String hostId,
+    public Map<String, Object> listRelations(@RequestParam(value = "hostId", required = false) String hostId,
         @RequestParam(value = "groupId", required = false) String groupId,
         @RequestParam(value = "clusterId", required = false) String clusterId,
         @RequestParam(value = "sourceType", required = false) String sourceType,
-        @RequestParam(value = "sourceId", required = false) String sourceId, ServerWebExchange exchange) {
-        return Mono.fromCallable(() -> {
-            List<Map<String, Object>> relations =
-                hostRelationService.listRelations(hostId, groupId, clusterId, sourceType, sourceId);
-            Map<String, Object> result = new LinkedHashMap<>();
-            result.put("relations", relations);
-            return result;
-        }).subscribeOn(Schedulers.boundedElastic());
+        @RequestParam(value = "sourceId", required = false) String sourceId, HttpServletRequest request) {
+        List<Map<String, Object>> relations =
+            hostRelationService.listRelations(hostId, groupId, clusterId, sourceType, sourceId);
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("relations", relations);
+        return result;
     }
 
     /**
@@ -90,13 +88,11 @@ public class HostRelationController {
      * @return the host relation graph data enriched with business services
      */
     @GetMapping("/graph")
-    public Mono<Map<String, Object>> getGraph(@RequestParam(value = "groupId", required = false) String groupId,
-        @RequestParam(value = "clusterId", required = false) String clusterId, ServerWebExchange exchange) {
-        return Mono.fromCallable(() -> {
-            Map<String, Object> graph = hostRelationService.getGraphData(groupId, clusterId);
-            enrichWithBusinessServices(graph, groupId, clusterId);
-            return graph;
-        }).subscribeOn(Schedulers.boundedElastic());
+    public Map<String, Object> getGraph(@RequestParam(value = "groupId", required = false) String groupId,
+        @RequestParam(value = "clusterId", required = false) String clusterId, HttpServletRequest request) {
+        Map<String, Object> graph = hostRelationService.getGraphData(groupId, clusterId);
+        enrichWithBusinessServices(graph, groupId, clusterId);
+        return graph;
     }
 
     /**
@@ -107,10 +103,9 @@ public class HostRelationController {
      * @return the neighbor hosts for a given host
      */
     @GetMapping("/hosts/{hostId}/neighbors")
-    public Mono<Map<String, Object>> getHostNeighbors(@PathVariable("hostId") String hostId,
-        ServerWebExchange exchange) {
-        return Mono.fromCallable(() -> hostRelationService.getNeighbors(hostId))
-            .subscribeOn(Schedulers.boundedElastic());
+    public Map<String, Object> getHostNeighbors(@PathVariable("hostId") String hostId,
+        HttpServletRequest request) {
+        return hostRelationService.getNeighbors(hostId);
     }
 
     /**
@@ -121,22 +116,20 @@ public class HostRelationController {
      * @return the result
      */
     @PostMapping
-    public Mono<ResponseEntity<Map<String, Object>>> createRelation(@RequestBody Map<String, Object> request,
-        ServerWebExchange exchange) {
-        return Mono.fromCallable(() -> {
-            try {
-                Map<String, Object> relation = hostRelationService.createRelation(request);
-                Map<String, Object> body = new LinkedHashMap<>();
-                body.put("success", true);
-                body.put("relation", relation);
-                return ResponseEntity.status(HttpStatus.CREATED).body(body);
-            } catch (IllegalArgumentException e) {
-                Map<String, Object> body = new LinkedHashMap<>();
-                body.put("success", false);
-                body.put("error", "Invalid host relation request");
-                return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(body);
-            }
-        }).subscribeOn(Schedulers.boundedElastic());
+    public ResponseEntity<Map<String, Object>> createRelation(@RequestBody Map<String, Object> requestBody,
+        HttpServletRequest request) {
+        try {
+            Map<String, Object> relation = hostRelationService.createRelation(requestBody);
+            Map<String, Object> body = new LinkedHashMap<>();
+            body.put("success", true);
+            body.put("relation", relation);
+            return ResponseEntity.status(HttpStatus.CREATED).body(body);
+        } catch (IllegalArgumentException e) {
+            Map<String, Object> body = new LinkedHashMap<>();
+            body.put("success", false);
+            body.put("error", "Invalid host relation request");
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(body);
+        }
     }
 
     /**
@@ -148,22 +141,20 @@ public class HostRelationController {
      * @return the result
      */
     @PutMapping("/{id}")
-    public Mono<ResponseEntity<Map<String, Object>>> updateRelation(@PathVariable("id") String id,
-        @RequestBody Map<String, Object> request, ServerWebExchange exchange) {
-        return Mono.fromCallable(() -> {
-            try {
-                Map<String, Object> relation = hostRelationService.updateRelation(id, request);
-                Map<String, Object> body = new LinkedHashMap<>();
-                body.put("success", true);
-                body.put("relation", relation);
-                return ResponseEntity.ok(body);
-            } catch (IllegalArgumentException e) {
-                Map<String, Object> body = new LinkedHashMap<>();
-                body.put("success", false);
-                body.put("error", "Host relation not found");
-                return ResponseEntity.status(HttpStatus.NOT_FOUND).body(body);
-            }
-        }).subscribeOn(Schedulers.boundedElastic());
+    public ResponseEntity<Map<String, Object>> updateRelation(@PathVariable("id") String id,
+        @RequestBody Map<String, Object> requestBody, HttpServletRequest request) {
+        try {
+            Map<String, Object> relation = hostRelationService.updateRelation(id, requestBody);
+            Map<String, Object> body = new LinkedHashMap<>();
+            body.put("success", true);
+            body.put("relation", relation);
+            return ResponseEntity.ok(body);
+        } catch (IllegalArgumentException e) {
+            Map<String, Object> body = new LinkedHashMap<>();
+            body.put("success", false);
+            body.put("error", "Host relation not found");
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(body);
+        }
     }
 
     /**
@@ -174,20 +165,18 @@ public class HostRelationController {
      * @return the result
      */
     @DeleteMapping("/{id}")
-    public Mono<ResponseEntity<Map<String, Object>>> deleteRelation(@PathVariable("id") String id,
-        ServerWebExchange exchange) {
-        return Mono.fromCallable(() -> {
-            boolean deleted = hostRelationService.deleteRelation(id);
-            if (!deleted) {
-                Map<String, Object> body = new LinkedHashMap<>();
-                body.put("success", false);
-                body.put("error", "Host relation not found: " + id);
-                return ResponseEntity.status(HttpStatus.NOT_FOUND).body(body);
-            }
+    public ResponseEntity<Map<String, Object>> deleteRelation(@PathVariable("id") String id,
+        HttpServletRequest request) {
+        boolean deleted = hostRelationService.deleteRelation(id);
+        if (!deleted) {
             Map<String, Object> body = new LinkedHashMap<>();
-            body.put("success", true);
-            return ResponseEntity.ok(body);
-        }).subscribeOn(Schedulers.boundedElastic());
+            body.put("success", false);
+            body.put("error", "Host relation not found: " + id);
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(body);
+        }
+        Map<String, Object> body = new LinkedHashMap<>();
+        body.put("success", true);
+        return ResponseEntity.ok(body);
     }
 
     @SuppressWarnings("unchecked")

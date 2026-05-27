@@ -5,10 +5,10 @@
 package com.huawei.opsfactory.operationintelligence.common;
 
 import org.springframework.boot.web.error.ErrorAttributeOptions;
-import org.springframework.boot.web.reactive.error.DefaultErrorAttributes;
+import org.springframework.boot.web.servlet.error.DefaultErrorAttributes;
 import org.springframework.core.env.Environment;
 import org.springframework.stereotype.Component;
-import org.springframework.web.reactive.function.server.ServerRequest;
+import org.springframework.web.context.request.WebRequest;
 
 import java.util.Map;
 
@@ -30,7 +30,7 @@ public class CustomErrorAttributes extends DefaultErrorAttributes {
     }
 
     @Override
-    public Map<String, Object> getErrorAttributes(ServerRequest request, ErrorAttributeOptions options) {
+    public Map<String, Object> getErrorAttributes(WebRequest request, ErrorAttributeOptions options) {
         Map<String, Object> errorAttributes = super.getErrorAttributes(request, options);
         if (!isProduction()) {
             errorAttributes.put("detail", getError(request).getMessage());

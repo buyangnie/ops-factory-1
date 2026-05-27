@@ -6,6 +6,7 @@ package com.huawei.opsfactory.gateway.service.channel;
 
 import reactor.core.publisher.Mono;
 
+import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.web.server.ServerWebExchange;
 
 /**
@@ -28,9 +29,19 @@ public interface ChannelAdapter {
     Mono<String> verifyWebhook(String channelId, ServerWebExchange exchange);
 
     /**
+     * Verifies an incoming webhook request for the given channel (Servlet API).
+     */
+    String verifyWebhookServlet(String channelId, HttpServletRequest request);
+
+    /**
      * Handles an incoming webhook payload for the given channel.
      */
     Mono<Void> handleWebhook(String channelId, String rawBody, ServerWebExchange exchange);
+
+    /**
+     * Handles an incoming webhook payload for the given channel (Servlet API).
+     */
+    String handleWebhookServlet(String channelId, String rawBody, HttpServletRequest request);
 
     /**
      * Tests the connectivity of the given channel.

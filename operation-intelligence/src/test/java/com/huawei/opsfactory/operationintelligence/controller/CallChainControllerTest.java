@@ -4,25 +4,29 @@
 
 package com.huawei.opsfactory.operationintelligence.controller;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.huawei.opsfactory.operationintelligence.qos.model.CallChainTree;
 import com.huawei.opsfactory.operationintelligence.qos.model.QueryCallChainRequest;
 import com.huawei.opsfactory.operationintelligence.service.CallChainService;
 
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.autoconfigure.web.reactive.WebFluxTest;
+import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.http.MediaType;
-import org.springframework.test.web.reactive.server.WebTestClient;
-import reactor.core.publisher.Mono;
+import org.springframework.test.web.servlet.MockMvc;
 
 import java.util.List;
+import java.util.Map;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyList;
-import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.when;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 /**
  * Call Chain Controller Test.
@@ -30,7 +34,7 @@ import static org.mockito.Mockito.when;
  * @author call-chain
  * @since 2026-05-18
  */
-@WebFluxTest(
+@WebMvcTest(
     controllers = CallChainController.class,
     properties = {
         "operation-intelligence.secret-key=test",
@@ -40,22 +44,23 @@ import static org.mockito.Mockito.when;
 class CallChainControllerTest {
 
     private static final String SECRET_KEY = "test";
+    private static final ObjectMapper MAPPER = new ObjectMapper();
 
     @Autowired
-    private WebTestClient webClient;
+    private MockMvc mockMvc;
 
     @MockBean
     private CallChainService callChainService;
 
     @Test
-    void testQueryCallChainSuccess() {
+    void testQueryCallChainSuccess() throws Exception {
         CallChainTree tree = new CallChainTree();
         tree.setChainType("BES");
         tree.setTotalCount(100L);
         tree.setFlows(List.of());
 
         when(callChainService.queryCallChain(anyString(), anyList(), anyLong(), anyLong()))
-            .thenReturn(Mono.just(tree));
+            .thenReturn(tree);
 
         QueryCallChainRequest request = new QueryCallChainRequest();
         request.setSolutionType("DigitalCRM.sit");
@@ -66,20 +71,17 @@ class CallChainControllerTest {
         request.setStartTime(1746057600000L);
         request.setEndTime(1746058000000L);
 
-        webClient.post()
-            .uri("/operation-intelligence/call-chain/query")
-            .header("x-secret-key", SECRET_KEY)
-            .contentType(MediaType.APPLICATION_JSON)
-            .bodyValue(request)
-            .exchange()
-            .expectStatus().isOk()
-            .expectBody()
-            .jsonPath("$.chainType").isEqualTo("BES")
-            .jsonPath("$.totalCount").isEqualTo(100);
+        mockMvc.perform(post("/operation-intelligence/call-chain/query")
+                .header("x-secret-key", SECRET_KEY)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(MAPPER.writeValueAsString(request)))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.chainType").value("BES"))
+            .andExpect(jsonPath("$.totalCount").value(100));
     }
 
     @Test
-    void testQueryCallChainMissingSolutionType() {
+    void testQueryCallChainMissingSolutionType() throws Exception {
         QueryCallChainRequest request = new QueryCallChainRequest();
         QueryCallChainRequest.Condition condition = new QueryCallChainRequest.Condition();
         condition.setConditionKey("menuId");
@@ -88,34 +90,30 @@ class CallChainControllerTest {
         request.setStartTime(1746057600000L);
         request.setEndTime(1746662400000L);
 
-        webClient.post()
-            .uri("/operation-intelligence/call-chain/query")
-            .header("x-secret-key", SECRET_KEY)
-            .contentType(MediaType.APPLICATION_JSON)
-            .bodyValue(request)
-            .exchange()
-            .expectStatus().isBadRequest();
+        mockMvc.perform(post("/operation-intelligence/call-chain/query")
+                .header("x-secret-key", SECRET_KEY)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(MAPPER.writeValueAsString(request)))
+            .andExpect(status().isBadRequest());
     }
 
     @Test
-    void testQueryCallChainMissingCondition() {
+    void testQueryCallChainMissingCondition() throws Exception {
         QueryCallChainRequest request = new QueryCallChainRequest();
         request.setSolutionType("DigitalCRM.sit");
         request.setCondition(List.of());
         request.setStartTime(1746057600000L);
         request.setEndTime(1746058000000L);
 
-        webClient.post()
-            .uri("/operation-intelligence/call-chain/query")
-            .header("x-secret-key", SECRET_KEY)
-            .contentType(MediaType.APPLICATION_JSON)
-            .bodyValue(request)
-            .exchange()
-            .expectStatus().isBadRequest();
+        mockMvc.perform(post("/operation-intelligence/call-chain/query")
+                .header("x-secret-key", SECRET_KEY)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(MAPPER.writeValueAsString(request)))
+            .andExpect(status().isBadRequest());
     }
 
     @Test
-    void testQueryCallChainInvalidTimeRange() {
+    void testQueryCallChainInvalidTimeRange() throws Exception {
         QueryCallChainRequest request = new QueryCallChainRequest();
         request.setSolutionType("DigitalCRM.sit");
         QueryCallChainRequest.Condition condition = new QueryCallChainRequest.Condition();
@@ -125,17 +123,15 @@ class CallChainControllerTest {
         request.setStartTime(1746662400000L);
         request.setEndTime(1746057600000L);
 
-        webClient.post()
-            .uri("/operation-intelligence/call-chain/query")
-            .header("x-secret-key", SECRET_KEY)
-            .contentType(MediaType.APPLICATION_JSON)
-            .bodyValue(request)
-            .exchange()
-            .expectStatus().isBadRequest();
+        mockMvc.perform(post("/operation-intelligence/call-chain/query")
+                .header("x-secret-key", SECRET_KEY)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(MAPPER.writeValueAsString(request)))
+            .andExpect(status().isBadRequest());
     }
 
     @Test
-    void testQueryCallChainNoAuth() {
+    void testQueryCallChainNoAuth() throws Exception {
         QueryCallChainRequest request = new QueryCallChainRequest();
         request.setSolutionType("DigitalCRM.sit");
         QueryCallChainRequest.Condition condition = new QueryCallChainRequest.Condition();
@@ -145,11 +141,9 @@ class CallChainControllerTest {
         request.setStartTime(1746057600000L);
         request.setEndTime(1746662400000L);
 
-        webClient.post()
-            .uri("/operation-intelligence/call-chain/query")
-            .contentType(MediaType.APPLICATION_JSON)
-            .bodyValue(request)
-            .exchange()
-            .expectStatus().isUnauthorized();
+        mockMvc.perform(post("/operation-intelligence/call-chain/query")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(MAPPER.writeValueAsString(request)))
+            .andExpect(status().isUnauthorized());
     }
 }

@@ -9,26 +9,24 @@ import static org.junit.Assert.assertNotNull;
 
 import com.huawei.opsfactory.gateway.config.GatewayProperties;
 
-import reactor.core.publisher.Mono;
-import reactor.test.StepVerifier;
-
 import org.junit.Before;
 import org.junit.Test;
-import org.springframework.mock.http.server.reactive.MockServerHttpRequest;
-import org.springframework.mock.web.server.MockServerWebExchange;
-import org.springframework.web.server.WebFilterChain;
+import org.springframework.mock.web.MockHttpServletRequest;
+import org.springframework.mock.web.MockHttpServletResponse;
+import org.springframework.mock.web.MockFilterChain;
 
 /**
  * Test coverage for Request Context Filter.
  *
  * @author x00000000
- * @since 2026-05-09
+ * @since 2026-05-26
  */
 public class RequestContextFilterTest {
     private RequestContextFilter filter;
 
     /**
-     * Sets the up.
+     * Initializes the test fixture before each test method.
+     * Creates filter instance with default gateway properties.
      */
     @Before
     public void setUp() {
@@ -37,35 +35,40 @@ public class RequestContextFilterTest {
     }
 
     /**
-     * Tests generates request id when missing.
+     * Tests that request ID is generated when not present in request header.
+     * Verifies generated ID is set as request attribute and response header.
+     *
+     * @throws Exception if filter chain processing fails
      */
     @Test
-    public void testGeneratesRequestIdWhenMissing() {
-        MockServerHttpRequest request = MockServerHttpRequest.get("/gateway/status").build();
-        MockServerWebExchange exchange = MockServerWebExchange.from(request);
+    public void testGeneratesRequestIdWhenMissing() throws Exception {
+        MockHttpServletRequest request = new MockHttpServletRequest("GET", "/gateway/status");
+        MockHttpServletResponse response = new MockHttpServletResponse();
+        MockFilterChain chain = new MockFilterChain();
 
-        WebFilterChain chain = ex -> Mono.empty();
-        StepVerifier.create(filter.filter(exchange, chain)).verifyComplete();
+        filter.doFilter(request, response, chain);
 
-        String requestId = exchange.getAttribute(RequestContextFilter.REQUEST_ID_ATTR);
-        assertNotNull(requestId);
-        assertEquals(requestId, exchange.getResponse().getHeaders().getFirst(RequestContextFilter.REQUEST_ID_HEADER));
+        String requestId = (String) request.getAttribute(RequestContextFilter.REQUEST_ID_ATTR);
+        assertNotNull("Request ID should be generated", requestId);
+        assertEquals(requestId, response.getHeader(RequestContextFilter.REQUEST_ID_HEADER));
     }
 
     /**
-     * Tests reuses incoming request id.
+     * Tests that existing request ID in header is reused.
+     * Verifies request attribute and response header match the incoming ID.
+     *
+     * @throws Exception if filter chain processing fails
      */
     @Test
-    public void testReusesIncomingRequestId() {
-        MockServerHttpRequest request = MockServerHttpRequest.get("/gateway/status")
-            .header(RequestContextFilter.REQUEST_ID_HEADER, "req-123")
-            .build();
-        MockServerWebExchange exchange = MockServerWebExchange.from(request);
+    public void testReusesIncomingRequestId() throws Exception {
+        MockHttpServletRequest request = new MockHttpServletRequest("GET", "/gateway/status");
+        request.addHeader(RequestContextFilter.REQUEST_ID_HEADER, "req-123");
+        MockHttpServletResponse response = new MockHttpServletResponse();
+        MockFilterChain chain = new MockFilterChain();
 
-        WebFilterChain chain = ex -> Mono.empty();
-        StepVerifier.create(filter.filter(exchange, chain)).verifyComplete();
+        filter.doFilter(request, response, chain);
 
-        assertEquals("req-123", exchange.getAttribute(RequestContextFilter.REQUEST_ID_ATTR));
-        assertEquals("req-123", exchange.getResponse().getHeaders().getFirst(RequestContextFilter.REQUEST_ID_HEADER));
+        assertEquals("req-123", request.getAttribute(RequestContextFilter.REQUEST_ID_ATTR));
+        assertEquals("req-123", response.getHeader(RequestContextFilter.REQUEST_ID_HEADER));
     }
 }

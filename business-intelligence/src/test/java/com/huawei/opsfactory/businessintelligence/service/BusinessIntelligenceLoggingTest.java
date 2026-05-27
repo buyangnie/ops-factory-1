@@ -1,3 +1,7 @@
+/*
+ * Copyright (c) Huawei Technologies Co., Ltd. 2026-2026. All rights reserved.
+ */
+
 package com.huawei.opsfactory.businessintelligence.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -11,6 +15,12 @@ import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.Test;
 
+/**
+ * Business Intelligence Logging Test.
+ *
+ * @author x00000000
+ * @since 2026-05-27
+ */
 class BusinessIntelligenceLoggingTest {
 
     @Test
@@ -35,6 +45,12 @@ class BusinessIntelligenceLoggingTest {
         return properties;
     }
 
+/**
+     * Counting Provider.
+     *
+     * @author x00000000
+     * @since 2026-05-27
+     */
     private static final class CountingProvider implements BiDataProvider {
 
         private final AtomicInteger loads;

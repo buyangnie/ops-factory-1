@@ -1,3 +1,7 @@
+/*
+ * Copyright (c) Huawei Technologies Co., Ltd. 2026-2026. All rights reserved.
+ */
+
 package com.huawei.opsfactory.skillmarket.service;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -23,6 +27,12 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.springframework.mock.web.MockMultipartFile;
 
+/**
+ * Skill Catalog Service Test.
+ *
+ * @author x00000000
+ * @since 2026-05-27
+ */
 class SkillCatalogServiceTest {
 
     @TempDir

@@ -48,7 +48,7 @@
     │   └── resources/
     │       ├── application.yml                  # Spring Boot 配置
     │       ├── application-test.yaml            # 测试 profile
-    │       └── log4j2-spring.xml                # 日志配置
+    │       └── logback-spring.xml                # 日志配置
     └── test/
         └── java/com/huawei/opsfactory/<servicename>/
             └── ...                              # 测试类
@@ -96,10 +96,10 @@
     </dependencyManagement>
 
     <dependencies>
-        <!-- Web 层：WebMVC 或 WebFlux（二选一） -->
+        <!-- Web 层：Spring MVC (使用 spring-boot-starter-web) -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
-            <artifactId>spring-boot-starter-webflux</artifactId>
+            <artifactId>spring-boot-starter-web</artifactId>
             <exclusions>
                 <exclusion>
                     <groupId>org.springframework.boot</groupId>
@@ -118,10 +118,10 @@
                 </exclusion>
             </exclusions>
         </dependency>
-        <!-- 日志：统一使用 Log4j2 -->
+        <!-- 日志：统一使用 Logback -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
-            <artifactId>spring-boot-starter-log4j2</artifactId>
+            <artifactId>spring-boot-starter-logging</artifactId>
         </dependency>
         <!-- 测试 -->
         <dependency>
@@ -162,14 +162,6 @@
     </build>
 </project>
 ```
-
-### 3.2 WebMVC vs WebFlux 选型
-
-| 场景 | 推荐 | 原因 |
-| --- | --- | --- |
-| 常规 CRUD / 表单处理 | WebMVC（`spring-boot-starter-web`） | 简单直接，同步编程模型 |
-| 需要 WebClient / Netty SSL / 流式响应 | WebFlux（`spring-boot-starter-webflux`） | 原生支持响应式，避免同时引入 servlet 和 reactive 栈 |
-| 与外部系统高频 HTTP 交互 | WebFlux | 非阻塞 IO，适合并发调用 |
 
 ## 4. Spring Boot 应用
 
@@ -228,7 +220,7 @@ spring:
     import: optional:file:${<SERVICE_NAME>_CONFIG_PATH:./config.yaml}
 
 logging:
-  config: classpath:log4j2-spring.xml
+  config: classpath:logback-spring.xml
 
 management:
   endpoints:
@@ -262,8 +254,8 @@ spring:
 ### 5.1 统一日志 API
 
 - 所有日志使用 **SLF4J API**（`org.slf4j.Logger` + `org.slf4j.LoggerFactory`）
-- 禁止直接依赖 Log4j2 或 Logback 专有 API
-- 运行时使用 Log4j2 作为 backend（通过 `spring-boot-starter-log4j2`）
+- 禁止直接依赖 Logback 专有 API
+- 运行时使用 Logback 作为 backend（通过 `spring-boot-starter-logging`）
 
 ### 5.2 MDC 上下文
 
@@ -310,47 +302,13 @@ public class RequestLoggingFilter extends OncePerRequestFilter {
 }
 ```
 
-**WebFlux 版本**（使用 `spring-boot-starter-webflux` 的服务）：
-
-```java
-@Component
-@Order(Ordered.HIGHEST_PRECEDENCE)
-public class RequestLoggingFilter implements WebFilter {
-
-    private static final Logger log = LoggerFactory.getLogger(RequestLoggingFilter.class);
-    private final <ServiceName>Properties properties;
-
-    @Override
-    public Mono<Void> filter(ServerWebExchange exchange, WebFilterChain chain) {
-        String requestId = resolveRequestId(exchange);
-        exchange.getResponse().getHeaders().set("X-Request-Id", requestId);
-        long startedAt = System.currentTimeMillis();
-        MDC.put("requestId", requestId);
-        return chain.filter(exchange)
-                .doFinally(signalType -> {
-                    try {
-                        if (properties.getLogging().isAccessLogEnabled()) {
-                            log.info("HTTP {} {} completed status={} durationMs={}",
-                                    exchange.getRequest().getMethod(),
-                                    exchange.getRequest().getURI().getPath(),
-                                    exchange.getResponse().getStatusCode(),
-                                    System.currentTimeMillis() - startedAt);
-                        }
-                    } finally {
-                        MDC.remove("requestId");
-                    }
-                });
-    }
-}
-```
-
 **要点**：
 - 从请求头 `X-Request-Id` 读取，若无则生成 UUID
 - 响应头中回传 `X-Request-Id`，便于调用方链路追踪
 - access log 通过 `logging.accessLogEnabled` 开关控制
 - access log 格式统一为 `HTTP {method} {path} completed status={status} durationMs={duration}`
 
-### 5.4 log4j2-spring.xml 模板
+### 5.4 logback-spring.xml 模板
 
 ```xml
 <?xml version="1.0" encoding="UTF-8"?>
@@ -502,27 +460,6 @@ public class WebConfig {
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
         source.registerCorsConfiguration("/**", config);
         return new CorsFilter(source);
-    }
-}
-```
-
-### 11.2 WebFlux 版本（使用 `CorsWebFilter`）
-
-```java
-@Configuration
-public class WebConfig {
-
-    private final <ServiceName>Properties properties;
-
-    @Bean
-    public CorsWebFilter corsWebFilter() {
-        CorsConfiguration config = new CorsConfiguration();
-        // 与 WebMVC 版本相同的 CorsConfiguration 设置
-        // ...
-
-        UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
-        source.registerCorsConfiguration("/**", config);
-        return new CorsWebFilter(source);
     }
 }
 ```
@@ -735,18 +672,18 @@ cd web-app && npm run build               # 构建验证
 
 - [ ] Application 主类带 `@SpringBootApplication` + `@EnableConfigurationProperties`
 - [ ] Properties 类使用 `@ConfigurationProperties(prefix = "<service-name>")`
-- [ ] `application.yml` 端口、config import、log4j2、actuator 配置完整
+- [ ] `application.yml` 端口、config import、logback、actuator 配置完整
 - [ ] `application-test.yaml` 随机端口 + 最小配置
 
 ### 日志与规范
 
-- [ ] `log4j2-spring.xml` 符合第 5.4 节模板
+- [ ] `logback-spring.xml` 符合第 5.4 节模板
 - [ ] `RequestLoggingFilter` 实现完整（MDC、access log、requestId 回传）
 - [ ] 日志级别使用符合第 5.5 节规则，无敏感数据泄漏
 
 ### CORS 与配置
 
-- [ ] `WebConfig` CORS 配置正确（WebMVC 用 `CorsFilter`，WebFlux 用 `CorsWebFilter`）
+- [ ] `WebConfig` CORS 配置正确（使用 `CorsFilter`）
 - [ ] `config.yaml.example` 入库，配置项带注释
 - [ ] 环境变量覆盖路径正常工作
 

@@ -7,6 +7,12 @@ package com.huawei.opsfactory.gateway.controller;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.huawei.opsfactory.gateway.config.GatewayProperties;
 import com.huawei.opsfactory.gateway.filter.AuthWebFilter;
@@ -16,12 +22,12 @@ import com.huawei.opsfactory.gateway.service.SopService;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.autoconfigure.web.reactive.WebFluxTest;
+import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
 import org.springframework.test.context.junit4.SpringRunner;
-import org.springframework.test.web.reactive.server.WebTestClient;
+import org.springframework.test.web.servlet.MockMvc;
 
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -34,11 +40,17 @@ import java.util.Map;
  * @since 2026-05-09
  */
 @RunWith(SpringRunner.class)
-@WebFluxTest(SopController.class)
+@WebMvcTest(SopController.class)
 @Import({GatewayProperties.class, AuthWebFilter.class, UserContextFilter.class})
+/**
+ * Sop Controller Test.
+ *
+ * @author x00000000
+ * @since 2026-05-27
+ */
 public class SopControllerTest {
     @Autowired
-    private WebTestClient webTestClient;
+    private MockMvc mockMvc;
 
     @MockBean
     private SopService sopService;
@@ -52,45 +64,33 @@ public class SopControllerTest {
      * Tests list sops empty.
      */
     @Test
-    public void testListSops_empty() {
+    public void testListSops_empty() throws Exception {
         when(sopService.listSops()).thenReturn(List.of());
 
-        webTestClient.get()
-            .uri("/gateway/sops/")
-            .header("x-secret-key", "test")
-            .header("x-user-id", "admin")
-            .exchange()
-            .expectStatus()
-            .isOk()
-            .expectBody()
-            .jsonPath("$.sops")
-            .isArray()
-            .jsonPath("$.sops")
-            .isEmpty();
+        mockMvc.perform(get("/gateway/sops/")
+                .header("x-secret-key", "test")
+                .header("x-user-id", "admin"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.sops").isArray())
+            .andExpect(jsonPath("$.sops").isEmpty());
     }
 
     /**
      * Tests list sops with data.
      */
     @Test
-    public void testListSops_withData() {
+    public void testListSops_withData() throws Exception {
         Map<String, Object> sop = new LinkedHashMap<>();
         sop.put("id", "sop-1");
         sop.put("name", "RCPA诊断");
         when(sopService.listSops()).thenReturn(List.of(sop));
 
-        webTestClient.get()
-            .uri("/gateway/sops/")
-            .header("x-secret-key", "test")
-            .header("x-user-id", "admin")
-            .exchange()
-            .expectStatus()
-            .isOk()
-            .expectBody()
-            .jsonPath("$.sops[0].id")
-            .isEqualTo("sop-1")
-            .jsonPath("$.sops[0].name")
-            .isEqualTo("RCPA诊断");
+        mockMvc.perform(get("/gateway/sops/")
+                .header("x-secret-key", "test")
+                .header("x-user-id", "admin"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.sops[0].id").value("sop-1"))
+            .andExpect(jsonPath("$.sops[0].name").value("RCPA诊断"));
     }
 
     // ── getSop ───────────────────────────────────────────────────
@@ -99,41 +99,32 @@ public class SopControllerTest {
      * Tests get sop existing.
      */
     @Test
-    public void testGetSop_existing() {
+    public void testGetSop_existing() throws Exception {
         Map<String, Object> sop = new LinkedHashMap<>();
         sop.put("id", "sop-1");
         sop.put("name", "TestSOP");
         sop.put("nodes", List.of());
         when(sopService.getSop("sop-1")).thenReturn(sop);
 
-        webTestClient.get()
-            .uri("/gateway/sops/sop-1")
-            .header("x-secret-key", "test")
-            .header("x-user-id", "admin")
-            .exchange()
-            .expectStatus()
-            .isOk()
-            .expectBody()
-            .jsonPath("$.success")
-            .isEqualTo(true)
-            .jsonPath("$.sop.id")
-            .isEqualTo("sop-1");
+        mockMvc.perform(get("/gateway/sops/sop-1")
+                .header("x-secret-key", "test")
+                .header("x-user-id", "admin"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.success").value(true))
+            .andExpect(jsonPath("$.sop.id").value("sop-1"));
     }
 
     /**
      * Tests get sop not found.
      */
     @Test
-    public void testGetSop_notFound() {
+    public void testGetSop_notFound() throws Exception {
         when(sopService.getSop("nonexistent")).thenThrow(new IllegalArgumentException("SOP not found: nonexistent"));
 
-        webTestClient.get()
-            .uri("/gateway/sops/nonexistent")
-            .header("x-secret-key", "test")
-            .header("x-user-id", "admin")
-            .exchange()
-            .expectStatus()
-            .is5xxServerError();
+        mockMvc.perform(get("/gateway/sops/nonexistent")
+                .header("x-secret-key", "test")
+                .header("x-user-id", "admin"))
+            .andExpect(status().is5xxServerError());
     }
 
     // ── createSop ────────────────────────────────────────────────
@@ -142,56 +133,37 @@ public class SopControllerTest {
      * Tests create sop success.
      */
     @Test
-    public void testCreateSop_success() {
+    public void testCreateSop_success() throws Exception {
         Map<String, Object> created = new LinkedHashMap<>();
         created.put("id", "new-id");
         created.put("name", "NewSOP");
         when(sopService.createSop(any())).thenReturn(created);
 
-        Map<String, Object> body = new LinkedHashMap<>();
-        body.put("name", "NewSOP");
-        body.put("description", "Test");
-
-        webTestClient.post()
-            .uri("/gateway/sops/")
-            .header("x-secret-key", "test")
-            .header("x-user-id", "admin")
-            .contentType(MediaType.APPLICATION_JSON)
-            .bodyValue(body)
-            .exchange()
-            .expectStatus()
-            .isCreated()
-            .expectBody()
-            .jsonPath("$.success")
-            .isEqualTo(true)
-            .jsonPath("$.sop.id")
-            .isEqualTo("new-id");
+        mockMvc.perform(post("/gateway/sops/")
+                .header("x-secret-key", "test")
+                .header("x-user-id", "admin")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"name\": \"NewSOP\", \"description\": \"Test\"}"))
+            .andExpect(status().isCreated())
+            .andExpect(jsonPath("$.success").value(true))
+            .andExpect(jsonPath("$.sop.id").value("new-id"));
     }
 
     /**
      * Tests create sop error.
      */
     @Test
-    public void testCreateSop_error() {
+    public void testCreateSop_error() throws Exception {
         when(sopService.createSop(any())).thenThrow(new RuntimeException("Write failed"));
 
-        Map<String, Object> body = new LinkedHashMap<>();
-        body.put("name", "SOP");
-
-        webTestClient.post()
-            .uri("/gateway/sops/")
-            .header("x-secret-key", "test")
-            .header("x-user-id", "admin")
-            .contentType(MediaType.APPLICATION_JSON)
-            .bodyValue(body)
-            .exchange()
-            .expectStatus()
-            .is5xxServerError()
-            .expectBody()
-            .jsonPath("$.success")
-            .isEqualTo(false)
-            .jsonPath("$.error")
-            .isEqualTo("Internal server error");
+        mockMvc.perform(post("/gateway/sops/")
+                .header("x-secret-key", "test")
+                .header("x-user-id", "admin")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"name\": \"SOP\"}"))
+            .andExpect(status().is5xxServerError())
+            .andExpect(jsonPath("$.success").value(false))
+            .andExpect(jsonPath("$.error").value("Internal server error"));
     }
 
     // ── updateSop ────────────────────────────────────────────────
@@ -200,51 +172,36 @@ public class SopControllerTest {
      * Tests update sop success.
      */
     @Test
-    public void testUpdateSop_success() {
+    public void testUpdateSop_success() throws Exception {
         Map<String, Object> updated = new LinkedHashMap<>();
         updated.put("id", "sop-1");
         updated.put("name", "UpdatedSOP");
         when(sopService.updateSop(eq("sop-1"), any())).thenReturn(updated);
 
-        Map<String, Object> body = new LinkedHashMap<>();
-        body.put("name", "UpdatedSOP");
-
-        webTestClient.put()
-            .uri("/gateway/sops/sop-1")
-            .header("x-secret-key", "test")
-            .header("x-user-id", "admin")
-            .contentType(MediaType.APPLICATION_JSON)
-            .bodyValue(body)
-            .exchange()
-            .expectStatus()
-            .isOk()
-            .expectBody()
-            .jsonPath("$.success")
-            .isEqualTo(true)
-            .jsonPath("$.sop.name")
-            .isEqualTo("UpdatedSOP");
+        mockMvc.perform(put("/gateway/sops/sop-1")
+                .header("x-secret-key", "test")
+                .header("x-user-id", "admin")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"name\": \"UpdatedSOP\"}"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.success").value(true))
+            .andExpect(jsonPath("$.sop.name").value("UpdatedSOP"));
     }
 
     /**
      * Tests update sop not found.
      */
     @Test
-    public void testUpdateSop_notFound() {
+    public void testUpdateSop_notFound() throws Exception {
         when(sopService.updateSop(eq("nonexistent"), any()))
             .thenThrow(new IllegalArgumentException("SOP not found: nonexistent"));
 
-        Map<String, Object> body = new LinkedHashMap<>();
-        body.put("name", "Updated");
-
-        webTestClient.put()
-            .uri("/gateway/sops/nonexistent")
-            .header("x-secret-key", "test")
-            .header("x-user-id", "admin")
-            .contentType(MediaType.APPLICATION_JSON)
-            .bodyValue(body)
-            .exchange()
-            .expectStatus()
-            .isEqualTo(409);
+        mockMvc.perform(put("/gateway/sops/nonexistent")
+                .header("x-secret-key", "test")
+                .header("x-user-id", "admin")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"name\": \"Updated\"}"))
+            .andExpect(status().isConflict());
     }
 
     // ── deleteSop ────────────────────────────────────────────────
@@ -253,64 +210,45 @@ public class SopControllerTest {
      * Tests delete sop success.
      */
     @Test
-    public void testDeleteSop_success() {
+    public void testDeleteSop_success() throws Exception {
         when(sopService.deleteSop("sop-1")).thenReturn(true);
 
-        webTestClient.delete()
-            .uri("/gateway/sops/sop-1")
-            .header("x-secret-key", "test")
-            .header("x-user-id", "admin")
-            .exchange()
-            .expectStatus()
-            .isOk()
-            .expectBody()
-            .jsonPath("$.success")
-            .isEqualTo(true);
+        mockMvc.perform(delete("/gateway/sops/sop-1")
+                .header("x-secret-key", "test")
+                .header("x-user-id", "admin"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.success").value(true));
     }
 
     /**
      * Tests delete sop not found.
      */
     @Test
-    public void testDeleteSop_notFound() {
+    public void testDeleteSop_notFound() throws Exception {
         when(sopService.deleteSop("nonexistent")).thenReturn(false);
 
-        webTestClient.delete()
-            .uri("/gateway/sops/nonexistent")
-            .header("x-secret-key", "test")
-            .header("x-user-id", "admin")
-            .exchange()
-            .expectStatus()
-            .isNotFound()
-            .expectBody()
-            .jsonPath("$.success")
-            .isEqualTo(false);
+        mockMvc.perform(delete("/gateway/sops/nonexistent")
+                .header("x-secret-key", "test")
+                .header("x-user-id", "admin"))
+            .andExpect(status().isNotFound())
+            .andExpect(jsonPath("$.success").value(false));
     }
 
     /**
      * Tests create sop duplicate name returns conflict.
      */
     @Test
-    public void testCreateSop_duplicateName_returnsConflict() {
+    public void testCreateSop_duplicateName_returnsConflict() throws Exception {
         when(sopService.createSop(any())).thenThrow(new IllegalArgumentException("SOP name already exists: TestSOP"));
 
-        Map<String, Object> body = new LinkedHashMap<>();
-        body.put("name", "TestSOP");
-
-        webTestClient.post()
-            .uri("/gateway/sops/")
-            .header("x-secret-key", "test")
-            .header("x-user-id", "admin")
-            .contentType(MediaType.APPLICATION_JSON)
-            .bodyValue(body)
-            .exchange()
-            .expectStatus()
-            .isEqualTo(409)
-            .expectBody()
-            .jsonPath("$.success")
-            .isEqualTo(false)
-            .jsonPath("$.error")
-            .isEqualTo("SOP name already exists");
+        mockMvc.perform(post("/gateway/sops/")
+                .header("x-secret-key", "test")
+                .header("x-user-id", "admin")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"name\": \"TestSOP\"}"))
+            .andExpect(status().isConflict())
+            .andExpect(jsonPath("$.success").value(false))
+            .andExpect(jsonPath("$.error").value("SOP name already exists"));
     }
 
     // ── Auth tests ───────────────────────────────────────────────
@@ -319,52 +257,40 @@ public class SopControllerTest {
      * Tests list sops unauthorized no key.
      */
     @Test
-    public void testListSops_unauthorized_noKey() {
-        webTestClient.get()
-            .uri("/gateway/sops/")
-            .header("x-user-id", "admin")
-            .exchange()
-            .expectStatus()
-            .isUnauthorized();
+    public void testListSops_unauthorized_noKey() throws Exception {
+        mockMvc.perform(get("/gateway/sops/")
+                .header("x-user-id", "admin"))
+            .andExpect(status().isUnauthorized());
     }
 
     /**
      * Tests list sops succeeds for any authenticated user.
      */
     @Test
-    public void testListSops_succeeds_forAnyUser() {
+    public void testListSops_succeeds_forAnyUser() throws Exception {
         when(sopService.listSops()).thenReturn(List.of());
 
-        webTestClient.get()
-            .uri("/gateway/sops/")
-            .header("x-secret-key", "test")
-            .header("x-user-id", "regular-user")
-            .exchange()
-            .expectStatus()
-            .isOk();
+        mockMvc.perform(get("/gateway/sops/")
+                .header("x-secret-key", "test")
+                .header("x-user-id", "regular-user"))
+            .andExpect(status().isOk());
     }
 
     /**
      * Tests create sop succeeds for any authenticated user.
      */
     @Test
-    public void testCreateSop_succeeds_forAnyUser() {
+    public void testCreateSop_succeeds_forAnyUser() throws Exception {
         Map<String, Object> created = new LinkedHashMap<>();
         created.put("id", "new-id");
         created.put("name", "SOP");
         when(sopService.createSop(any())).thenReturn(created);
 
-        Map<String, Object> body = new LinkedHashMap<>();
-        body.put("name", "SOP");
-
-        webTestClient.post()
-            .uri("/gateway/sops/")
-            .header("x-secret-key", "test")
-            .header("x-user-id", "regular-user")
-            .contentType(MediaType.APPLICATION_JSON)
-            .bodyValue(body)
-            .exchange()
-            .expectStatus()
-            .isCreated();
+        mockMvc.perform(post("/gateway/sops/")
+                .header("x-secret-key", "test")
+                .header("x-user-id", "regular-user")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"name\": \"SOP\"}"))
+            .andExpect(status().isCreated());
     }
 }

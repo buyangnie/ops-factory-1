@@ -18,7 +18,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 /**
  * Time Split Strategy Test.
  *
- * @author call-chain
+ * @author x00000000
  * @since 2026-05-18
  */
 class TimeSplitStrategyTest {

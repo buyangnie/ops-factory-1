@@ -6,25 +6,24 @@ package com.huawei.opsfactory.operationintelligence.qos.dv;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-
-import io.netty.handler.ssl.SslContext;
+import com.fasterxml.jackson.core.JsonProcessingException;
 
 import jakarta.annotation.PreDestroy;
 
-import reactor.core.publisher.Mono;
-import reactor.core.scheduler.Schedulers;
-import reactor.netty.http.client.HttpClient;
-
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.http.client.reactive.ReactorClientHttpConnector;
+import org.springframework.http.client.ClientHttpRequestFactory;
+import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.stereotype.Component;
-import org.springframework.web.reactive.function.client.WebClient;
+import org.springframework.web.client.RestClient;
 
-import java.time.Duration;
+import java.io.IOException;
+import java.net.HttpURLConnection;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+
+import javax.net.ssl.SSLContext;
 
 /**
  * Dv Auth Service.
@@ -45,7 +44,7 @@ public class DvAuthService {
 
     private final ConcurrentHashMap<String, TokenInfo> tokenCache = new ConcurrentHashMap<>();
 
-    private final ConcurrentHashMap<String, WebClient> clientCache = new ConcurrentHashMap<>();
+    private final ConcurrentHashMap<String, RestClient> clientCache = new ConcurrentHashMap<>();
 
     /**
      * Dv Auth Service.
@@ -99,14 +98,22 @@ public class DvAuthService {
 
     private TokenInfo fetchNewToken(DvEnvironmentInfo env) {
         try {
-            WebClient webClient = clientCache.computeIfAbsent(env.getServerUrl(), url -> {
-                SslContext sslCtx =
-                    sslFactory.createSslContext(env.getCrtContent(), env.getCrtFileName(), env.isStrictSsl());
-                HttpClient httpClient = HttpClient.create()
-                    .secure(t -> t.sslContext(sslCtx).handshakeTimeout(Duration.ofSeconds(10)))
-                    .responseTimeout(Duration.ofSeconds(30));
-                return WebClient.builder()
-                    .clientConnector(new ReactorClientHttpConnector(httpClient))
+            RestClient webClient = clientCache.computeIfAbsent(env.getServerUrl(), url -> {
+                SSLContext sslContext = sslFactory.createSslContext(env.getCrtContent(), env.getCrtFileName(), env.isStrictSsl());
+                ClientHttpRequestFactory requestFactory = new SimpleClientHttpRequestFactory() {
+                    @Override
+                    protected void prepareConnection(HttpURLConnection conn, String httpMethod) throws IOException {
+                        super.prepareConnection(conn, httpMethod);
+                        if (conn instanceof javax.net.ssl.HttpsURLConnection httpsConn) {
+                            httpsConn.setSSLSocketFactory(sslContext.getSocketFactory());
+                            httpsConn.setConnectTimeout(10000);
+                            httpsConn.setReadTimeout(30000);
+                            httpsConn.setHostnameVerifier((hostname, session) -> true);
+                        }
+                    }
+                };
+                return RestClient.builder()
+                    .requestFactory(requestFactory)
                     .baseUrl(url)
                     .build();
             });
@@ -117,11 +124,9 @@ public class DvAuthService {
             String response = webClient.put()
                 .uri("/rest/plat/smapp/v1/sessions")
                 .header("Content-Type", "application/json")
-                .body(Mono.just(loginBody), String.class)
+                .body(loginBody)
                 .retrieve()
-                .bodyToMono(String.class)
-                .subscribeOn(Schedulers.boundedElastic())
-                .block(Duration.ofSeconds(30));
+                .body(String.class);
 
             if (response == null || response.isBlank()) {
                 throw new IllegalStateException("Empty response from SSO login at " + env.getServerUrl());
@@ -148,7 +153,7 @@ public class DvAuthService {
             }
             log.info("DV SSO token acquired for {}", env.getEnvCode());
             return new TokenInfo(token, roaRand, System.currentTimeMillis(), ttlMs);
-        } catch (Exception e) {
+        } catch (IOException | IllegalStateException e) {
             log.error("Failed to get SSO token from {}: {}", env.getServerUrl(), e.getMessage());
             throw new IllegalStateException("DV SSO login failed", e);
         }

@@ -269,21 +269,22 @@ export default function Knowledge() {
         setError(null)
         try {
             const response = await fetch(`${runtime.KNOWLEDGE_SERVICE_URL}/sources?page=1&pageSize=100`)
-            const data = await response.json() as SourceListResponse
+            const data = await response.json().catch(() => null) as SourceListResponse | null
             if (!response.ok) {
-                throw new Error((data as { message?: string }).message || response.statusText)
+                const errorData = data as { message?: string } | null
+                throw new Error(errorData?.message || response.statusText)
             }
-            setSources(data.items || [])
+            setSources(data?.items || [])
 
             const statsEntries = await Promise.all(
-                (data.items || []).map(async source => {
+                (data?.items || []).map(async source => {
                     try {
                         const statsResponse = await fetch(`${runtime.KNOWLEDGE_SERVICE_URL}/sources/${source.id}/stats`)
-                        const statsData = await statsResponse.json() as SourceStats
+                        const statsData = await statsResponse.json().catch(() => null) as SourceStats | null
                         if (!statsResponse.ok) {
                             throw new Error(statsResponse.statusText)
                         }
-                        return [source.id, statsData] as const
+                        return [source.id, statsData!] as const
                     } catch {
                         return [source.id, {
                             sourceId: source.id,
@@ -300,7 +301,9 @@ export default function Knowledge() {
             )
             setStats(Object.fromEntries(statsEntries))
         } catch (err) {
-            setError(err instanceof Error ? err.message : 'Failed to load knowledge sources')
+            const message = err instanceof Error ? err.message : ''
+            const isJsonError = message.includes('Unexpected token') || message.includes('is not valid JSON')
+            setError(isJsonError ? t('knowledge.connectionError') : message || t('knowledge.loadFailed'))
         } finally {
             setIsLoading(false)
         }

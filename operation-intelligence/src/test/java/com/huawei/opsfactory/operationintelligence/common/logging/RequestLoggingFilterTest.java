@@ -14,7 +14,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 /**
  * Request Logging Filter Test.
  *
- * @author call-chain
+ * @author x00000000
  * @since 2026-05-18
  */
 class RequestLoggingFilterTest {
@@ -32,7 +32,7 @@ class RequestLoggingFilterTest {
         OperationIntelligenceProperties properties = new OperationIntelligenceProperties();
         RequestLoggingFilter filter = new RequestLoggingFilter(properties);
 
-        // Filter is a WebFilter
-        assertTrue(filter instanceof org.springframework.web.server.WebFilter);
+        // Filter is a Servlet Filter
+        assertTrue(filter instanceof jakarta.servlet.Filter);
     }
 }

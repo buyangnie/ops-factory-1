@@ -1,3 +1,7 @@
+/*
+ * Copyright (c) Huawei Technologies Co., Ltd. 2026-2026. All rights reserved.
+ */
+
 package com.huawei.opsfactory.exporter;
 
 import java.io.IOException;
@@ -10,6 +14,12 @@ import org.springframework.web.bind.annotation.RestController;
 
 @RestController
 @RequestMapping
+/**
+ * Exporter Controller.
+ *
+ * @author x00000000
+ * @since 2026-05-27
+ */
 public class ExporterController {
 
     private final GatewayMetricsCollector collector;

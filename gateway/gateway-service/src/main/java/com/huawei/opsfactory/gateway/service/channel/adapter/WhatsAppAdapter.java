@@ -12,13 +12,15 @@ import com.huawei.opsfactory.gateway.service.channel.model.ChannelConnectionConf
 import com.huawei.opsfactory.gateway.service.channel.model.ChannelConnectivityResult;
 import com.huawei.opsfactory.gateway.service.channel.model.ChannelDetail;
 
+import jakarta.servlet.http.HttpServletRequest;
 import reactor.core.publisher.Mono;
 
+import java.util.Locale;
+
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.web.server.ResponseStatusException;
 import org.springframework.web.server.ServerWebExchange;
-
-import java.util.Locale;
 
 /**
  * {@link ChannelAdapter} implementation for WhatsApp Web channels, providing connectivity testing based on login state.
@@ -74,6 +76,20 @@ public class WhatsAppAdapter implements ChannelAdapter {
         channelConfigService.recordEvent(channelId, "warning", "webhook.unsupported",
             "WhatsApp Web mode received an unexpected webhook call");
         return Mono.error(new ResponseStatusException(BAD_REQUEST, "WhatsApp Web mode does not use webhooks"));
+    }
+
+    @Override
+    public String verifyWebhookServlet(String channelId, HttpServletRequest request) {
+        channelConfigService.recordEvent(channelId, "warning", "webhook.unsupported",
+            "WhatsApp Web mode does not use webhook verification");
+        return "WhatsApp Web mode does not use webhooks";
+    }
+
+    @Override
+    public String handleWebhookServlet(String channelId, String rawBody, HttpServletRequest request) {
+        channelConfigService.recordEvent(channelId, "warning", "webhook.unsupported",
+            "WhatsApp Web mode received an unexpected webhook call");
+        return "{\"error\":\"WhatsApp Web mode does not use webhooks\"}";
     }
 
     /**

@@ -98,14 +98,20 @@ interface MemoryFileCardProps {
     onSave: (content: string) => Promise<boolean>
     onDelete: () => void
     autoEdit?: boolean
+    isDeleting?: boolean
 }
 
-export default function MemoryFileCard({ category, content, onSave, onDelete, autoEdit }: MemoryFileCardProps) {
+const MAX_PREVIEW_LINES = 3
+const MAX_PREVIEW_CHARS = 50
+const MAX_CONTENT_CHARS = 20000
+
+export default function MemoryFileCard({ category, content, onSave, onDelete, autoEdit, isDeleting = false }: MemoryFileCardProps) {
     const { t } = useTranslation()
     const [isEditing, setIsEditing] = useState(autoEdit || false)
     const [editContent, setEditContent] = useState(content)
     const [isSaving, setIsSaving] = useState(false)
     const [hasChanges, setHasChanges] = useState(false)
+    const [expandedEntries, setExpandedEntries] = useState<Set<number>>(new Set())
 
     const entries = useMemo(() => isEditing ? [] : parseMemoryContent(content), [isEditing, content])
 
@@ -122,6 +128,10 @@ export default function MemoryFileCard({ category, content, onSave, onDelete, au
     }
 
     const handleSave = async () => {
+        if (editContent.length > MAX_CONTENT_CHARS) {
+            alert(t('memory.contentTooLong', { max: MAX_CONTENT_CHARS.toLocaleString() }))
+            return
+        }
         setIsSaving(true)
         const ok = await onSave(editContent)
         setIsSaving(false)
@@ -134,6 +144,34 @@ export default function MemoryFileCard({ category, content, onSave, onDelete, au
     const handleChange = (val: string) => {
         setEditContent(val)
         setHasChanges(val !== content)
+    }
+
+    const toggleExpanded = (idx: number) => {
+        setExpandedEntries(prev => {
+            const next = new Set(prev)
+            if (next.has(idx)) {
+                next.delete(idx)
+            } else {
+                next.add(idx)
+            }
+            return next
+        })
+    }
+
+    const needsTruncate = (text: string): boolean => {
+        const lines = text.split('\n')
+        return lines.length > MAX_PREVIEW_LINES || text.length > MAX_PREVIEW_CHARS
+    }
+
+    const getPreviewContent = (text: string): string => {
+        const lines = text.split('\n')
+        if (lines.length > MAX_PREVIEW_LINES) {
+            return lines.slice(0, MAX_PREVIEW_LINES).join('\n').trim()
+        }
+        if (text.length > MAX_PREVIEW_CHARS) {
+            return text.slice(0, MAX_PREVIEW_CHARS)
+        }
+        return text
     }
 
     return (
@@ -173,6 +211,12 @@ export default function MemoryFileCard({ category, content, onSave, onDelete, au
                 </div>
             </div>
 
+            {isDeleting && (
+                <div className="memory-delete-confirm">
+                    {t('memory.deleteConfirm')} <span className="memory-delete-confirm-name">「{category}」</span>
+                </div>
+            )}
+
             {isEditing ? (
                 <div className="memory-file-editor">
                     <textarea
@@ -181,8 +225,13 @@ export default function MemoryFileCard({ category, content, onSave, onDelete, au
                         onChange={e => handleChange(e.target.value)}
                         rows={10}
                     />
-                    <div className="memory-format-hint">
-                        {t('memory.formatHint')}
+                    <div className="memory-editor-footer">
+                        <div className="memory-format-hint">
+                            {t('memory.formatHint')}
+                        </div>
+                        <div className={`memory-char-count ${editContent.length > MAX_CONTENT_CHARS ? 'memory-char-count-error' : ''}`}>
+                            {editContent.length.toLocaleString()} / {MAX_CONTENT_CHARS.toLocaleString()}
+                        </div>
                     </div>
                     <div className="prompts-editor-actions">
                         <div className="prompts-editor-actions-left" />
@@ -190,7 +239,7 @@ export default function MemoryFileCard({ category, content, onSave, onDelete, au
                             <Button variant="secondary" onClick={handleCancel}>
                                 {t('common.cancel')}
                             </Button>
-                            <Button variant="primary" onClick={handleSave} disabled={isSaving || !hasChanges}>
+                            <Button variant="primary" onClick={handleSave} disabled={isSaving || !hasChanges || editContent.length > MAX_CONTENT_CHARS}>
                                 {isSaving ? t('agentConfigure.saving') : t('common.save')}
                             </Button>
                         </div>
@@ -201,31 +250,50 @@ export default function MemoryFileCard({ category, content, onSave, onDelete, au
                     {entries.length === 0 ? (
                         <div className="memory-entry-empty">{t('memory.emptyFile')}</div>
                     ) : (
-                        entries.map((entry, idx) => (
-                            <div key={idx} className="memory-entry">
-                                <div className="memory-entry-tags">
-                                    {entry.tags.length > 0 ? (
-                                        entry.tags.map(tag => {
-                                            const c = getTagColor(tag)
-                                            return (
-                                                <span
-                                                    key={tag}
-                                                    className="memory-tag"
-                                                    style={{ background: c.bg, color: c.fg }}
+                        entries.map((entry, idx) => {
+                            const isExpanded = expandedEntries.has(idx)
+                            const shouldTruncate = !isExpanded && needsTruncate(entry.content)
+                            const displayContent = shouldTruncate ? getPreviewContent(entry.content) : entry.content
+
+                            return (
+                                <div key={idx} className="memory-entry">
+                                    <div className="memory-entry-tags">
+                                        {entry.tags.length > 0 ? (
+                                            entry.tags.map(tag => {
+                                                const c = getTagColor(tag)
+                                                return (
+                                                    <span
+                                                        key={tag}
+                                                        className="memory-tag"
+                                                        style={{ background: c.bg, color: c.fg }}
+                                                    >
+                                                        {tag}
+                                                    </span>
+                                                )
+                                            })
+                                        ) : (
+                                            <span className="memory-tag memory-tag-untagged">{t('memory.untagged')}</span>
+                                        )}
+                                    </div>
+                                    {entry.content && (
+                                        <>
+                                            <div className={`memory-entry-content ${shouldTruncate ? 'memory-entry-content-truncated' : ''}`}>
+                                                {displayContent}
+                                            </div>
+                                            {needsTruncate(entry.content) && (
+                                                <button
+                                                    type="button"
+                                                    className="memory-expand-button"
+                                                    onClick={() => toggleExpanded(idx)}
                                                 >
-                                                    {tag}
-                                                </span>
-                                            )
-                                        })
-                                    ) : (
-                                        <span className="memory-tag memory-tag-untagged">{t('memory.untagged')}</span>
+                                                    {isExpanded ? t('memory.collapse') : t('memory.expand')}
+                                                </button>
+                                            )}
+                                        </>
                                     )}
                                 </div>
-                                {entry.content && (
-                                    <div className="memory-entry-content">{entry.content}</div>
-                                )}
-                            </div>
-                        ))
+                            )
+                        })
                     )}
                 </div>
             )}

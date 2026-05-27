@@ -1,3 +1,7 @@
+/*
+ * Copyright (c) Huawei Technologies Co., Ltd. 2026-2026. All rights reserved.
+ */
+
 package com.huawei.opsfactory.controlcenter.config;
 
 import org.springframework.boot.context.properties.ConfigurationProperties;
@@ -6,6 +10,12 @@ import java.util.ArrayList;
 import java.util.List;
 
 @ConfigurationProperties(prefix = "control-center")
+/**
+ * Control Center Properties.
+ *
+ * @author x00000000
+ * @since 2026-05-27
+ */
 public class ControlCenterProperties {
 
     private String secretKey = "change-me";
@@ -54,6 +64,12 @@ public class ControlCenterProperties {
         this.langfuse = langfuse;
     }
 
+/**
+     * Service Target.
+     *
+     * @author x00000000
+     * @since 2026-05-27
+     */
     public static class ServiceTarget {
         private String id;
         private String name;
@@ -138,6 +154,12 @@ public class ControlCenterProperties {
         }
     }
 
+/**
+     * Auth.
+     *
+     * @author x00000000
+     * @since 2026-05-27
+     */
     public static class Auth {
         private String type = "none";
         private String secretKey = "";
@@ -159,6 +181,12 @@ public class ControlCenterProperties {
         }
     }
 
+/**
+     * Langfuse.
+     *
+     * @author x00000000
+     * @since 2026-05-27
+     */
     public static class Langfuse {
         private String host = "";
         private String publicKey = "";

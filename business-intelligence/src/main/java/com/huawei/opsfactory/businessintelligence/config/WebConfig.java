@@ -1,3 +1,7 @@
+/*
+ * Copyright (c) Huawei Technologies Co., Ltd. 2026-2026. All rights reserved.
+ */
+
 package com.huawei.opsfactory.businessintelligence.config;
 
 import java.util.Arrays;
@@ -9,7 +13,13 @@ import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 import org.springframework.web.filter.CorsFilter;
 
-@Configuration
+@Configuration("businessIntelligenceWebConfig")
+/**
+ * Web Config.
+ *
+ * @author x00000000
+ * @since 2026-05-27
+ */
 public class WebConfig {
 
     private final BusinessIntelligenceRuntimeProperties properties;
