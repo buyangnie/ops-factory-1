@@ -47,12 +47,6 @@ import java.util.Map;
 @RunWith(SpringRunner.class)
 @WebMvcTest(AgentController.class)
 @Import({GatewayProperties.class, AuthWebFilter.class, UserContextFilter.class})
-/**
- * Agent Controller Test.
- *
- * @author x00000000
- * @since 2026-05-27
- */
 public class AgentControllerTest {
     @Autowired
     private MockMvc mockMvc;

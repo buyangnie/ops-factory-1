@@ -99,6 +99,8 @@ gateway/agents/*/data/sessions/
 # Playwright
 /.playwright-cli/
 /test-results/
+test-output/
+output/
 test/test-results/
 test/playwright-report/
 

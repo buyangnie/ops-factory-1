@@ -6,7 +6,6 @@ package com.huawei.opsfactory.gateway.controller;
 import org.apache.servicecomb.provider.rest.common.RestSchema;
 import jakarta.servlet.http.HttpServletRequest;
 
-import com.huawei.opsfactory.gateway.common.constants.GatewayConstants;
 import com.huawei.opsfactory.gateway.common.model.ManagedInstance;
 import com.huawei.opsfactory.gateway.common.util.FileUtil;
 import com.huawei.opsfactory.gateway.filter.RequestContextFilter;

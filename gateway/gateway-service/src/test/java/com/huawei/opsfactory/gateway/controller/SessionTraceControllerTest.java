@@ -35,12 +35,6 @@ import org.springframework.test.web.servlet.MockMvc;
 @RunWith(SpringRunner.class)
 @WebMvcTest(SessionTraceController.class)
 @Import({GatewayProperties.class, AuthWebFilter.class, UserContextFilter.class})
-/**
- * Session Trace Controller Test.
- *
- * @author x00000000
- * @since 2026-05-27
- */
 public class SessionTraceControllerTest {
     @Autowired
     private MockMvc mockMvc;

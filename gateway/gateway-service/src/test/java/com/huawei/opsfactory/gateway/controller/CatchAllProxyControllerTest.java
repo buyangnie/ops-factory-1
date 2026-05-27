@@ -10,7 +10,6 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import com.huawei.opsfactory.gateway.common.model.ManagedInstance;
@@ -22,10 +21,9 @@ import reactor.core.publisher.Mono;
 
 import org.junit.Before;
 import org.junit.Test;
-import org.springframework.http.HttpMethod;
-import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.mock.web.MockHttpServletRequest;
-import org.springframework.web.server.ResponseStatusException;
 
 /**
  * Test coverage for Catch All Proxy Controller.
@@ -97,9 +95,10 @@ public class CatchAllProxyControllerTest {
         when(goosedProxy.fetchJson(eq(INSTANCE_PORT), any(), eq("/system_info"), any(), eq(TIMEOUT_SECONDS), eq(SECRET_KEY)))
             .thenReturn(Mono.just("{\"info\":\"test\"}"));
 
-        String result = controller.proxySystemInfo(TEST_AGENT_ID, request);
+        ResponseEntity<String> result = controller.proxySystemInfo(TEST_AGENT_ID, request);
 
-        assertEquals("{\"info\":\"test\"}", result);
+        assertEquals("{\"info\":\"test\"}", result.getBody());
+        assertEquals(MediaType.APPLICATION_JSON, result.getHeaders().getContentType());
         verify(instanceManager).getOrSpawn(TEST_AGENT_ID, TEST_USER_ID);
     }
 

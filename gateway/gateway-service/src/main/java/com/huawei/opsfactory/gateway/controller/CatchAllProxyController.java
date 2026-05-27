@@ -13,12 +13,12 @@ import com.huawei.opsfactory.gateway.proxy.GoosedProxy;
 
 import org.springframework.core.annotation.Order;
 import org.springframework.http.HttpMethod;
-import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.server.ResponseStatusException;
 
 /**
  * Proxy controller: forwards agent status requests to the goosed instance.
@@ -74,11 +74,14 @@ public class CatchAllProxyController {
      * @return the response from goosed instance
      */
     @GetMapping("/agents/{agentId}/system_info")
-    public String proxySystemInfo(@PathVariable("agentId") String agentId, HttpServletRequest request) {
+    public ResponseEntity<String> proxySystemInfo(@PathVariable("agentId") String agentId, HttpServletRequest request) {
         String userId = (String) request.getAttribute(UserContextFilter.USER_ID_ATTR);
 
         var instance = instanceManager.getOrSpawn(agentId, userId).block();
-        return goosedProxy.fetchJson(instance.getPort(), HttpMethod.GET, "/system_info",
+        String body = goosedProxy.fetchJson(instance.getPort(), HttpMethod.GET, "/system_info",
             null, 30, instance.getSecretKey()).block();
+        return ResponseEntity.ok()
+            .contentType(MediaType.parseMediaType(MediaType.APPLICATION_JSON_VALUE))
+            .body(body);
     }
 }
