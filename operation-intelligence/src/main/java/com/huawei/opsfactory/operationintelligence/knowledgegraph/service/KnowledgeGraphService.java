@@ -21,13 +21,17 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.time.OffsetDateTime;
+import java.util.Arrays;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.locks.ReentrantLock;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
@@ -44,6 +48,8 @@ public class KnowledgeGraphService {
     private static final String EXPORT_FORMAT = "KG_NATIVE_JSON";
 
     private static final Pattern SAFE_ID_PATTERN = Pattern.compile("[A-Za-z0-9_.-]+");
+
+    private final Map<String, ReentrantLock> ontologyLocks = new ConcurrentHashMap<>();
 
     private final OperationIntelligenceProperties properties;
 
@@ -133,20 +139,27 @@ public class KnowledgeGraphService {
     public Map<String, Object> deleteOntology(String ontologyId) {
         ensureEnabled();
         requireSafeId(ontologyId, "ontologyId");
-        schemaRegistry.getOntology(ontologyId);
-        int loadedSnapshotCount = graphStore.countOntologySnapshots(ontologyId);
-        int persistedSnapshotCount = snapshotStore.countOntologySnapshots(ontologyId);
-        int snapshotCount = Math.max(loadedSnapshotCount, persistedSnapshotCount);
-        if (snapshotCount > 0) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
-                "Ontology has entity snapshots. Delete entities before deleting ontology.");
+        ReentrantLock lock = ontologyLocks.computeIfAbsent(ontologyId, key -> new ReentrantLock());
+        lock.lock();
+        try {
+            schemaRegistry.getOntology(ontologyId);
+            int loadedSnapshotCount = graphStore.countOntologySnapshots(ontologyId);
+            int persistedSnapshotCount = snapshotStore.countOntologySnapshots(ontologyId);
+            int snapshotCount = Math.max(loadedSnapshotCount, persistedSnapshotCount);
+            if (snapshotCount > 0) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "Ontology has entity snapshots. Delete entities before deleting ontology.");
+            }
+            GraphOntology deleted = schemaRegistry.deleteOntology(ontologyId);
+            ontologyStore.delete(ontologyId);
+            Map<String, Object> result = new LinkedHashMap<>();
+            result.put("ontologyId", deleted.getOntologyId());
+            result.put("deleted", true);
+            return result;
+        } finally {
+            lock.unlock();
+            ontologyLocks.remove(ontologyId);
         }
-        GraphOntology deleted = schemaRegistry.deleteOntology(ontologyId);
-        ontologyStore.delete(ontologyId);
-        Map<String, Object> result = new LinkedHashMap<>();
-        result.put("ontologyId", deleted.getOntologyId());
-        result.put("deleted", true);
-        return result;
     }
 
     /**
@@ -392,7 +405,8 @@ public class KnowledgeGraphService {
         List<Map<String, Object>> candidates = snapshot.getObservations()
             .stream()
             .filter(observation -> entityScope.contains(observation.getEntityId()))
-            .filter(observation -> !"normal".equalsIgnoreCase(observation.getSeverity()))
+            .filter(observation -> !"normal".equals(observation.getSeverity() == null
+                ? null : observation.getSeverity().toLowerCase(Locale.ROOT)))
             .map(observation -> toRootCauseCandidate(snapshot, observation))
             .filter(Objects::nonNull)
             .sorted(candidateComparator())
@@ -467,7 +481,8 @@ public class KnowledgeGraphService {
                     .filter(value -> value != null && !value.isBlank())
                     .findFirst()
                     .orElse(null);
-                return firstNonBlank(List.of(envName, envNameAlt, entityEnvName, envCode));
+                return firstNonBlank(
+                    Arrays.asList(envName, envNameAlt, entityEnvName, envCode));
             })
             .orElse(envCode);
     }
@@ -526,23 +541,26 @@ public class KnowledgeGraphService {
     }
 
     private boolean matches(String expected, String actual) {
-        return expected == null || expected.isBlank() || expected.equalsIgnoreCase(actual);
+        return expected == null || expected.isBlank()
+            || expected.toLowerCase(Locale.ROOT).equals(actual == null ? null : actual.toLowerCase(Locale.ROOT));
     }
 
     private int severityScore(String severity) {
-        if ("critical".equalsIgnoreCase(severity)) {
-            return 100;
+        if (severity == null) {
+            return 20;
         }
-        if ("major".equalsIgnoreCase(severity)) {
-            return 80;
+        switch (severity.toLowerCase(Locale.ROOT)) {
+            case "critical":
+                return 100;
+            case "major":
+                return 80;
+            case "warning":
+                return 60;
+            case "minor":
+                return 40;
+            default:
+                return 20;
         }
-        if ("warning".equalsIgnoreCase(severity)) {
-            return 60;
-        }
-        if ("minor".equalsIgnoreCase(severity)) {
-            return 40;
-        }
-        return 20;
     }
 
     private int boundedHops(Object value, int defaultValue) {

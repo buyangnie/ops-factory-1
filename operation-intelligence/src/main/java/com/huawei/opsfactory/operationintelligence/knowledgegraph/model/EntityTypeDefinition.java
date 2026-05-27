@@ -6,6 +6,7 @@ package com.huawei.opsfactory.operationintelligence.knowledgegraph.model;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
 
 /**
  * Entity type definition in a graph ontology.
@@ -44,7 +45,7 @@ public class EntityTypeDefinition {
      * @return the requiredProperties
      */
     public List<String> getRequiredProperties() {
-        return requiredProperties;
+        return new ArrayList<>(requiredProperties);
     }
 
     /**
@@ -62,7 +63,7 @@ public class EntityTypeDefinition {
      * @return the optionalProperties
      */
     public List<String> getOptionalProperties() {
-        return optionalProperties;
+        return new ArrayList<>(optionalProperties);
     }
 
     /**
@@ -72,5 +73,27 @@ public class EntityTypeDefinition {
      */
     public void setOptionalProperties(List<String> optionalProperties) {
         this.optionalProperties = optionalProperties == null ? new ArrayList<>() : new ArrayList<>(optionalProperties);
+    }
+
+    @Override
+    public boolean equals(Object obj) {
+        if (this == obj) {
+            return true;
+        }
+        if (obj == null || getClass() != obj.getClass()) {
+            return false;
+        }
+        EntityTypeDefinition that = (EntityTypeDefinition) obj;
+        return Objects.equals(type, that.type);
+    }
+
+    @Override
+    public int hashCode() {
+        return Objects.hash(type);
+    }
+
+    @Override
+    public String toString() {
+        return "EntityTypeDefinition{type='" + type + "'}";
     }
 }

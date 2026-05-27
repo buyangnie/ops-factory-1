@@ -8,8 +8,12 @@ import com.huawei.opsfactory.gateway.config.GatewayProperties;
 
 import reactor.core.publisher.Mono;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
@@ -30,7 +34,11 @@ import java.time.Duration;
  */
 @Service
 public class OperationIntelligenceProxyService {
+    private static final Logger logger = LoggerFactory.getLogger(OperationIntelligenceProxyService.class);
+
     private static final String GATEWAY_PREFIX = "/gateway";
+
+    private static final String OI_PATH_PREFIX = "/operation-intelligence/";
 
     private final GatewayProperties properties;
 
@@ -58,7 +66,15 @@ public class OperationIntelligenceProxyService {
      */
     public Mono<ResponseEntity<String>> proxy(ServerWebExchange exchange) {
         String bodyPath = targetPath(exchange);
-        URI targetUri = UriComponentsBuilder.fromUriString(properties.getOperationIntelligence().getBaseUrl())
+        if (!bodyPath.startsWith(OI_PATH_PREFIX)) {
+            return Mono.just(ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                .body("{\"error\":\"Invalid proxy path\"}"));
+        }
+        String baseUrl = properties.getOperationIntelligence().getBaseUrl();
+        if (!baseUrl.startsWith("https://") && !properties.getOperationIntelligence().getSecretKey().isEmpty()) {
+            logger.warn("Secret key transmitted over plain HTTP - use HTTPS for production");
+        }
+        URI targetUri = UriComponentsBuilder.fromUriString(baseUrl)
             .path(bodyPath)
             .query(exchange.getRequest().getURI().getRawQuery())
             .build(true)

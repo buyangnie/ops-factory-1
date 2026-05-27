@@ -4,9 +4,11 @@
 
 package com.huawei.opsfactory.operationintelligence.knowledgegraph.model;
 
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 
 /**
  * Knowledge graph entity.
@@ -127,7 +129,7 @@ public class GraphEntity {
      * @return the labels
      */
     public List<String> getLabels() {
-        return labels;
+        return new ArrayList<>(labels);
     }
 
     /**
@@ -136,7 +138,7 @@ public class GraphEntity {
      * @param labels the labels
      */
     public void setLabels(List<String> labels) {
-        this.labels = labels == null ? List.of() : labels;
+        this.labels = labels == null ? List.of() : new ArrayList<>(labels);
     }
 
     /**
@@ -145,7 +147,7 @@ public class GraphEntity {
      * @return the properties
      */
     public Map<String, Object> getProperties() {
-        return properties;
+        return new LinkedHashMap<>(properties);
     }
 
     /**
@@ -173,5 +175,27 @@ public class GraphEntity {
      */
     public void setSource(GraphSource source) {
         this.source = source == null ? new GraphSource() : source;
+    }
+
+    @Override
+    public boolean equals(Object obj) {
+        if (this == obj) {
+            return true;
+        }
+        if (obj == null || getClass() != obj.getClass()) {
+            return false;
+        }
+        GraphEntity that = (GraphEntity) obj;
+        return Objects.equals(id, that.id);
+    }
+
+    @Override
+    public int hashCode() {
+        return Objects.hash(id);
+    }
+
+    @Override
+    public String toString() {
+        return "GraphEntity{id='" + id + "', type='" + type + "', name='" + name + "'}";
     }
 }

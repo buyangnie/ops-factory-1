@@ -8,6 +8,7 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 
 /**
  * Full graph snapshot for one environment.
@@ -190,7 +191,7 @@ public class GraphSnapshot {
      * @return the metadata
      */
     public Map<String, Object> getMetadata() {
-        return metadata;
+        return new LinkedHashMap<>(metadata);
     }
 
     /**
@@ -208,7 +209,7 @@ public class GraphSnapshot {
      * @return the entities
      */
     public List<GraphEntity> getEntities() {
-        return entities;
+        return new ArrayList<>(entities);
     }
 
     /**
@@ -226,7 +227,7 @@ public class GraphSnapshot {
      * @return the relations
      */
     public List<GraphRelation> getRelations() {
-        return relations;
+        return new ArrayList<>(relations);
     }
 
     /**
@@ -244,7 +245,7 @@ public class GraphSnapshot {
      * @return the observations
      */
     public List<GraphObservation> getObservations() {
-        return observations;
+        return new ArrayList<>(observations);
     }
 
     /**
@@ -254,5 +255,29 @@ public class GraphSnapshot {
      */
     public void setObservations(List<GraphObservation> observations) {
         this.observations = observations == null ? new ArrayList<>() : new ArrayList<>(observations);
+    }
+
+    @Override
+    public boolean equals(Object obj) {
+        if (this == obj) {
+            return true;
+        }
+        if (obj == null || getClass() != obj.getClass()) {
+            return false;
+        }
+        GraphSnapshot that = (GraphSnapshot) obj;
+        return Objects.equals(ontologyId, that.ontologyId) && Objects.equals(envCode, that.envCode)
+            && Objects.equals(snapshotId, that.snapshotId);
+    }
+
+    @Override
+    public int hashCode() {
+        return Objects.hash(ontologyId, envCode, snapshotId);
+    }
+
+    @Override
+    public String toString() {
+        return "GraphSnapshot{ontologyId='" + ontologyId + "', envCode='" + envCode
+            + "', snapshotId='" + snapshotId + "'}";
     }
 }

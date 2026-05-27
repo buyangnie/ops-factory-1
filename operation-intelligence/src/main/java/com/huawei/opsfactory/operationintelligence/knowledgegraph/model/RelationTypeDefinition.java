@@ -6,6 +6,7 @@ package com.huawei.opsfactory.operationintelligence.knowledgegraph.model;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
 
 /**
  * Relation type definition in a graph ontology.
@@ -46,7 +47,7 @@ public class RelationTypeDefinition {
      * @return the from
      */
     public List<String> getFrom() {
-        return from;
+        return new ArrayList<>(from);
     }
 
     /**
@@ -64,7 +65,7 @@ public class RelationTypeDefinition {
      * @return the to
      */
     public List<String> getTo() {
-        return to;
+        return new ArrayList<>(to);
     }
 
     /**
@@ -92,5 +93,27 @@ public class RelationTypeDefinition {
      */
     public void setLayer(String layer) {
         this.layer = layer;
+    }
+
+    @Override
+    public boolean equals(Object obj) {
+        if (this == obj) {
+            return true;
+        }
+        if (obj == null || getClass() != obj.getClass()) {
+            return false;
+        }
+        RelationTypeDefinition that = (RelationTypeDefinition) obj;
+        return Objects.equals(type, that.type);
+    }
+
+    @Override
+    public int hashCode() {
+        return Objects.hash(type);
+    }
+
+    @Override
+    public String toString() {
+        return "RelationTypeDefinition{type='" + type + "', layer='" + layer + "'}";
     }
 }

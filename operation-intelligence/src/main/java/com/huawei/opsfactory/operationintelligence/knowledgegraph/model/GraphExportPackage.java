@@ -25,10 +25,10 @@ public class GraphExportPackage {
     /**
      * Gets the manifest.
      *
-     * @return the result
+     * @return the manifest
      */
     public Map<String, Object> getManifest() {
-        return manifest;
+        return new LinkedHashMap<>(manifest);
     }
 
     /**
@@ -37,13 +37,13 @@ public class GraphExportPackage {
      * @param manifest the manifest
      */
     public void setManifest(Map<String, Object> manifest) {
-        this.manifest = manifest;
+        this.manifest = manifest == null ? new LinkedHashMap<>() : new LinkedHashMap<>(manifest);
     }
 
     /**
      * Gets the ontology.
      *
-     * @return the result
+     * @return the ontology
      */
     public GraphOntology getOntology() {
         return ontology;
@@ -61,7 +61,7 @@ public class GraphExportPackage {
     /**
      * Gets the schema DSL.
      *
-     * @return the result
+     * @return the schemaDsl
      */
     public String getSchemaDsl() {
         return schemaDsl;
@@ -79,7 +79,7 @@ public class GraphExportPackage {
     /**
      * Gets the snapshot.
      *
-     * @return the result
+     * @return the snapshot
      */
     public GraphSnapshot getSnapshot() {
         return snapshot;

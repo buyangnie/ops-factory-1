@@ -228,6 +228,12 @@ public class OperationIntelligenceProperties {
         return (configuredPath == null || configuredPath.isBlank()) ? null : configuredPath;
     }
 
+    /**
+     * QoS scoring configuration.
+     *
+     * @author x00000000
+     * @since 2026-05-27
+     */
     public static class Qos {
         private boolean enabled = true;
 
@@ -409,6 +415,7 @@ public class OperationIntelligenceProperties {
             this.dvEnvironments = dvEnvironments;
         }
 
+        /** Weight factors for QoS dimension scoring. */
         public static class Weights {
             private double availability = 0.4;
 
@@ -471,6 +478,7 @@ public class OperationIntelligenceProperties {
             }
         }
 
+        /** Quality threshold boundaries. */
         public static class Thresholds {
             private double good = 0.9;
 
@@ -533,6 +541,7 @@ public class OperationIntelligenceProperties {
             }
         }
 
+        /** DV environment connection configuration. */
         public static class DvEnvironment {
             private String envCode;
 
@@ -757,6 +766,7 @@ public class OperationIntelligenceProperties {
         }
     }
 
+    /** Logging configuration. */
     public static class Logging {
         private boolean accessLogEnabled = true;
 
@@ -779,14 +789,22 @@ public class OperationIntelligenceProperties {
         }
     }
 
+    /** Call chain analysis configuration. */
     public static class CallChain {
         private boolean enabled = true;
+
         private int querySize = 100;
+
         private int queryLimit = 10000;
+
         private long requestTimeoutMs = 60000;
+
         private long maxTimeRangeMs = 1800000;
+
         private long rotationIntervalMs = 3600000;
+
         private long normalizeDataRetentionDays = 90;
+
         private TimeSplit timeSplit = new TimeSplit();
 
         /**
@@ -933,8 +951,10 @@ public class OperationIntelligenceProperties {
             this.timeSplit = timeSplit;
         }
 
+        /** Time split degradation strategy. */
         public static class TimeSplit {
             private long initialMinutes = 15;
+
             private List<Long> degradeMinutes = List.of(10L, 5L);
 
             /**

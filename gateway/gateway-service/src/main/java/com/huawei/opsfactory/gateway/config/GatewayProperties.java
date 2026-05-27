@@ -9,7 +9,6 @@ import org.slf4j.LoggerFactory;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.stereotype.Component;
 
-import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
 
@@ -511,6 +510,13 @@ public class GatewayProperties {
     }
 
     // ---- Nested config classes ----
+
+    /** {@inheritDoc} */
+    @Override
+    public String toString() {
+        return "GatewayProperties{" + "secretKey='***'" + ", corsOrigin='" + corsOrigin + '\'' + ", gooseTls="
+            + gooseTls + ", gooseScheme='" + gooseScheme() + '\'' + ", goosedBin='" + goosedBin + '\'' + '}';
+    }
 
     public static class Paths {
         private String projectRoot = "..";
@@ -1135,6 +1141,12 @@ public class GatewayProperties {
         }
     }
 
+    /**
+     * FileBrowser
+     *
+     * @author x00000000
+     * @since 2026-05-27
+     */
     public static class FileBrowser {
         private List<FileScanRoot> scanRoots = List.of(new FileScanRoot("workingDir", "${userAgentDir}", false),
             new FileScanRoot("output", "${userAgentDir}/output", false));
@@ -1158,6 +1170,12 @@ public class GatewayProperties {
         }
     }
 
+    /**
+     * FileScanRoot
+     *
+     * @author x00000000
+     * @since 2026-05-27
+     */
     public static class FileScanRoot {
         private String id = "";
 
@@ -1173,9 +1191,19 @@ public class GatewayProperties {
 
         private long scanTimeoutMs = 2000;
 
+        /**
+         * Creates a file scan root with default values.
+         */
         public FileScanRoot() {
         }
 
+        /**
+         * Creates a file scan root.
+         *
+         * @param id the scan root identifier
+         * @param path the scan root path
+         * @param recursive whether to scan recursively
+         */
         public FileScanRoot(String id, String path, boolean recursive) {
             this.id = id;
             this.path = path;
@@ -1309,6 +1337,12 @@ public class GatewayProperties {
         }
     }
 
+    /**
+     * SkillMarket
+     *
+     * @author x00000000
+     * @since 2026-05-27
+     */
     public static class SkillMarket {
         private String baseUrl = "http://127.0.0.1:8095";
 
@@ -1371,6 +1405,12 @@ public class GatewayProperties {
         }
     }
 
+    /**
+     * Knowledge
+     *
+     * @author x00000000
+     * @since 2026-05-27
+     */
     public static class Knowledge {
         private String artifactsRoot = "../knowledge-service/data/artifacts";
 
@@ -1393,7 +1433,12 @@ public class GatewayProperties {
         }
     }
 
-    /** Operation intelligence proxy configuration. */
+    /**
+     * Operation intelligence proxy configuration.
+     *
+     * @author zlj
+     * @since 2026-05-27
+     */
     public static class OperationIntelligence {
         private String baseUrl = "http://localhost:8096";
 
@@ -1477,18 +1522,8 @@ public class GatewayProperties {
 
         @Override
         public String toString() {
-            return "OperationIntelligence{"
-                + "baseUrl='" + baseUrl + '\''
-                + ", secretKey='***'"
-                + ", requestTimeoutMs=" + requestTimeoutMs
-                + ", maxResponseSizeMb=" + maxResponseSizeMb
-                + '}';
+            return "OperationIntelligence{" + "baseUrl='" + baseUrl + '\'' + ", secretKey='***'" + ", requestTimeoutMs="
+                + requestTimeoutMs + ", maxResponseSizeMb=" + maxResponseSizeMb + '}';
         }
-    }
-
-    @Override
-    public String toString() {
-        return "GatewayProperties{" + "secretKey='***'" + ", corsOrigin='" + corsOrigin + '\'' + ", gooseTls="
-            + gooseTls + ", gooseScheme='" + gooseScheme() + '\'' + ", goosedBin='" + goosedBin + '\'' + '}';
     }
 }

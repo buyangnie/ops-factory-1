@@ -6,6 +6,7 @@ package com.huawei.opsfactory.operationintelligence.knowledgegraph.model;
 
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.Objects;
 
 /**
  * Knowledge graph observation.
@@ -184,7 +185,7 @@ public class GraphObservation {
      * @return the properties
      */
     public Map<String, Object> getProperties() {
-        return properties;
+        return new LinkedHashMap<>(properties);
     }
 
     /**
@@ -212,5 +213,27 @@ public class GraphObservation {
      */
     public void setSource(GraphSource source) {
         this.source = source == null ? new GraphSource() : source;
+    }
+
+    @Override
+    public boolean equals(Object obj) {
+        if (this == obj) {
+            return true;
+        }
+        if (obj == null || getClass() != obj.getClass()) {
+            return false;
+        }
+        GraphObservation that = (GraphObservation) obj;
+        return Objects.equals(id, that.id);
+    }
+
+    @Override
+    public int hashCode() {
+        return Objects.hash(id);
+    }
+
+    @Override
+    public String toString() {
+        return "GraphObservation{id='" + id + "', entityId='" + entityId + "', severity='" + severity + "'}";
     }
 }

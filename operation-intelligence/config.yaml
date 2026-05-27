@@ -4,13 +4,11 @@
 spring:
   profiles:
     active: prod                        # env override: OI_SPRING_PROFILE (set to 'prod' in production)
+  codec:
+    max-in-memory-size: 10MB             # allow large knowledge graph JSON imports
 
 server:
   port: 8096                            # env override: OI_PORT
-
-spring:
-  codec:
-    max-in-memory-size: 10MB             # allow large knowledge graph JSON imports
 
 operation-intelligence:
   secret-key: test                      # env override: OI_SECRET_KEY

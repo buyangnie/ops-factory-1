@@ -8,6 +8,7 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 
 /**
  * Knowledge graph ontology definition.
@@ -108,7 +109,7 @@ public class GraphOntology {
      * @return the metadata
      */
     public Map<String, Object> getMetadata() {
-        return metadata;
+        return new LinkedHashMap<>(metadata);
     }
 
     /**
@@ -126,7 +127,7 @@ public class GraphOntology {
      * @return the entityTypes
      */
     public List<EntityTypeDefinition> getEntityTypes() {
-        return entityTypes;
+        return new ArrayList<>(entityTypes);
     }
 
     /**
@@ -144,7 +145,7 @@ public class GraphOntology {
      * @return the relationTypes
      */
     public List<RelationTypeDefinition> getRelationTypes() {
-        return relationTypes;
+        return new ArrayList<>(relationTypes);
     }
 
     /**
@@ -154,5 +155,27 @@ public class GraphOntology {
      */
     public void setRelationTypes(List<RelationTypeDefinition> relationTypes) {
         this.relationTypes = relationTypes == null ? new ArrayList<>() : new ArrayList<>(relationTypes);
+    }
+
+    @Override
+    public boolean equals(Object obj) {
+        if (this == obj) {
+            return true;
+        }
+        if (obj == null || getClass() != obj.getClass()) {
+            return false;
+        }
+        GraphOntology that = (GraphOntology) obj;
+        return Objects.equals(ontologyId, that.ontologyId);
+    }
+
+    @Override
+    public int hashCode() {
+        return Objects.hash(ontologyId);
+    }
+
+    @Override
+    public String toString() {
+        return "GraphOntology{ontologyId='" + ontologyId + "', name='" + name + "', version='" + version + "'}";
     }
 }
