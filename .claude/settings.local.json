@@ -1,29 +1,6 @@
 {
   "permissions": {
     "allow": [
-      "mcp__zread__get_repo_structure",
-      "mcp__web-search-prime__web_search_prime",
-      "mcp__web-reader__webReader",
-      "WebSearch",
-      "Bash(bash:*)",
-      "Bash(gh pr *)",
-      "Read(//tmp/**)",
-      "Bash(awk { if \\(length\\($0\\) > 120\\) print FILENAME\":\"NR\":\"length\\($0\\)\" \"$0 } *)",
-      "Bash(awk 'length > 120' operation-intelligence/src/main/java/com/huawei/opsfactory/operationintelligence/knowledgegraph/service/KnowledgeGraphService.java operation-intelligence/src/main/java/com/huawei/opsfactory/operationintelligence/knowledgegraph/service/GraphSchemaRegistry.java operation-intelligence/src/main/java/com/huawei/opsfactory/operationintelligence/knowledgegraph/store/InMemoryGraphStore.java operation-intelligence/src/main/java/com/huawei/opsfactory/operationintelligence/knowledgegraph/store/GraphSnapshotStore.java operation-intelligence/src/main/java/com/huawei/opsfactory/operationintelligence/knowledgegraph/store/GraphOntologyStore.java operation-intelligence/src/main/java/com/huawei/opsfactory/operationintelligence/controller/KnowledgeGraphController.java operation-intelligence/src/main/java/com/huawei/opsfactory/operationintelligence/controller/OperationIntelligenceExceptionHandler.java operation-intelligence/src/main/java/com/huawei/opsfactory/operationintelligence/config/OperationIntelligenceProperties.java)",
-      "Bash(awk 'length>120{print NR\": \"length\" chars: \"$0}' operation-intelligence/src/main/java/com/huawei/opsfactory/operationintelligence/knowledgegraph/service/KnowledgeGraphService.java)",
-      "Bash(grep -n \"^$\" gateway/gateway-service/src/main/java/com/huawei/opsfactory/gateway/service/OperationIntelligenceProxyService.java)",
-      "Bash(awk *)",
-      "Bash(mvn compile *)",
-      "Bash(mvn test *)",
-      "Bash(git stash *)",
-      "Bash(mvn test-compile *)",
-      "Bash(git status *)",
-      "Bash(git commit *)",
-      "Bash(./scripts/ctl.sh status *)",
-      "Bash(./scripts/ctl.sh startup *)",
-      "Bash(curl -s -o /dev/null -w \"%{http_code}\" http://127.0.0.1:8096/actuator/health)",
-      "Bash(git add *)",
-      "Bash(curl -s http://127.0.0.1:3000/api/config)"
     ]
   }
 }
